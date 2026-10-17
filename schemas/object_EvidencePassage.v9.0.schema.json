@@ -1,0 +1,63 @@
+{
+  "$id": "urn:research-harness:object:EvidencePassage:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "locator": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    },
+    "normalized_claim": {
+      "maxLength": 5000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "passage_fingerprint_policy_version": {
+      "maxLength": 20,
+      "minLength": 1,
+      "type": "string"
+    },
+    "passage_head_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "passage_norm_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "passage_tail_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "passage_token_count": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    }
+  },
+  "required": [
+    "locator"
+  ],
+  "title": "EvidencePassage content (schema 9.0)",
+  "type": "object"
+}

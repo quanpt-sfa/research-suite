@@ -1,0 +1,93 @@
+{
+  "$id": "urn:research-harness:proposal:9.0.0",
+  "additionalProperties": false,
+  "properties": {
+    "base": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "pattern": "^SNAP_[0-9]{5,12}$",
+          "type": "string"
+        },
+        "state_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "state_revision",
+        "state_sha256"
+      ],
+      "type": "object"
+    },
+    "note": {
+      "maxLength": 2000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "operations": {
+      "items": {
+        "properties": {
+          "operation": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "type": "array"
+    },
+    "origin_channel": {
+      "enum": [
+        "chatgpt_web",
+        "codex",
+        "human_cli",
+        "other"
+      ]
+    },
+    "project_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_\\-]{0,63}$",
+      "type": "string"
+    },
+    "proposal_id": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "type": "string"
+    },
+    "protocol_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "read_set": {
+      "additionalProperties": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxProperties": 500,
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "proposal_id",
+    "project_id",
+    "base",
+    "read_set",
+    "origin_channel",
+    "operations"
+  ],
+  "title": "Proposal (protocol 9.0.0); operations validated per OP_SCHEMAS",
+  "type": "object"
+}

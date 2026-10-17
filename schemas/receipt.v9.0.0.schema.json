@@ -1,0 +1,21 @@
+{
+  "$id": "urn:research-harness:receipt:9.0.0",
+  "properties": {
+    "decision": {
+      "enum": [
+        "ACCEPTED",
+        "REJECTED",
+        "CONFLICT",
+        "DUPLICATE",
+        "INVALID_SCHEMA",
+        "UNAUTHORIZED"
+      ]
+    }
+  },
+  "required": [
+    "proposal_id",
+    "decision",
+    "timestamp"
+  ],
+  "type": "object"
+}

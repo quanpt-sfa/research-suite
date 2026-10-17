@@ -1,0 +1,72 @@
+{
+  "$id": "urn:research-harness:object:Adjudication:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "assessment_kind": {
+      "enum": [
+        "source_integrity",
+        "semantic_entailment",
+        "scientific_judgment"
+      ]
+    },
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "rationale": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "revision"
+      ],
+      "type": "object"
+    },
+    "verdict": {
+      "enum": [
+        "SUPPORTED",
+        "NOT_SUPPORTED",
+        "UNCLEAR"
+      ]
+    }
+  },
+  "required": [
+    "subject",
+    "assessment_kind",
+    "verdict",
+    "rationale"
+  ],
+  "title": "Adjudication content (schema 9.0)",
+  "type": "object"
+}

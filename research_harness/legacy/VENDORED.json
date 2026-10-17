@@ -1,0 +1,16 @@
+{
+  "vendored_file": "v8_state_integrity.py",
+  "origin": "Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution/controllers/state_integrity.py",
+  "origin_zip": "Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution.zip",
+  "sha256": "46217c3d00456a720fa2c90cd74cd64e320a53d2d11ff22b909312ace71fc31d",
+  "modification": "NONE (byte-identical copy). Do not edit; re-vendor from a newer legacy release instead.",
+  "reused_symbols": [
+    "canonical_json_hash",
+    "atomic_write_text",
+    "atomic_write_json",
+    "project_file_lock",
+    "verify_hash_chained_csv",
+    "verify_hash_chained_jsonl"
+  ],
+  "note": "tests/test_legacy_compat.py asserts the sha256 above and, when the extracted legacy tree is present, equality with the legacy source."
+}

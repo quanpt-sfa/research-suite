@@ -1,0 +1,121 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "claim_tier": {
+      "enum": [
+        "descriptive",
+        "associational",
+        "predictive",
+        "mechanism_consistent",
+        "causal",
+        "measurement_validation",
+        "conceptual"
+      ]
+    },
+    "depends_on": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "maxItems": 100,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "formation_basis": {
+      "enum": [
+        "exploratory",
+        "confirmatory",
+        "unknown"
+      ]
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "observed_results_at_formation": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "maxItems": 200,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "operation": {
+      "const": "propose_claim"
+    },
+    "proposed_id": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "type": "string"
+    },
+    "relations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "relation": {
+            "enum": [
+              "defines",
+              "operationalizes",
+              "measures",
+              "tests",
+              "estimated_with",
+              "supports",
+              "challenges",
+              "derived_from",
+              "depends_on",
+              "cited_by"
+            ]
+          },
+          "target_id": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation",
+          "target_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 100,
+      "type": "array"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    },
+    "suggested_status": {
+      "enum": [
+        "exploratory",
+        "confirmatory",
+        "proposed"
+      ]
+    },
+    "text": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "operation",
+    "proposed_id",
+    "claim_tier",
+    "text",
+    "depends_on"
+  ],
+  "type": "object"
+}

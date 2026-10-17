@@ -1,0 +1,50 @@
+{
+  "$id": "urn:research-harness:object:Claim:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "claim_tier": {
+      "enum": [
+        "descriptive",
+        "associational",
+        "predictive",
+        "mechanism_consistent",
+        "causal",
+        "measurement_validation",
+        "conceptual",
+        "unclassified"
+      ]
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    },
+    "text": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "text",
+    "claim_tier"
+  ],
+  "title": "Claim content (schema 9.0)",
+  "type": "object"
+}

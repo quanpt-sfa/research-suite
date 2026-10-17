@@ -1,0 +1,42 @@
+{
+  "$id": "urn:research-harness:object:Proxy:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "definition": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    },
+    "unit": {
+      "maxLength": 100,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "label"
+  ],
+  "title": "Proxy content (schema 9.0)",
+  "type": "object"
+}

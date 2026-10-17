@@ -1,0 +1,90 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "content": {
+      "type": "object"
+    },
+    "depends_on": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "maxItems": 100,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "formation_basis": {
+      "enum": [
+        "exploratory",
+        "confirmatory",
+        "unknown"
+      ]
+    },
+    "object_id": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "type": "string"
+    },
+    "observed_results_at_formation": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "maxItems": 200,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "operation": {
+      "const": "revise_object"
+    },
+    "relations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "relation": {
+            "enum": [
+              "defines",
+              "operationalizes",
+              "measures",
+              "tests",
+              "estimated_with",
+              "supports",
+              "challenges",
+              "derived_from",
+              "depends_on",
+              "cited_by"
+            ]
+          },
+          "target_id": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation",
+          "target_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 100,
+      "type": "array"
+    },
+    "suggested_status": {
+      "enum": [
+        "exploratory",
+        "confirmatory",
+        "proposed"
+      ]
+    }
+  },
+  "required": [
+    "operation",
+    "object_id",
+    "base_revision",
+    "content"
+  ],
+  "type": "object"
+}

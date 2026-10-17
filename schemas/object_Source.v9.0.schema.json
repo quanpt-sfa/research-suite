@@ -1,0 +1,49 @@
+{
+  "$id": "urn:research-harness:object:Source:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "bibliographic_identity": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "citation_key": {
+      "pattern": "^[A-Za-z0-9_:\\-\\.]{1,100}$",
+      "type": "string"
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "doi": {
+      "pattern": "^10\\.[0-9]{4,9}/[^\\s]{1,180}$",
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "library_file_id": {
+      "pattern": "^[A-Za-z0-9._:\\-]{1,200}$",
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    }
+  },
+  "required": [
+    "citation_key"
+  ],
+  "title": "Source content (schema 9.0)",
+  "type": "object"
+}

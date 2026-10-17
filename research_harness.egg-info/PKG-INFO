@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: research-harness
+Version: 9.0.0.dev0
+Summary: Research Harness 9.0-dev: versioned research state, proposal gateway, dependency invalidation
+Requires-Python: >=3.10
+Requires-Dist: jsonschema>=4.17
+Provides-Extra: test
+Requires-Dist: pytest>=7; extra == "test"

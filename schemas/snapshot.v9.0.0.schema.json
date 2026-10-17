@@ -1,0 +1,16 @@
+{
+  "$id": "urn:research-harness:snapshot:9.0.0",
+  "required": [
+    "protocol_version",
+    "snapshot_id",
+    "project_id",
+    "scope",
+    "state_revision",
+    "state_sha256",
+    "objects",
+    "permitted_operations",
+    "integrity"
+  ],
+  "title": "Snapshot exported by D13 (read-only context for an agent; HMAC-protected)",
+  "type": "object"
+}

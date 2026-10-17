@@ -1,0 +1,102 @@
+{
+  "$id": "urn:research-harness:object:Approval:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "acknowledged_invalidations": {
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "actor_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "type": "string"
+    },
+    "actor_roles": {
+      "items": {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "decision": {
+      "enum": [
+        "approve",
+        "reject"
+      ]
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "independence_group": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "author_approval",
+        "independent_review"
+      ]
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "rationale": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    },
+    "state_sha256_at_review": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "revision"
+      ],
+      "type": "object"
+    },
+    "subject_revision_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "subject",
+    "kind",
+    "decision"
+  ],
+  "title": "Approval content (schema 9.0)",
+  "type": "object"
+}

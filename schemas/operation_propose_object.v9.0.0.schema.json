@@ -1,0 +1,71 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "content": {
+      "type": "object"
+    },
+    "object_type": {
+      "enum": [
+        "ResearchQuestion",
+        "Theory",
+        "Construct",
+        "Mechanism",
+        "Proxy",
+        "Dataset",
+        "Source",
+        "EvidencePassage",
+        "Analysis",
+        "Result",
+        "Claim",
+        "ManuscriptArtifact",
+        "Adjudication"
+      ]
+    },
+    "operation": {
+      "const": "propose_object"
+    },
+    "proposed_id": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "type": "string"
+    },
+    "relations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "relation": {
+            "enum": [
+              "defines",
+              "operationalizes",
+              "measures",
+              "tests",
+              "estimated_with",
+              "supports",
+              "challenges",
+              "derived_from",
+              "depends_on",
+              "cited_by"
+            ]
+          },
+          "target_id": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation",
+          "target_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 100,
+      "type": "array"
+    }
+  },
+  "required": [
+    "operation",
+    "proposed_id",
+    "object_type",
+    "content"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,37 @@
+{
+  "$id": "urn:research-harness:object:Construct:9.0",
+  "additionalProperties": false,
+  "properties": {
+    "attributes": {
+      "maxProperties": 50,
+      "type": "object"
+    },
+    "definition": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "description": {
+      "maxLength": 20000,
+      "minLength": 0,
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ]
+    }
+  },
+  "required": [
+    "label"
+  ],
+  "title": "Construct content (schema 9.0)",
+  "type": "object"
+}
