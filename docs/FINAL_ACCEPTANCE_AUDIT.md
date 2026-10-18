@@ -6,6 +6,7 @@
 **Baseline Audited Commit:** `6ab523c05be96e5dd598dc4e2487a91e6f4f0414`  
 **Previous Milestone HEAD:** `3d79e12b72922b339055ec38cf772c034b342ab0`  
 **Remediation Branch:** `remediation/p0-p1-acceptance`  
+**Remediation Commit SHA:** `f575f268fce71f9e28908b8c26c055b4851da3f9`  
 **Target Release:** Research Harness 9.0.0  
 
 ---
