@@ -12,7 +12,21 @@ from __future__ import annotations
 
 from research_harness.graph.relations import RELATIONS
 
-DB_SCHEMA_VERSION = "9.0.1"
+DB_SCHEMA_VERSION = "9.0.2"
+
+# 9.0.2: an edge may only be inserted in the state revision that created its source revision.
+# (Revision digests cover the outgoing edge set; late edges would silently change it.)
+EDGE_SEAL_TRIGGER = """
+CREATE TRIGGER IF NOT EXISTS edges_sealed_at_revision_creation BEFORE INSERT ON edges
+BEGIN
+  SELECT CASE
+    WHEN NEW.created_state_revision IS NOT
+         (SELECT created_state_revision FROM objects
+           WHERE object_id = NEW.source_id AND revision = NEW.source_revision)
+      THEN RAISE(ABORT, 'edge set of a revision is sealed when the revision is created')
+  END;
+END;
+"""
 
 _REL_CHECK = ",".join(f"'{r}'" for r in RELATIONS)
 
@@ -211,7 +225,29 @@ CREATE TRIGGER heads_monotonic BEFORE UPDATE OF head_revision ON object_heads
 BEGIN SELECT CASE WHEN NEW.head_revision <> OLD.head_revision + 1
   THEN RAISE(ABORT, 'head revision must advance by exactly one') END; END;
 """)
+    out.append(EDGE_SEAL_TRIGGER)
     return "\n".join(out)
 
 
 SQL_SCHEMA = _TABLES + _triggers()
+
+
+def upgrade_schema(store, token: str | None = None) -> dict:
+    """Explicitly upgrade an existing database schema to DB_SCHEMA_VERSION.
+
+    Requires an authenticated owner token. Re-applies missing triggers (such as EDGE_SEAL_TRIGGER),
+    attests the actor registry into the event log, and bumps meta.db_schema_version.
+    """
+    from research_harness.state.actors import attest_registry_in_tx
+    with store.write_tx(token=token, require_roles=("owner",), bump=False) as tx:
+        conn = tx.conn
+        row = conn.execute("SELECT value FROM meta WHERE key='db_schema_version'").fetchone()
+        current_version = row[0] if row else "9.0.1"
+        if current_version == DB_SCHEMA_VERSION:
+            return {"status": "NOOP", "version": current_version, "message": "schema already at latest version"}
+        # Upgrade to 9.0.2: apply edge seal trigger if missing and attest actors
+        conn.executescript(EDGE_SEAL_TRIGGER)
+        conn.execute("UPDATE meta SET value=? WHERE key='db_schema_version'", (DB_SCHEMA_VERSION,))
+        attest_registry_in_tx(tx)
+        return {"status": "UPGRADED", "from_version": current_version, "to_version": DB_SCHEMA_VERSION}
+

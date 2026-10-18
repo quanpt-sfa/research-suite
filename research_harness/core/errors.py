@@ -17,6 +17,11 @@ class HarnessError(Exception):
         self.details = details
 
 
+class AuthorizationError(HarnessError):
+    """Authentication or authorization failed. Never carries a token or token hash."""
+
+
+
 class ProposalRejection(Exception):
     """Raised inside the import transaction; rolls back and becomes a receipt."""
 

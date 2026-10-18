@@ -84,7 +84,7 @@ def export_snapshot(store: StateStore, actor: Actor, scope: str) -> dict:
     if not actor.has_role("owner", "importer", "author"):
         raise HarnessError("UNAUTHORIZED", "exporting a snapshot requires role owner|importer|author")
     key = store.hmac_key
-    with store.write_tx(actor.actor_id, bump=False) as tx:
+    with store.write_tx(actor.actor_id, require_roles=("owner", "importer", "author"), bump=False) as tx:
         conn = tx.conn
         rev = tx.base_revision
         state_sha = conn.execute("SELECT state_sha256 FROM state_revisions WHERE revision=?", (rev,)).fetchone()[0]

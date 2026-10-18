@@ -20,7 +20,7 @@ from typing import Optional
 from research_harness import SUPPORTED_PROTOCOL_VERSIONS
 from research_harness.core.auth import authenticate
 from research_harness.core.canonical import StrictJSONError, sha256_bytes, strict_json_loads
-from research_harness.core.errors import HarnessError, ProposalRejection
+from research_harness.core.errors import AuthorizationError, HarnessError, ProposalRejection
 from research_harness.core.model import SERVER_ONLY_TYPES, Decision
 from research_harness.protocols.guards import forbidden_key_paths, secret_findings
 from research_harness.protocols.schema import ALLOWED_OPERATIONS, validate_proposal_structure
@@ -179,8 +179,11 @@ def import_proposal(store: StateStore, raw: bytes | str, token: Optional[str], *
         if doc["project_id"] != store.project_id:
             reject("PROJECT_MISMATCH", "proposal targets a different project", expected=store.project_id,
                    actual=doc["project_id"])
-        with store.write_tx(actor.actor_id, commit=not dry_run) as tx:
+        with store.write_tx(actor.actor_id, require_roles=("importer", "owner"), commit=not dry_run) as tx:
             rec = _apply(store, tx, doc, raw_b, sha, dry_run)
+    except AuthorizationError as e:  # actor disabled / role revoked between authentication and the transaction
+        rec = _from_rejection(store, ProposalRejection(Decision.UNAUTHORIZED, e.code, e.message), doc, sha,
+                              actor.actor_id, dry_run)
     except ProposalRejection as r:
         rec = _from_rejection(store, r, doc, sha, actor.actor_id, dry_run)
     except sqlite3.IntegrityError as e:

@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from research_harness import SCHEMA_VERSION, __version__
-from research_harness.core.auth import new_token, token_hash, validate_roles
+from research_harness.core.auth import Actor, authenticate, load_actor, new_token, token_fingerprint, token_hash, validate_roles
 from research_harness.core.canonical import canonical_json_hash
-from research_harness.core.errors import Clock, HarnessError, utc_now
+from research_harness.core.errors import AuthorizationError, Clock, HarnessError, utc_now
 from research_harness.core.model import PROJECT_ID_RE, Lifecycle, ReviewStatus
 from research_harness.provenance.events import append_event, chain_head
 from research_harness.state.artifacts import ArtifactStore
@@ -68,16 +68,20 @@ def revision_digest(content_digest: str, edges: Iterable[tuple]) -> str:
 class Tx:
     """A write transaction. Created only by ``StateStore.write_tx``."""
 
-    def __init__(self, store: "StateStore", conn: sqlite3.Connection, actor_id: str, base_revision: int, bump: bool):
+    def __init__(self, store: "StateStore", conn: sqlite3.Connection, actor_id: str, base_revision: int, bump: bool,
+                 actor: Optional[Actor] = None):
         self.store = store
         self.conn = conn
         self.actor_id = actor_id
+        self.actor = actor  # server-side identity, re-read inside this transaction
         self.base_revision = base_revision
         self.bump = bump
         self.revision = base_revision + 1 if bump else base_revision
         self.at = store.clock()
         self.changed = False
         self.events: list[dict] = []
+        # Revisions created in THIS transaction: the only ones whose edge set may still be written.
+        self._open_revisions: set[tuple[str, int]] = set()
 
     # ---- reads -------------------------------------------------------------------------
     def head(self, object_id: str) -> Optional[dict]:
@@ -94,6 +98,18 @@ class Tx:
                           state_revision=self.revision, at=self.at, payload=payload)
         self.events.append(ev)
         return ev
+
+    def audit(self, action: str, decision: str, detail: Optional[dict] = None, proposal_id: Optional[str] = None) -> None:
+        """Audit-log row written atomically with the state change it describes (same transaction)."""
+        self.conn.execute("INSERT INTO audit_log(at,actor_id,action,decision,proposal_id,detail) VALUES (?,?,?,?,?,?)",
+                          (self.at, self.actor_id, action, decision, proposal_id,
+                           json.dumps(detail or {}, sort_keys=True, ensure_ascii=False, default=str)))
+
+    def require_roles(self, *roles: str) -> Actor:
+        """Raise unless the authenticated actor of THIS transaction holds one of ``roles``."""
+        if self.actor is None or not self.actor.has_role(*roles):
+            raise AuthorizationError("ROLE_REQUIRED", "requires role " + " or ".join(roles))
+        return self.actor
 
     def add_revision(self, *, object_id: str, object_type: str, content: dict, origin: dict,
                      edges: list[tuple]) -> dict:
@@ -123,6 +139,7 @@ class Tx:
                           (object_id, rev, ReviewStatus.UNASSESSED.value, None, self.at, self.revision))
         self._log_status(object_id, rev, "scientific_review", None, ReviewStatus.UNASSESSED.value,
                          {"reason": "new revision starts UNASSESSED"})
+        self._open_revisions.add((object_id, rev))
         for relation, tid, trev, prov in edges:
             self.add_edge(object_id, rev, relation, tid, trev, prov)
         self.changed = True
@@ -134,6 +151,13 @@ class Tx:
 
     def add_edge(self, source_id: str, source_rev: int, relation: str, target_id: str, target_rev: int,
                  provenance: dict) -> None:
+        # The revision digest covers the outgoing edge set. A revision's edge set is therefore
+        # sealed when the revision is created: late edges would change its logical dependency set
+        # without changing its digest (audit finding A3). Attach edges through ``add_revision``.
+        if (source_id, source_rev) not in self._open_revisions:
+            raise HarnessError("EDGE_SET_SEALED",
+                               "edges can only be added while their source revision is being created",
+                               source_id=source_id, source_revision=source_rev)
         self.conn.execute(
             "INSERT INTO edges(source_id,source_revision,target_id,target_revision,relation,provenance,"
             "created_state_revision) VALUES (?,?,?,?,?,?,?)",
@@ -233,7 +257,10 @@ class StateStore:
                           None, token_hash(token), at, owner_id))
             ev = append_event(conn, event_type="PROJECT_INITIALIZED", actor_id=owner_id, state_revision=0, at=at,
                               payload={"project_id": project_id, "engine_version": __version__,
-                                       "db_schema_version": DB_SCHEMA_VERSION})
+                                       "db_schema_version": DB_SCHEMA_VERSION,
+                                        "owner": {"actor_id": owner_id, "roles": ["author", "importer", "owner"],
+                                                  "independence_group": None, "display_name": "project owner",
+                                                  "token_fingerprint": token_fingerprint(token_hash(token))}})
             conn.execute("INSERT INTO state_revisions(revision,state_sha256,committed_at,event_seq,actor_id)"
                          " VALUES (0,?,?,?,?)", (compute_state_digest(conn), at, ev["seq"], owner_id))
             conn.execute("COMMIT")
@@ -271,6 +298,54 @@ class StateStore:
             raise HarnessError("SNAPSHOT_KEY_INVALID", "key shorter than 32 bytes")
         return key
 
+    def recover(self, max_staging_age_seconds: float = 0.0) -> dict[str, Any]:
+        """Clean up stale staging files and inspect storage consistency after an interrupted operation."""
+        stale = self.artifacts.stale_staging(max_staging_age_seconds)
+        removed_staging = 0
+        for p in stale:
+            try:
+                p.unlink()
+                removed_staging += 1
+            except OSError:
+                pass
+
+        try:
+            conn = self.connect()
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.close()
+        except Exception:
+            pass
+
+        with self.read() as conn:
+            known_artifacts = set()
+            try:
+                for row in conn.execute("SELECT artifact_sha256 FROM proposals WHERE artifact_sha256 IS NOT NULL"):
+                    if row[0]:
+                        known_artifacts.add(row[0])
+            except Exception:
+                pass
+
+            for row in conn.execute("SELECT content FROM objects"):
+                try:
+                    c = json.loads(row[0])
+                    if isinstance(c, dict):
+                        for k in ("artifact_sha256", "data_ref", "blob_sha256", "passage_norm_sha256", "library_file_id"):
+                            v = c.get(k)
+                            if isinstance(v, str) and len(v) == 64:
+                                known_artifacts.add(v)
+                except Exception:
+                    pass
+
+        all_blobs = set(self.artifacts.blobs())
+        orphans = sorted(all_blobs - known_artifacts)
+
+        return {
+            "status": "RECOVERED",
+            "project_id": self.project_id,
+            "stale_staging_removed": removed_staging,
+            "orphan_artifacts": orphans,
+        }
+
     # ---- connections / transactions ----------------------------------------------------
     def connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.paths.db, timeout=30, isolation_level=None)
@@ -293,12 +368,21 @@ class StateStore:
             conn.close()
 
     @contextmanager
-    def write_tx(self, actor_id: str, *, bump: bool = True, commit: bool = True):
+    def write_tx(self, actor_id: Optional[str] = None, *, token: Optional[str] = None,
+                 require_roles: tuple = (), bump: bool = True, commit: bool = True):
+        """Open the single-writer transaction.
+
+        Authorization is evaluated INSIDE ``BEGIN IMMEDIATE`` (no check/use gap): either ``token`` is
+        authenticated, or ``actor_id`` is re-verified (must exist, not disabled). ``require_roles``
+        (any-of) is checked against the roles stored *now*, not against a caller-supplied copy.
+        Raises ``AuthorizationError`` before any mutation; nothing is written in that case.
+        """
         conn = self.connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            actor = self._authorize(conn, actor_id, token, tuple(require_roles))
             base = conn.execute("SELECT MAX(revision) FROM state_revisions").fetchone()[0]
-            tx = Tx(self, conn, actor_id, base, bump)
+            tx = Tx(self, conn, actor.actor_id, base, bump, actor)
             try:
                 yield tx
                 tx.finalize()
@@ -309,7 +393,25 @@ class StateStore:
                     conn.execute("ROLLBACK")
                 raise
         finally:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
             conn.close()
+
+    @staticmethod
+    def _authorize(conn: sqlite3.Connection, actor_id: Optional[str], token: Optional[str],
+                   require_roles: tuple) -> Actor:
+        if token is not None:
+            actor = authenticate(conn, token)
+        elif actor_id is not None:
+            actor = load_actor(conn, actor_id)
+        else:
+            actor = None
+        if actor is None:
+            raise AuthorizationError("AUTHENTICATION_FAILED", "missing, unknown or disabled actor")
+        if require_roles and not actor.has_role(*require_roles):
+            raise AuthorizationError("ROLE_REQUIRED", "requires role " + " or ".join(require_roles))
+        return actor
+
 
     def audit(self, *, actor_id: Optional[str], action: str, decision: str, proposal_id: Optional[str] = None,
               detail: Optional[dict] = None) -> None:

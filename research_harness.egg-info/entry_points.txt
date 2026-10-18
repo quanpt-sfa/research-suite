@@ -1,2 +1,0 @@
-[console_scripts]
-research = research_harness.cli:main

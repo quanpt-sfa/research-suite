@@ -1,0 +1,25 @@
+# Python bytecode / build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.venv/
+venv/
+
+# Research state must never be committed (lives outside the engine repo; see docs/D13_DEPLOYMENT_RUNBOOK.md)
+state.sqlite3
+state.sqlite3-wal
+state.sqlite3-shm
+secrets/
+*.key
+
+# Legacy v8.4.4 material supplied for parity verification (original archive is never modified).
+legacy_v8_4_4/
+Reusable_Research_Harness_Suite_*.zip
+
+# Local test/verification scratch
+.tmp/
+.verify_venv/

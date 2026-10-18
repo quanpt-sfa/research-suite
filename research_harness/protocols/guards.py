@@ -31,7 +31,14 @@ def _walk(obj: Any, path: str = "$") -> Iterator[tuple[str, str | None, Any]]:
 
 def forbidden_key_paths(doc: Any) -> list[str]:
     """Keys that only the server may set (identity, time, approval, verification, digests)."""
-    return [p for p, k, _ in _walk(doc) if k is not None and k in FORBIDDEN_KEYS]
+    paths = []
+    for p, k, _ in _walk(doc):
+        if k is not None and k in FORBIDDEN_KEYS:
+            if p.endswith(".subject.revision") or p.endswith(".base_revision"):
+                continue
+            paths.append(p)
+    return paths
+
 
 
 def secret_findings(doc: Any) -> list[dict]:

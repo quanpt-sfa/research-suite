@@ -36,8 +36,14 @@ class ArtifactStore:
             raise HarnessError("ARTIFACT_DIGEST_INVALID", "digest must be 64 lowercase hex chars")
         return self.root / "sha256" / digest[:2] / digest
 
+    def path(self, digest: str) -> Path:
+        return self.path_for(digest)
+
     def exists(self, digest: str) -> bool:
         return self.path_for(digest).is_file()
+
+    def has(self, digest: str) -> bool:
+        return self.exists(digest)
 
     def put_bytes(self, data: bytes) -> str:
         digest = hashlib.sha256(data).hexdigest()
@@ -60,6 +66,9 @@ class ArtifactStore:
                 except OSError:
                     pass
         return digest
+
+    def put(self, data: bytes) -> str:
+        return self.put_bytes(data)
 
     def get_bytes(self, digest: str) -> bytes:
         data = self.path_for(digest).read_bytes()

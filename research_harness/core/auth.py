@@ -53,3 +53,25 @@ def authenticate(conn: sqlite3.Connection, token: Optional[str]) -> Optional[Act
     if not row or row[4]:
         return None
     return Actor(row[0], frozenset(json.loads(row[1])), row[2], row[3])
+
+
+def load_actor(conn: sqlite3.Connection, actor_id: str) -> Optional[Actor]:
+    """Re-read an *enabled* actor by id (used to re-verify an identity inside a write transaction)."""
+    if not actor_id or not isinstance(actor_id, str):
+        return None
+    row = conn.execute(
+        "SELECT actor_id,roles,independence_group,display_name,disabled_at FROM actors WHERE actor_id=?",
+        (actor_id,)).fetchone()
+    if not row or row[4]:
+        return None
+    return Actor(row[0], frozenset(json.loads(row[1])), row[2], row[3])
+
+
+def token_fingerprint(token_sha256: str) -> str:
+    """Short, non-reversible identifier of a stored token hash for the event log.
+
+    It is a hash *of the stored hash*, so it cannot be used to authenticate and it reveals nothing
+    that is not already in the database; it only lets the audit prove which registry row an event
+    described.
+    """
+    return hashlib.sha256(("rh-token-fp:" + token_sha256).encode("utf-8")).hexdigest()[:16]

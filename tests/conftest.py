@@ -24,37 +24,31 @@ def harness_env(project_dir: Path):
     project_id = "PRJ_TEST_001"
     store, owner_token = StateStore.create(project_dir, project_id, owner_id="owner_alice")
 
+    from research_harness.state.actors import register_actor, update_actor
+    update_actor(store, owner_token, actor_id="owner_alice", independence_group="group_owner")
+
     # Register additional actors
     actors = {}
-    with store.write_tx("owner_alice", bump=False) as tx:
-        tx.conn.execute("UPDATE actors SET independence_group='group_owner' WHERE actor_id='owner_alice'")
+    # 1. Author Bob
+    res_bob = register_actor(
+        store, owner_token, actor_id="author_bob", display_name="Author Bob",
+        roles=["author", "importer"], independence_group="group_alpha",
+    )
+    actors["bob"] = {"actor_id": "author_bob", "token": res_bob["token"], "group": "group_alpha"}
 
-        # 1. Author Bob
-        token_bob = new_token()
-        tx.conn.execute(
-            "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("author_bob", "Author Bob", json.dumps(["author", "importer"]), "group_alpha", token_hash(token_bob), tx.at, "owner_alice"),
-        )
-        actors["bob"] = {"actor_id": "author_bob", "token": token_bob, "group": "group_alpha"}
+    # 2. Reviewer Carol (independent, group_beta)
+    res_carol = register_actor(
+        store, owner_token, actor_id="rev_carol", display_name="Reviewer Carol",
+        roles=["independent_reviewer"], independence_group="group_beta",
+    )
+    actors["carol"] = {"actor_id": "rev_carol", "token": res_carol["token"], "group": "group_beta"}
 
-        # 2. Reviewer Carol (independent, group_beta)
-        token_carol = new_token()
-        tx.conn.execute(
-            "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("rev_carol", "Reviewer Carol", json.dumps(["independent_reviewer"]), "group_beta", token_hash(token_carol), tx.at, "owner_alice"),
-        )
-        actors["carol"] = {"actor_id": "rev_carol", "token": token_carol, "group": "group_beta"}
-
-        # 3. Reviewer Dave (in same group_alpha as Bob - non-independent of Bob)
-        token_dave = new_token()
-        tx.conn.execute(
-            "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("rev_dave", "Reviewer Dave", json.dumps(["independent_reviewer"]), "group_alpha", token_hash(token_dave), tx.at, "owner_alice"),
-        )
-        actors["dave"] = {"actor_id": "rev_dave", "token": token_dave, "group": "group_alpha"}
+    # 3. Reviewer Dave (in same group_alpha as Bob - non-independent of Bob)
+    res_dave = register_actor(
+        store, owner_token, actor_id="rev_dave", display_name="Reviewer Dave",
+        roles=["independent_reviewer"], independence_group="group_alpha",
+    )
+    actors["dave"] = {"actor_id": "rev_dave", "token": res_dave["token"], "group": "group_alpha"}
 
     return {
         "home": project_dir,

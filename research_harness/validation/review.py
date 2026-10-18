@@ -6,12 +6,18 @@ through the proposal gateway. The acting identity is read from the token registr
 document. Independence is a policy over *recorded facts* (distinct authenticated actor, role,
 owner-attested independence group not shared with any contributor); it is not a claim of
 real-world independence, which the engine cannot observe (see docs/THREAT_MODEL.md).
+
+Authorization is re-verified inside the write transaction (``write_tx(..., require_roles=...)``): the
+token is authenticated up front only to produce a precise refusal, but the identity and roles that
+authorize the mutation are the ones stored *at commit time*, so an actor disabled or demoted in between
+cannot record a review. The audit row is written in the same transaction as the Approval.
 """
 from __future__ import annotations
 
 from typing import Optional
 
 from research_harness.core.auth import Actor, authenticate
+from research_harness.core.errors import AuthorizationError
 from research_harness.core.model import Lifecycle, OriginKind, ReviewStatus
 from research_harness.graph.dependency import stale_pinned_edges
 from research_harness.state.store import StateStore
@@ -73,16 +79,17 @@ def record_review(store: StateStore, token: Optional[str], *, object_id: str, re
     if not actor.has_role(*needed):
         return _refuse(store, actor, "ROLE_REQUIRED", f"{kind} requires role {' or '.join(needed)}", "UNAUTHORIZED")
     try:
-        result = _record(store, actor, object_id, revision, kind, decision, rationale, acknowledge_invalidations)
+        return _record(store, actor, needed, object_id, revision, kind, decision, rationale, acknowledge_invalidations)
+    except AuthorizationError as e:  # identity or role changed between the pre-check and the transaction
+        return _refuse(store, actor, e.code, e.message or "authorization failed", "UNAUTHORIZED")
     except _Refused as r:
         return _refuse(store, actor, r.rule, r.message, **r.details)
-    store.audit(actor_id=actor.actor_id, action="review_record", decision="RECORDED", detail=result)
-    return result
 
 
-def _record(store: StateStore, actor: Actor, object_id: str, revision: int, kind: str, decision: str,
-            rationale: str, acknowledge_invalidations: bool) -> dict:
-    with store.write_tx(actor.actor_id) as tx:
+def _record(store: StateStore, pre_actor: Actor, needed: tuple, object_id: str, revision: int, kind: str,
+            decision: str, rationale: str, acknowledge_invalidations: bool) -> dict:
+    with store.write_tx(pre_actor.actor_id, require_roles=needed) as tx:
+        actor = tx.actor  # identity/roles as stored inside this transaction
         conn = tx.conn
         head = tx.head(object_id)
         if head is None:
@@ -140,5 +147,5 @@ def _record(store: StateStore, actor: Actor, object_id: str, revision: int, kind
                   "kind": kind, "review_decision": decision, "new_review_status": new.value,
                   "new_state_revision": tx.revision, "actor": actor.actor_id,
                   "resolved_invalidations": [i["inval_id"] for i in open_inv] if acknowledge_invalidations else []}
-    store.audit(actor_id=actor.actor_id, action="review_record", decision="RECORDED", detail=result)
+        tx.audit("review_record", "RECORDED", result)
     return result

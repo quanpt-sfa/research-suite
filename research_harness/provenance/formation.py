@@ -52,10 +52,14 @@ def build_formation(*, conn: sqlite3.Connection, at: str, state_revision: int, c
         history: list = []
         prior_status = None
     else:
-        first = {k: previous[k] for k in ("first_recorded_at", "first_recorded_state_revision",
-                                          "first_recorded_text_sha256", "ledger_results_at_first_recording")}
+        first = {
+            "first_recorded_at": previous.get("first_recorded_at", at),
+            "first_recorded_state_revision": previous.get("first_recorded_state_revision", state_revision),
+            "first_recorded_text_sha256": previous.get("first_recorded_text_sha256") or tsha,
+            "ledger_results_at_first_recording": list(previous.get("ledger_results_at_first_recording") or []),
+        }
         history = list(previous.get("history", []))
-        prior_status = previous["inference_status"]
+        prior_status = previous.get("inference_status", UNKNOWN)
 
     if declared_obs is None:
         exposure = "UNKNOWN"
@@ -83,11 +87,12 @@ def build_formation(*, conn: sqlite3.Connection, at: str, state_revision: int, c
                 "a claim first recorded as exploratory/unknown cannot become confirmatory by revision; "
                 "register a new claim derived from it instead", previous_status=prior_status)
         if prior_status == CONFIRMATORY and status == CONFIRMATORY:
-            changed = tsha != previous["history"][-1]["text_sha256"] or claim_tier != previous["history"][-1]["claim_tier"]
+            last_hist = previous.get("history", [])[-1] if previous.get("history") else {}
+            changed = tsha != last_hist.get("text_sha256", tsha) or claim_tier != last_hist.get("claim_tier", claim_tier)
             if changed and ledger_results:
                 status, downgrade = EXPLORATORY, "CONTENT_CHANGED_AFTER_RESULTS_RECORDED"
         # never raise a-priori-ness (e.g. EXPLORATORY -> UNKNOWN because a revision omitted declarations)
-        if _APRIORI[status] > _APRIORI[prior_status]:
+        if _APRIORI[status] > _APRIORI.get(prior_status, 1):
             status = prior_status
             downgrade = downgrade or "RETAINED_PRIOR_LOWER_APRIORI_STATUS"
 
