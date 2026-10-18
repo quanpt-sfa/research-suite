@@ -301,22 +301,47 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         edges_by_source_rev.setdefault((e[0], e[1]), []).append(e)
         edges_by_target_rev.setdefault((e[3], e[4]), []).append(e)
 
-    # Index adjudications strictly by subject (object_id, revision)
+    # Index adjudications strictly by subject (object_id, revision) and classify them
     adjudications_by_subject_rev: dict[tuple[str, int], list[dict]] = {}
+    adjudications_summary_total = {
+        "CURRENT_AUTHORIZED": 0,
+        "LEGACY_HISTORICAL": 0,
+        "SUPERSEDED": 0,
+        "UNRESOLVED": 0,
+        "UNAUTHORIZED_OR_UNVERIFIABLE": 0,
+    }
+
     for a_id, a_rev, raw_c, raw_o in adjudication_rows:
         try:
-            a_data = json.loads(raw_c)
-            a_orig = json.loads(raw_o) if raw_o else {}
-            # Scenario B-1 Invariant: Proposed adjudications (PROPOSAL_IMPORTED) cannot become authoritative scientific judgments!
-            if a_orig.get("kind") == OriginKind.PROPOSAL_IMPORTED.value:
-                continue
-
+            a_data = json.loads(raw_c) if isinstance(raw_c, str) else raw_c
+            a_orig = json.loads(raw_o) if isinstance(raw_o, str) else (raw_o or {})
+            orig_kind = a_orig.get("kind")
+            is_historical = bool(a_data.get("is_historical") or orig_kind == OriginKind.LEGACY_MIGRATED.value)
+            verdict = a_data.get("verdict")
             subj = a_data.get("subject", {})
             s_id = subj.get("object_id")
             s_rev = subj.get("revision")
-            if s_id and s_rev is not None:
+
+            if orig_kind == OriginKind.PROPOSAL_IMPORTED.value:
+                classification = "UNAUTHORIZED_OR_UNVERIFIABLE"
+            elif s_id in head_map and s_rev is not None and int(s_rev) < head_map[s_id]:
+                classification = "SUPERSEDED"
+            elif verdict in {"UNCLEAR", "NOT_SUPPORTED"}:
+                classification = "UNRESOLVED"
+            elif is_historical:
+                classification = "LEGACY_HISTORICAL"
+            else:
+                classification = "CURRENT_AUTHORIZED"
+
+            adjudications_summary_total[classification] += 1
+
+            if s_id and s_rev is not None and classification != "UNAUTHORIZED_OR_UNVERIFIABLE":
                 adjudications_by_subject_rev.setdefault((s_id, int(s_rev)), []).append({
-                    **a_data, "adjudication_id": a_id, "origin_kind": a_orig.get("kind")
+                    **a_data,
+                    "adjudication_id": a_id,
+                    "origin_kind": orig_kind,
+                    "classification": classification,
+                    "is_historical": is_historical,
                 })
         except Exception:
             pass
@@ -441,18 +466,30 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         elif tier == "measurement_validation":
             if not (has_construct and has_proxy):
                 claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_OPERATIONALIZATION: Measurement validation claim '{cid}' requires construct and proxy operationalization")
-            if not (has_empirical_result or claim_adjudications):
-                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_VALIDATION_EVIDENCE: Measurement validation claim '{cid}' requires empirical Result or authorized Adjudication demonstrating validity")
+            if not has_empirical_result:
+                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_VALIDATION_RESULT: Measurement validation claim '{cid}' requires empirical Result demonstrating instrument validation")
         elif tier == "causal":
-            supported_adjs = [a for a in claim_adjudications if a.get("verdict") == "SUPPORTED"]
-            if not has_empirical_result and not supported_adjs:
+            current_supported_adjs = [
+                a for a in claim_adjudications
+                if a.get("classification") == "CURRENT_AUTHORIZED" and a.get("verdict") == "SUPPORTED"
+            ]
+            historical_supported_adjs = [
+                a for a in claim_adjudications
+                if a.get("classification") == "LEGACY_HISTORICAL" and a.get("verdict") == "SUPPORTED"
+            ]
+            if not has_empirical_result:
                 claim_blocked_reasons.append(
-                    f"CAUSAL_CLAIM_LACKS_EMPIRICAL_OR_ADJUDICATED_SUPPORT: Causal claim '{cid}' lacks empirical result or verified adjudication"
+                    f"CAUSAL_CLAIM_LACKS_EMPIRICAL_SUPPORT: Causal claim '{cid}' requires empirical Result (experiment, quasi-experiment, or causal inference)"
                 )
-            if policy.get("require_causal_adjudication") and not supported_adjs:
-                claim_blocked_reasons.append(
-                    f"CAUSAL_CLAIM_LACKS_ADJUDICATION: Causal claim '{cid}' requires an authorized scientific Adjudication with verdict SUPPORTED"
-                )
+            if not current_supported_adjs:
+                if historical_supported_adjs and not policy.get("allow_historical_adjudication", False):
+                    claim_blocked_reasons.append(
+                        f"HISTORICAL_ADJUDICATION_NOT_CURRENT: Causal claim '{cid}' has historical adjudication {historical_supported_adjs[0].get('adjudication_id')} but default policy requires current authenticated adjudication"
+                    )
+                elif not (historical_supported_adjs and policy.get("allow_historical_adjudication", False)):
+                    claim_blocked_reasons.append(
+                        f"CAUSAL_CLAIM_LACKS_ADJUDICATION: Causal claim '{cid}' requires an authorized scientific Adjudication with verdict SUPPORTED"
+                    )
         elif tier == "mechanism_consistent":
             if not has_mechanism:
                 claim_blocked_reasons.append(f"MECHANISM_CLAIM_LACKS_MECHANISM_LINK: Mechanism-consistent claim '{cid}' requires linkage to a Mechanism object")
@@ -477,8 +514,14 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
                 claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Claim '{cid}' has no supporting evidence")
 
         # Adjudication checks
-        if require_adjudication_for_all and not claim_adjudications:
-            claim_blocked_reasons.append(f"REQUIRED_ADJUDICATION_MISSING: Claim '{cid}' requires semantic adjudication")
+        if require_adjudication_for_all:
+            curr_supp = [a for a in claim_adjudications if a.get("classification") == "CURRENT_AUTHORIZED" and a.get("verdict") == "SUPPORTED"]
+            hist_supp = [a for a in claim_adjudications if a.get("classification") == "LEGACY_HISTORICAL" and a.get("verdict") == "SUPPORTED"]
+            if not curr_supp:
+                if hist_supp and not policy.get("allow_historical_adjudication", False):
+                    claim_blocked_reasons.append(f"HISTORICAL_ADJUDICATION_NOT_CURRENT: Claim '{cid}' requires current authenticated adjudication")
+                elif not hist_supp and not curr_supp:
+                    claim_blocked_reasons.append(f"REQUIRED_ADJUDICATION_MISSING: Claim '{cid}' requires semantic adjudication")
 
         for adj in claim_adjudications:
             v = adj.get("verdict")
@@ -501,6 +544,12 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
             "review_status": cstatus,
             "linked_evidence_count": len(evidence_ids),
             "adjudications_count": len(claim_adjudications),
+            "adjudications_summary": {
+                "current_authorized": len([a for a in claim_adjudications if a.get("classification") == "CURRENT_AUTHORIZED"]),
+                "legacy_historical": len([a for a in claim_adjudications if a.get("classification") == "LEGACY_HISTORICAL"]),
+                "unresolved": len([a for a in claim_adjudications if a.get("classification") == "UNRESOLVED"]),
+                "superseded": len([a for a in claim_adjudications if a.get("classification") == "SUPERSEDED"]),
+            },
             "eligible": len(claim_blocked_reasons) == 0,
             "reasons": claim_blocked_reasons,
         })
@@ -604,6 +653,8 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         "claims_count": len(claims),
         "open_invalidations_count": len(open_invalidations),
         "claims_evaluation": claims_evaluation,
+        "adjudications_summary": adjudications_summary_total,
+        "historical_adjudications_accepted": bool(policy.get("allow_historical_adjudication", False)),
         "policy_applied": policy.get("name", "claim_proportional_default"),
         "notes": [
             "IntegrityStatus checks cryptographic, relational, and CAS storage consistency.",

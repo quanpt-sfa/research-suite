@@ -92,4 +92,4 @@ class ArtifactStore:
 
     def stale_staging(self, max_age_seconds: float = 0.0):
         now = time.time()
-        return [p for p in sorted(self.staging.glob("*.tmp")) if now - p.stat().st_mtime >= max_age_seconds]
+        return [p for p in sorted(self.staging.glob("*.tmp")) if max_age_seconds <= 0.0 or (now - p.stat().st_mtime >= max_age_seconds)]

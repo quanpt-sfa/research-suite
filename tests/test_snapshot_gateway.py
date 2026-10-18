@@ -22,7 +22,7 @@ def test_snapshot_export_and_verify(harness_env):
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    snapshot = export_snapshot(store, actor, scope="full")
+    snapshot = export_snapshot(store, actor, scope="full", token=owner_token)
     assert snapshot["snapshot_id"] == "SNAP_00001"
     assert snapshot["project_id"] == store.project_id
     assert snapshot["state_revision"] == 0
@@ -50,7 +50,7 @@ def test_proposal_valid_import_and_receipt(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose Research Question
     ops = [
@@ -94,7 +94,7 @@ def test_proposal_idempotency_duplicate(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -124,7 +124,7 @@ def test_proposal_id_reuse_with_different_content_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops1 = [
         {
@@ -162,7 +162,7 @@ def test_read_set_conflict_on_concurrent_modification(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Step 1: Create Object X
     op_create = [
@@ -179,7 +179,7 @@ def test_read_set_conflict_on_concurrent_modification(harness_env):
     assert rec["decision"] == Decision.ACCEPTED.value
 
     # Step 2: Export snap1 containing PROXY_0001 rev 1
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
     assert snap1["object_revisions"]["PROXY_0001"] == 1
 
     # Step 3: Branch A revises PROXY_0001 to rev 2
@@ -222,7 +222,7 @@ def test_invalid_reference_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose claim pointing to non-existent target
     ops = [
@@ -248,7 +248,7 @@ def test_unauthorized_operation_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 1. Unknown operation name
     ops1 = [{"operation": "delete_everything", "object_id": "RQ_0001"}]
@@ -279,7 +279,7 @@ def test_forbidden_fields_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Attempt to inject server-controlled fields (e.g. approved_by, scientific_review_status)
     ops = [
@@ -305,7 +305,7 @@ def test_secrets_and_path_traversal_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 1. Path traversal in ID
     ops_traversal = [
@@ -346,7 +346,7 @@ def test_protocol_version_mismatch(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -371,7 +371,7 @@ def test_actor_authentication_and_role_required(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {

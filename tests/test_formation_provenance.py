@@ -18,7 +18,7 @@ def test_confirmatory_claim_declared_prior_to_results(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose confirmatory claim when no results exist in ledger
     ops = [
@@ -52,7 +52,7 @@ def test_exploratory_claim_declared_as_exploratory(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -82,7 +82,7 @@ def test_claim_downgraded_to_exploratory_when_results_exist_in_ledger(harness_en
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # First, record a Result in the ledger
     ops_res = [
@@ -97,7 +97,7 @@ def test_claim_downgraded_to_exploratory_when_results_exist_in_ledger(harness_en
     prop_res = make_proposal(store.project_id, snap0, "PROP_RES_REC", ops_res)
     import_proposal(store, json.dumps(prop_res), bob_token)
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Proposer falsely declares 'confirmatory' after Result exists in ledger
     ops_claim = [
@@ -131,7 +131,7 @@ def test_relabel_forbidden_exploratory_cannot_elevate_to_confirmatory(harness_en
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Create exploratory claim initially
     ops1 = [
@@ -148,7 +148,7 @@ def test_relabel_forbidden_exploratory_cannot_elevate_to_confirmatory(harness_en
     prop1 = make_proposal(store.project_id, snap0, "PROP_ELEV_01", ops1)
     import_proposal(store, json.dumps(prop1), bob_token)
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose revision attempting to relabel as confirmatory
     ops2 = [
@@ -180,7 +180,7 @@ def test_unknown_formation_basis_on_unspecified_declaration(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose claim without specifying formation_basis
     ops = [

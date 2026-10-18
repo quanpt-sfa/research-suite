@@ -20,7 +20,7 @@ def test_cascading_invalidation_on_proxy_revision(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 1. Propose Construct and Proxy
     ops1 = [
@@ -65,7 +65,7 @@ def test_cascading_invalidation_on_proxy_revision(harness_env):
     assert rev_rec["new_review_status"] == ReviewStatus.AUTHOR_APPROVED.value
 
     # Export snapshot with current state
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 2. Revise Proxy to revision 2
     ops2 = [
@@ -107,7 +107,7 @@ def test_cascading_invalidation_on_result_revision(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Create Result and dependent Claim
     ops1 = [
@@ -134,7 +134,7 @@ def test_cascading_invalidation_on_result_revision(harness_env):
     # Approve Claim
     record_review(store, owner_token, object_id="CLAIM_RES_001", revision=1, kind="author_approval", decision="approve")
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Revise Result
     ops2 = [
@@ -203,7 +203,7 @@ def test_unrelated_object_stability(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Two independent branches: Branch A (PA -> CA) and Branch B (PB -> CB)
     ops = [
@@ -245,7 +245,7 @@ def test_unrelated_object_stability(harness_env):
     record_review(store, owner_token, object_id="CLAIM_A", revision=1, kind="author_approval", decision="approve")
     record_review(store, owner_token, object_id="CLAIM_B", revision=1, kind="author_approval", decision="approve")
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Revise PROXY_A only
     ops_revA = [

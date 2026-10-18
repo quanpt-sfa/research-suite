@@ -33,6 +33,7 @@ def contributors(conn, object_id: str) -> set[str]:
     out = {r[0] for r in conn.execute("SELECT DISTINCT submitted_by FROM objects WHERE object_id=?", (object_id,))}
     out |= {r[0] for r in conn.execute(
         "SELECT DISTINCT submitted_by FROM objects WHERE object_type='Approval' "
+        "AND json_extract(content,'$.kind')='author_approval' "
         "AND json_extract(content,'$.subject.object_id')=?", (object_id,))}
     return out
 
@@ -251,10 +252,18 @@ def _record_adjudication(
         for ev in cited_evidence:
             ev_id = ev.get("object_id")
             ev_rev = ev.get("revision")
-            if ev_id and ev_rev:
-                ev_head = tx.head(ev_id)
-                if ev_head:
-                    edges.append(("evaluates", ev_id, ev_rev, {"origin": "adjudication_evidence_link"}))
+            if not ev_id or ev_rev is None:
+                raise _Refused("MALFORMED_CITED_EVIDENCE", "cited evidence must specify object_id and revision")
+            ev_head = tx.head(ev_id)
+            if ev_head is None:
+                raise _Refused("CITED_EVIDENCE_UNKNOWN", f"cited evidence {ev_id} does not exist")
+            if ev_head["object_type"] not in {"Result", "EvidencePassage", "Source", "Analysis", "Dataset"}:
+                raise _Refused("UNSUPPORTED_EVIDENCE_TYPE", f"object type {ev_head['object_type']} cannot be cited as evidence")
+            if ev_head["head_revision"] != ev_rev:
+                raise _Refused("STALE_CITED_EVIDENCE", f"cited evidence {ev_id} revision {ev_rev} is not the current head revision {ev_head['head_revision']}", expected=ev_head["head_revision"], actual=ev_rev)
+            if ev_head["lifecycle_status"] != Lifecycle.ACTIVE.value:
+                raise _Refused("CITED_EVIDENCE_WITHDRAWN", f"cited evidence {ev_id} is withdrawn")
+            edges.append(("depends_on", ev_id, ev_rev, {"origin": "adjudication_evidence_link"}))
 
         content = {
             "subject": {"object_id": subject_id, "revision": subject_revision},

@@ -91,26 +91,53 @@ def export_snapshot(
     if internal_capability is not None:
         raise AuthorizationError("AUTHENTICATION_FAILED", "internal capabilities cannot authorize snapshot export")
 
+    if token is None and isinstance(actor, str) and actor.startswith("rhk_"):
+        token = actor
+        actor = None
+
+    if token is None:
+        actor_id_str = actor.actor_id if isinstance(actor, Actor) else (actor if isinstance(actor, str) else None)
+        store.audit(actor_id=actor_id_str, action="snapshot_export", decision="DENIED",
+                    detail={"reason": "token required for snapshot export; plain actor objects cannot authenticate"})
+        raise AuthorizationError("AUTHENTICATION_FAILED", "token required for snapshot export; plain actor objects cannot authenticate")
+
     key = store.hmac_key
     conn = store.connect()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        if token is not None:
-            authed_actor = authenticate(conn, token)
-            if not authed_actor:
-                raise AuthorizationError("AUTHENTICATION_FAILED", "invalid token")
-            if not authed_actor.has_role("owner", "importer", "author"):
-                raise AuthorizationError("ROLE_REQUIRED", "requires role owner, importer, or author")
-            actor = authed_actor
-        elif actor is not None:
-            loaded = load_actor(conn, actor.actor_id)
-            if not loaded:
-                raise AuthorizationError("AUTHENTICATION_FAILED", f"actor '{actor.actor_id}' not found or disabled")
-            if not loaded.has_role("owner", "importer", "author"):
-                raise AuthorizationError("ROLE_REQUIRED", "requires role owner, importer, or author")
-            actor = loaded
-        else:
-            raise AuthorizationError("AUTHENTICATION_FAILED", "exporting a snapshot requires an authenticated token or registered actor")
+        authed_actor = authenticate(conn, token)
+        if not authed_actor:
+            conn.execute(
+                "INSERT INTO audit_log(at,actor_id,action,decision,proposal_id,detail) VALUES (?,?,?,?,?,?)",
+                (store.clock(), None, "snapshot_export", "DENIED", None,
+                 json.dumps({"reason": "invalid, unknown, or disabled token"}, sort_keys=True))
+            )
+            conn.commit()
+            raise AuthorizationError("AUTHENTICATION_FAILED", "invalid, unknown, or disabled token")
+
+        if actor is not None and isinstance(actor, Actor):
+            if actor.actor_id != authed_actor.actor_id:
+                conn.execute(
+                    "INSERT INTO audit_log(at,actor_id,action,decision,proposal_id,detail) VALUES (?,?,?,?,?,?)",
+                    (store.clock(), authed_actor.actor_id, "snapshot_export", "DENIED", None,
+                     json.dumps({"reason": "identity mismatch", "requested": actor.actor_id, "authenticated": authed_actor.actor_id}, sort_keys=True))
+                )
+                conn.commit()
+                raise AuthorizationError(
+                    "IDENTITY_MISMATCH",
+                    f"authenticated actor '{authed_actor.actor_id}' does not match requested '{actor.actor_id}'",
+                )
+
+        if not authed_actor.has_role("owner", "importer", "author"):
+            conn.execute(
+                "INSERT INTO audit_log(at,actor_id,action,decision,proposal_id,detail) VALUES (?,?,?,?,?,?)",
+                (store.clock(), authed_actor.actor_id, "snapshot_export", "DENIED", None,
+                 json.dumps({"reason": "requires role owner, importer, or author"}, sort_keys=True))
+            )
+            conn.commit()
+            raise AuthorizationError("ROLE_REQUIRED", "requires role owner, importer, or author")
+
+        actor = authed_actor
 
         rev = conn.execute("SELECT MAX(revision) FROM state_revisions").fetchone()[0]
         state_sha = conn.execute("SELECT state_sha256 FROM state_revisions WHERE revision=?", (rev,)).fetchone()[0]
