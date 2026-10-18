@@ -24,6 +24,8 @@ from research_harness.state.store import StateStore
 
 KINDS = ("author_approval", "independent_review")
 DECISIONS = ("approve", "reject")
+ADJUDICATION_KINDS = ("source_integrity", "semantic_entailment", "scientific_judgment")
+ADJUDICATION_VERDICTS = ("SUPPORTED", "NOT_SUPPORTED", "UNCLEAR")
 
 
 def contributors(conn, object_id: str) -> set[str]:
@@ -149,3 +151,159 @@ def _record(store: StateStore, token: str, needed: tuple, object_id: str, revisi
                   "resolved_invalidations": [i["inval_id"] for i in open_inv] if acknowledge_invalidations else []}
         tx.audit("review_record", "RECORDED", result)
     return result
+
+
+def record_adjudication(
+    store: StateStore,
+    token: Optional[str],
+    *,
+    subject_id: Optional[str] = None,
+    subject_revision: Optional[int] = None,
+    object_id: Optional[str] = None,
+    revision: Optional[int] = None,
+    assessment_kind: str = "semantic_entailment",
+    verdict: str,
+    rationale: str = "",
+    cited_evidence: Optional[list[dict]] = None,
+    is_independent: Optional[bool] = None,
+) -> dict:
+    """Record an authorized scientific adjudication on an object revision.
+
+    Requires an authenticated human actor.
+    - If is_independent is True: requires role 'independent_reviewer' and verified independence.
+    - If is_independent is False: requires role 'author' or 'owner'.
+    Adjudications are server-only, append-only, and bound to the exact subject revision.
+    """
+    subject_id = subject_id or object_id
+    subject_revision = subject_revision or revision
+    if not subject_id or subject_revision is None:
+        raise ValueError("subject_id/object_id and subject_revision/revision are required")
+    with store.read() as conn:
+        actor = authenticate(conn, token)
+    if actor is None:
+        return _refuse(store, None, "AUTHENTICATION_FAILED", "missing, unknown or disabled actor token", "UNAUTHORIZED")
+    if assessment_kind not in ADJUDICATION_KINDS:
+        return _refuse(store, actor, "INVALID_ADJUDICATION_PARAMETERS", f"assessment_kind must be in {ADJUDICATION_KINDS}")
+    if verdict not in ADJUDICATION_VERDICTS:
+        return _refuse(store, actor, "INVALID_ADJUDICATION_PARAMETERS", f"verdict must be in {ADJUDICATION_VERDICTS}")
+
+    if is_independent is None:
+        if actor.has_role("independent_reviewer") and not actor.has_role("author", "owner"):
+            is_independent = True
+        else:
+            is_independent = False
+
+    needed = ("independent_reviewer",) if is_independent else ("author", "owner")
+    if not actor.has_role(*needed):
+        return _refuse(store, actor, "ROLE_REQUIRED", f"adjudication requires role {' or '.join(needed)}", "UNAUTHORIZED")
+
+    try:
+        return _record_adjudication(
+            store, token, needed, subject_id, subject_revision, assessment_kind, verdict, rationale,
+            cited_evidence or [], is_independent
+        )
+    except AuthorizationError as e:
+        return _refuse(store, actor, e.code, e.message or "authorization failed", "UNAUTHORIZED")
+    except _Refused as r:
+        return _refuse(store, actor, r.rule, r.message, **r.details)
+
+
+def _record_adjudication(
+    store: StateStore,
+    token: str,
+    needed: tuple,
+    subject_id: str,
+    subject_revision: int,
+    assessment_kind: str,
+    verdict: str,
+    rationale: str,
+    cited_evidence: list[dict],
+    is_independent: bool,
+) -> dict:
+    with store.write_tx(token=token, require_roles=needed) as tx:
+        actor = tx.actor
+        conn = tx.conn
+        head = tx.head(subject_id)
+        if head is None:
+            raise _Refused("OBJECT_UNKNOWN", f"{subject_id} does not exist")
+        if head["object_type"] in {"Approval", "Adjudication"}:
+            raise _Refused("CANNOT_ADJUDICATE_SYSTEM_OBJECT", f"{head['object_type']} cannot be adjudicated")
+        if head["head_revision"] != subject_revision:
+            raise _Refused("REVISION_NOT_HEAD", "only the head revision can be adjudicated",
+                           expected=subject_revision, actual=head["head_revision"])
+        if head["lifecycle_status"] != Lifecycle.ACTIVE.value:
+            raise _Refused("OBJECT_WITHDRAWN", f"{subject_id} is withdrawn")
+
+        if is_independent:
+            problems = independence_findings(conn, actor, subject_id)
+            if problems:
+                raise _Refused("INDEPENDENCE_POLICY_NOT_MET",
+                               "recorded facts do not establish an independent adjudicator", problems=problems)
+
+        n = conn.execute("SELECT COUNT(*) FROM object_heads WHERE object_type='Adjudication'").fetchone()[0] + 1
+        aid = f"ADJ_{n:06d}"
+
+        subject = tx.get(subject_id, subject_revision)
+        edges = []
+        rel = "supports" if verdict == "SUPPORTED" else "challenges"
+        edges.append((rel, subject_id, subject_revision, {"origin": "scientific_adjudication"}))
+
+        for ev in cited_evidence:
+            ev_id = ev.get("object_id")
+            ev_rev = ev.get("revision")
+            if ev_id and ev_rev:
+                ev_head = tx.head(ev_id)
+                if ev_head:
+                    edges.append(("evaluates", ev_id, ev_rev, {"origin": "adjudication_evidence_link"}))
+
+        content = {
+            "subject": {"object_id": subject_id, "revision": subject_revision},
+            "assessment_kind": assessment_kind,
+            "verdict": verdict,
+            "rationale": rationale[:20000] if rationale else f"Authorized {assessment_kind} adjudication",
+            "adjudicator_actor_id": actor.actor_id,
+            "adjudicator_roles": sorted(actor.roles),
+            "independence_level": "independent" if is_independent else "author",
+            "independence_group": actor.independence_group,
+            "cited_evidence": cited_evidence,
+            "subject_revision_digest": subject["revision_digest"],
+            "adjudicated_at": tx.at,
+            "is_historical": False,
+        }
+
+        tx.add_revision(
+            object_id=aid,
+            object_type="Adjudication",
+            content=content,
+            edges=edges,
+            origin={
+                "kind": OriginKind.SYSTEM_DERIVED.value,
+                "operation": "record_adjudication",
+                "authenticated_actor": actor.actor_id,
+                "is_independent": is_independent,
+            },
+        )
+        tx.event("ADJUDICATION_RECORDED", {
+            "adjudication_id": aid,
+            "subject_id": subject_id,
+            "subject_revision": subject_revision,
+            "verdict": verdict,
+            "assessment_kind": assessment_kind,
+            "independence_level": "independent" if is_independent else "author",
+            "adjudicator": actor.actor_id,
+        })
+        result = {
+            "decision": "RECORDED",
+            "adjudication_id": aid,
+            "subject_id": subject_id,
+            "subject_revision": subject_revision,
+            "assessment_kind": assessment_kind,
+            "verdict": verdict,
+            "independence_level": "independent" if is_independent else "author",
+            "actor": actor.actor_id,
+            "new_state_revision": tx.revision,
+            "state_changed": True,
+        }
+        tx.audit("adjudication_record", "RECORDED", result)
+    return result
+

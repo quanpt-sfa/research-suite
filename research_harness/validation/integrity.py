@@ -23,6 +23,7 @@ from research_harness.core.model import (
     CLAIM_TIERS,
     IntegrityStatus,
     Lifecycle,
+    OriginKind,
     ReleaseEligibility,
     ReviewStatus,
     WorkflowStatus,
@@ -280,7 +281,7 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
 
         # Active adjudications
         adjudication_rows = conn.execute(
-            """SELECT o.object_id, o.revision, o.content
+            """SELECT o.object_id, o.revision, o.content, o.origin
                FROM object_heads h
                JOIN objects o ON o.object_id = h.object_id AND o.revision = h.head_revision
                WHERE h.object_type = 'Adjudication' AND h.lifecycle_status = 'ACTIVE'"""
@@ -302,14 +303,21 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
 
     # Index adjudications strictly by subject (object_id, revision)
     adjudications_by_subject_rev: dict[tuple[str, int], list[dict]] = {}
-    for a_id, a_rev, raw_c in adjudication_rows:
+    for a_id, a_rev, raw_c, raw_o in adjudication_rows:
         try:
             a_data = json.loads(raw_c)
+            a_orig = json.loads(raw_o) if raw_o else {}
+            # Scenario B-1 Invariant: Proposed adjudications (PROPOSAL_IMPORTED) cannot become authoritative scientific judgments!
+            if a_orig.get("kind") == OriginKind.PROPOSAL_IMPORTED.value:
+                continue
+
             subj = a_data.get("subject", {})
             s_id = subj.get("object_id")
             s_rev = subj.get("revision")
             if s_id and s_rev is not None:
-                adjudications_by_subject_rev.setdefault((s_id, int(s_rev)), []).append({**a_data, "adjudication_id": a_id})
+                adjudications_by_subject_rev.setdefault((s_id, int(s_rev)), []).append({
+                    **a_data, "adjudication_id": a_id, "origin_kind": a_orig.get("kind")
+                })
         except Exception:
             pass
 
@@ -413,31 +421,57 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         if stale_evidence_found:
             claim_blocked_reasons.append(f"STALE_DEPENDENT_EVIDENCE: Claim '{cid}' links to superseded evidence revision")
 
+        # Check for Mechanism objects linked to this claim
+        has_mechanism = False
+        for e in dependent_targets:
+            dep_id = e[3]
+            if head_types.get(dep_id) == "Mechanism":
+                has_mechanism = True
+        for e in supporting_sources:
+            evid = e[0]
+            if head_types.get(evid) == "Mechanism":
+                has_mechanism = True
+
         # Tier-specific evidence rules:
         if tier == "unclassified":
             claim_blocked_reasons.append(f"UNCLASSIFIED_CLAIM_TIER: Migrated claim '{cid}' must be classified before release")
         elif tier == "conceptual":
-            if not has_theory_or_construct and not has_empirical_result and not has_evidence_passage:
-                claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Conceptual claim '{cid}' requires theoretical construct or theory linkage")
+            if not has_theory_or_construct:
+                claim_blocked_reasons.append(f"CONCEPTUAL_CLAIM_LACKS_THEORY_OR_CONSTRUCT: Conceptual claim '{cid}' requires theoretical construct or theory linkage")
         elif tier == "measurement_validation":
-            if not (has_construct and has_proxy) and not has_empirical_result:
-                claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Measurement validation claim '{cid}' requires construct and proxy operationalization")
+            if not (has_construct and has_proxy):
+                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_OPERATIONALIZATION: Measurement validation claim '{cid}' requires construct and proxy operationalization")
+            if not (has_empirical_result or claim_adjudications):
+                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_VALIDATION_EVIDENCE: Measurement validation claim '{cid}' requires empirical Result or authorized Adjudication demonstrating validity")
         elif tier == "causal":
+            supported_adjs = [a for a in claim_adjudications if a.get("verdict") == "SUPPORTED"]
+            if not has_empirical_result and not supported_adjs:
+                claim_blocked_reasons.append(
+                    f"CAUSAL_CLAIM_LACKS_EMPIRICAL_OR_ADJUDICATED_SUPPORT: Causal claim '{cid}' lacks empirical result or verified adjudication"
+                )
+            if policy.get("require_causal_adjudication") and not supported_adjs:
+                claim_blocked_reasons.append(
+                    f"CAUSAL_CLAIM_LACKS_ADJUDICATION: Causal claim '{cid}' requires an authorized scientific Adjudication with verdict SUPPORTED"
+                )
+        elif tier == "mechanism_consistent":
+            if not has_mechanism:
+                claim_blocked_reasons.append(f"MECHANISM_CLAIM_LACKS_MECHANISM_LINK: Mechanism-consistent claim '{cid}' requires linkage to a Mechanism object")
+            if not (has_empirical_result or has_evidence_passage):
+                claim_blocked_reasons.append(f"MECHANISM_CLAIM_LACKS_EMPIRICAL_SUPPORT: Mechanism-consistent claim '{cid}' requires supporting empirical Result or EvidencePassage")
+        elif tier == "predictive":
             if not has_empirical_result:
-                supported_adjs = [a for a in claim_adjudications if a.get("verdict") == "SUPPORTED"]
-                if not supported_adjs:
-                    claim_blocked_reasons.append(
-                        f"CAUSAL_CLAIM_LACKS_EMPIRICAL_OR_ADJUDICATED_SUPPORT: Causal claim '{cid}' lacks empirical result or verified adjudication"
-                    )
-        elif tier in {"associational", "predictive"}:
+                claim_blocked_reasons.append(f"PREDICTIVE_CLAIM_LACKS_VALIDATION_RESULTS: Predictive claim '{cid}' requires empirical Result evaluating predictive validation")
+        elif tier == "associational":
             if not has_empirical_result and not has_evidence_passage:
-                claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: {tier.capitalize()} claim '{cid}' requires empirical result or evidence passage")
+                claim_blocked_reasons.append(f"ASSOCIATIONAL_CLAIM_LACKS_SUPPORT: Associational claim '{cid}' requires empirical result or evidence passage")
         elif tier == "descriptive":
             if not has_empirical_result and not has_evidence_passage:
                 if has_raw_source_only:
-                    claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Mere generic Source '{list(evidence_ids)[0]}' is insufficient evidence for Claim '{cid}'")
+                    claim_blocked_reasons.append(
+                        f"CLAIM_UNSUPPORTED_DESCRIPTIVE_SOURCE_ONLY: Mere generic Source '{list(evidence_ids)[0]}' is insufficient evidence for Claim '{cid}'; requires EvidencePassage"
+                    )
                 else:
-                    claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Claim '{cid}' has no supporting evidence")
+                    claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Descriptive claim '{cid}' has no supporting evidence")
         else:
             if not evidence_ids and not has_theory_or_construct:
                 claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Claim '{cid}' has no supporting evidence")

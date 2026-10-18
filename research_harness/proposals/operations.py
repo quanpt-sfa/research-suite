@@ -12,7 +12,7 @@ from typing import Any
 
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.core.errors import ProposalRejection
-from research_harness.core.model import CLAIM_TIERS, Decision, Lifecycle, OriginKind
+from research_harness.core.model import CLAIM_TIERS, Decision, Lifecycle, OriginKind, SERVER_ONLY_TYPES
 from research_harness.graph.dependency import invalidate_dependents
 from research_harness.graph.relations import edge_type_error
 from research_harness.protocols.schema import content_schema, schema_findings
@@ -118,6 +118,8 @@ def _new_id_free(ctx: Ctx, object_id: str) -> None:
 
 def op_propose_object(ctx: Ctx, i: int, op: dict) -> None:
     oid, otype = op["proposed_id"], op["object_type"]
+    if otype in SERVER_ONLY_TYPES:
+        reject("SERVER_ONLY_OBJECT_TYPE", f"object_type {otype!r} cannot be proposed", Decision.REJECTED, object_type=otype)
     if otype == "Claim":
         reject("USE_PROPOSE_CLAIM", "claims must be proposed with propose_claim so formation provenance is recorded")
     _scope(ctx, "propose_object", otype)
@@ -170,6 +172,8 @@ def op_revise_object(ctx: Ctx, i: int, op: dict) -> None:
     if head["lifecycle_status"] != Lifecycle.ACTIVE.value:
         reject("OBJECT_WITHDRAWN", f"{oid} is withdrawn", object_id=oid)
     otype = head["object_type"]
+    if otype in SERVER_ONLY_TYPES:
+        reject("SERVER_ONLY_OBJECT_TYPE", f"object_type {otype!r} cannot be revised via proposal", Decision.REJECTED, object_type=otype)
     _scope(ctx, "revise_object", otype)
     prev = ctx.tx.get(oid)
     content = op["content"]

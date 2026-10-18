@@ -1,7 +1,7 @@
 # Research Harness 9.0: Legacy Semantic Parity Matrix & Rule-by-Rule Audit
 
 **Baseline Legacy Version:** `Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution` (105 tests passing locally)  
-**Current Implementation:** `Research_Harness_9.0.0` (92 modern tests passing)  
+**Current Implementation:** `Research_Harness_9.0.0` (103 modern tests passing)  
 **Date:** 2026-10-18  
 **Audit Classification:** Rigorous Rule-Level Reassessment (Audited against actual v9.0 schemas and invariants)  
 
@@ -57,7 +57,7 @@ Every legacy scientific rule and invariant is classified under the mandatory aud
 | **`SEMANTIC_BENCHMARK_NOT_PASS`** | `release_gate.py:evaluate_release` | Block release when benchmark / validation fails | `release_check` blocks on missing empirical backing for causal/predictive | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_release_policy.py` | Causal claims require empirical results or verified adjudication. |
 | **`SEMANTIC_OBSERVATION_REVIEWER_MISSING`** | `release_gate.py:evaluate_release` | Ensure independent sign-off on empirical observations | Role check `independent_reviewer` required under strict release policy | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_release_policy.py`, `tests/test_review_authority.py` | Strict release policy enforces independent reviewer role. |
 | **`BENCHMARK_COMPARISON_REQUIRED_FOR_MINOR_RELEASE`** | `release_gate.py:evaluate_release` | Require comparative evaluation against prior state | `state_revisions` digest comparison + baseline tracking | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_release_policy.py` | State digests provide deterministic before/after comparison. |
-| **`CLAIM_PROPORTIONAL_ADJUDICATION`** | `release_gate.py:tier_gate` | Claim-proportional standards (descriptive vs causal vs predictive) | 6 claim tiers (`descriptive`, `associational`, `predictive`, `causal`, `conceptual`, `measurement_validation`) | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_release_policy.py`, `tests/test_p0_p1_remediation_final.py` | Tier-specific evidence rules implemented in `integrity.py`. |
+| **`CLAIM_PROPORTIONAL_ADJUDICATION`** | `release_gate.py:tier_gate` | Claim-proportional standards (descriptive vs causal vs predictive vs mechanism) | 7 claim tiers (`descriptive`, `associational`, `predictive`, `mechanism_consistent`, `causal`, `measurement_validation`, `conceptual`) | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_release_policy.py`, `tests/test_trust_boundary_and_hardening.py` | Tier-specific evidence rules implemented in `integrity.py` with Layer 1 vs Layer 2 governance. |
 | **`LEDGER_HASH_CHAIN_BROKEN`** | `state_integrity.py:verify_ledger` | Detect tampering with sequential mutation records | `events` table SHA-256 hash chain verified by `verify_chain` | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_integrity_deep.py`, `tests/test_integrity_and_release.py` | Sequential event hash chaining verified in integrity audit. |
 | **`LINEAGE_HASH_CHAIN_BROKEN`** | `state_integrity.py:verify_lineage` | Detect tampering with object status timeline | `object_status` + `events` state revision tracking | `EQUIVALENT_REIMPLEMENTATION` | `tests/test_integrity_deep.py` | Status history log tied to sequential state revisions. |
 | **`FIRST_RECORDED_TEXT_SHA256`** | `project_state.py:formation_tracker` | Prevent HARKing by freezing hypothesis text at registration | `origin.formation.first_recorded_text_sha256` in immutable `objects` | `PRESERVED` | `tests/test_formation_provenance.py`, `tests/test_legacy_adapter_p0.py` | Preserved in claim formation metadata across revisions. |
@@ -89,11 +89,11 @@ Every legacy scientific rule and invariant is classified under the mandatory aud
 ## 4. Test Verification Summary & CI Reproducibility Disclosure
 
 * **Modern v9 Test Suite:**
-  - 92 tests passing in 14.31s locally.
+  - 103 tests passing in 16.22s locally (11 dedicated trust boundary regression tests + 92 comprehensive unit/integration tests).
   - Automatically executed on every push and pull request across Python 3.10, 3.11, and 3.12 in GitHub Actions CI.
   - Classification: **`VERIFIED`**.
 
 * **Legacy v8.4.4 Test Suite:**
-  - 105 tests passing in 33.05s on local machine against pinned source fixture `legacy_v8_4_4/Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution`.
+  - 105 tests passing in 32.47s on local machine against pinned source fixture `legacy_v8_4_4/Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution`.
   - **CI Runner Classification:** **`NOT_VERIFIABLE` in GitHub Actions CI**. Because `legacy_v8_4_4/` is excluded from git tracking to prevent large binary bloat, GitHub Actions runs conditionally skip legacy execution and log an explicit warning rather than falsely claiming legacy tests executed.
   - Defensible External Process: Local execution against the authoritative legacy checkout proves 100% test passing (105/105).

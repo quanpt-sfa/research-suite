@@ -378,14 +378,14 @@ class StateStore:
 
     @contextmanager
     def write_tx(self, actor_id: Optional[str] = None, *, token: Optional[str] = None,
-                 internal_capability: Optional[InternalCapability] = None,
+                 internal_capability: Optional[Any] = None,
                  require_roles: tuple = (), bump: bool = True, commit: bool = True):
         """Open the single-writer transaction.
 
-        Authorization is evaluated INSIDE ``BEGIN IMMEDIATE`` (no check/use gap): either ``token`` is
-        authenticated, or ``internal_capability`` is verified. Plain string actor_ids are NEVER
-        trusted for authentication. ``require_roles`` (any-of) is checked against the roles stored
-        *now*, not against a caller-supplied copy.
+        Authorization is evaluated INSIDE ``BEGIN IMMEDIATE`` (no check/use gap): ``token`` is
+        strictly authenticated. Plain string actor_ids and unauthenticated internal capabilities
+        are NEVER accepted for runtime authorization. ``require_roles`` (any-of) is checked
+        against the roles stored *now*, not against a caller-supplied copy.
         Raises ``AuthorizationError`` before any mutation; nothing is written in that case.
         """
         conn = self.connect()
@@ -411,26 +411,23 @@ class StateStore:
     @staticmethod
     def _authorize(conn: sqlite3.Connection, actor_id: Optional[str], token: Optional[str],
                    require_roles: tuple,
-                   internal_capability: Optional[InternalCapability] = None) -> Actor:
-        if token is not None:
-            actor = authenticate(conn, token)
-            if actor is None:
-                raise AuthorizationError("AUTHENTICATION_FAILED", "invalid, unknown or disabled actor token")
-            if actor_id is not None and actor.actor_id != actor_id:
-                raise AuthorizationError("IDENTITY_MISMATCH", f"authenticated actor '{actor.actor_id}' does not match requested '{actor_id}'")
-        elif internal_capability is not None:
-            if not isinstance(internal_capability, InternalCapability):
-                raise AuthorizationError("INVALID_CAPABILITY", "internal_capability must be an instance of InternalCapability")
-            actor = load_actor(conn, internal_capability.actor_id)
-            if actor is None:
-                raise AuthorizationError("AUTHENTICATION_FAILED", f"capability actor '{internal_capability.actor_id}' not found or disabled")
-            if actor_id is not None and actor.actor_id != actor_id:
-                raise AuthorizationError("IDENTITY_MISMATCH", f"capability actor '{actor.actor_id}' does not match requested '{actor_id}'")
-        else:
+                   internal_capability: Optional[Any] = None) -> Actor:
+        if internal_capability is not None:
             raise AuthorizationError(
                 "AUTHENTICATION_FAILED",
-                "Authentication token or internal capability required; plain actor_id cannot be used for authentication"
+                "Internal capabilities are not authorized for runtime mutations; authenticated bearer token required"
             )
+        if token is None:
+            raise AuthorizationError(
+                "AUTHENTICATION_FAILED",
+                "Authentication token required; plain actor_id or unauthenticated capability cannot be used for authentication"
+            )
+
+        actor = authenticate(conn, token)
+        if actor is None:
+            raise AuthorizationError("AUTHENTICATION_FAILED", "invalid, unknown or disabled actor token")
+        if actor_id is not None and actor.actor_id != actor_id:
+            raise AuthorizationError("IDENTITY_MISMATCH", f"authenticated actor '{actor.actor_id}' does not match requested '{actor_id}'")
 
         if require_roles and not actor.has_role(*require_roles):
             raise AuthorizationError("ROLE_REQUIRED", "requires role " + " or ".join(require_roles))

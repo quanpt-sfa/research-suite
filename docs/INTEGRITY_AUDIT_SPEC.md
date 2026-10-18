@@ -32,6 +32,7 @@ graph TD
     OD --> EventLog[Hash-Chained Event Log]
     
     RD --> ApprovalBinding[Approval Object: subject_revision_digest]
+    RD --> AdjudicationBinding[Adjudication Object: subject_revision_digest]
     ActorToken[Bearer Token rhk_...] -->|SHA-256| ActorRegistry[actors.token_sha256]
     ActorRegistry --> EventLog
 ```
@@ -76,6 +77,15 @@ graph TD
   - The audit verifies that `subject_revision_digest` matches the live `revision_digest` of the target object.
   - If the target object is revised (bumping its revision digest), the approval remains anchored to the exact revision that was reviewed, and the new revision transitions to `NEEDS_REVIEW`.
 - **Verification Rules:** `APPROVAL_TARGET_MISSING`, `APPROVAL_DIGEST_MISMATCH`, `APPROVAL_ACTOR_UNKNOWN`.
+
+### 2.7 Cryptographic Adjudication Bindings
+- **Definition:** An `Adjudication` object records an authoritative scientific verdict (`SUPPORTED`, `NOT_SUPPORTED`, `UNCLEAR`) entered by an authenticated scholar.
+- **Binding Rule:**
+  - Adjudication content contains `subject_revision_digest` sealing the exact subject revision evaluated.
+  - Contains `adjudicator_actor_id`, `adjudicator_roles`, `independence_level`, and `cited_evidence` pin records.
+  - Requires origin kind `SYSTEM_DERIVED` from `record_adjudication` or `LEGACY_MIGRATION` with `is_historical: True`.
+  - Adjudications with origin `PROPOSAL_IMPORTED` are excluded from release eligibility to prevent agent self-certification.
+- **Verification Rules:** `ADJUDICATION_TARGET_MISSING`, `ADJUDICATION_DIGEST_MISMATCH`, `ADJUDICATION_ACTOR_UNKNOWN`.
 
 ---
 

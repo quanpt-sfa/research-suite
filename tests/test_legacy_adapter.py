@@ -67,7 +67,7 @@ def test_legacy_migration_dry_run(harness_env, populated_legacy_project):
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    res = migrate_legacy_project(populated_legacy_project, store, actor, dry_run=True)
+    res = migrate_legacy_project(populated_legacy_project, store, actor, token=owner_token, dry_run=True)
     assert res["decision"] == "DRY_RUN"
     assert "detected_registries" in res
     assert res["detected_registries"]["research_questions"] == 1
@@ -87,7 +87,7 @@ def test_legacy_migration_full_and_idempotent(harness_env, populated_legacy_proj
         actor = authenticate(conn, owner_token)
 
     # Run full migration
-    res1 = migrate_legacy_project(populated_legacy_project, store, actor, dry_run=False)
+    res1 = migrate_legacy_project(populated_legacy_project, store, actor, token=owner_token, dry_run=False)
     assert res1["decision"] == "ACCEPTED"
     assert "backup_zip" in res1
     backup_file = Path(res1["backup_zip"])
@@ -106,7 +106,7 @@ def test_legacy_migration_full_and_idempotent(harness_env, populated_legacy_proj
         assert claim["origin"]["formation"]["inference_status"] == "UNKNOWN"
 
     # Run migration a second time -> idempotent (no duplicate objects)
-    res2 = migrate_legacy_project(populated_legacy_project, store, actor, dry_run=False)
+    res2 = migrate_legacy_project(populated_legacy_project, store, actor, token=owner_token, dry_run=False)
     assert res2["decision"] == "ALREADY_MIGRATED"
 
     with store.read() as conn:

@@ -48,7 +48,7 @@ def test_p0_auth_actor_id_without_token_rejected(harness_env):
         with store.write_tx(actor_id=owner_actor.actor_id, require_roles=("owner",)) as tx:
             tx.conn.execute("SELECT 1")
     assert exc_info.value.code == "AUTHENTICATION_FAILED"
-    assert "Authentication token or internal capability required" in str(exc_info.value)
+    assert "Authentication token required" in str(exc_info.value)
 
     # 2. Attempt to write with importer's actor_id but no token
     with pytest.raises(AuthorizationError) as exc_info:
@@ -63,30 +63,32 @@ def test_p0_auth_actor_id_without_token_rejected(harness_env):
     assert exc_info.value.code == "AUTHENTICATION_FAILED"
 
 
-def test_p0_auth_internal_capability_trusted_and_non_forgeable(harness_env):
-    """P0-AUTH: Engine internal operations require genuine InternalCapability."""
+def test_p0_auth_internal_capability_cannot_confer_runtime_privilege(harness_env):
+    """P0-AUTH: General-purpose internal capabilities cannot confer runtime write privilege."""
     store = harness_env["store"]
     owner_token = harness_env["owner_token"]
 
     with store.read() as conn:
         owner_actor = authenticate(conn, owner_token)
 
-    # 1. Genuine capability created by trusted issue_internal_capability succeeds
+    # 1. Capability created by issue_internal_capability cannot authorize write_tx
     cap = issue_internal_capability(owner_actor.actor_id, "system_maintenance")
-    with store.write_tx(internal_capability=cap, require_roles=("owner",)) as tx:
-        assert tx.actor.actor_id == owner_actor.actor_id
+    with pytest.raises(AuthorizationError) as exc_info:
+        with store.write_tx(internal_capability=cap, require_roles=("owner",)) as tx:
+            tx.conn.execute("SELECT 1")
+    assert exc_info.value.code == "AUTHENTICATION_FAILED"
 
-    # 2. Forged capability (wrong sentinel or fake object) fails
+    # 2. Forged capability also fails
     class ForgedCapability:
         def __init__(self):
             self.actor_id = owner_actor.actor_id
             self.operation = "malicious_bypass"
-            self._sentinel = object()  # Different instance!
+            self._sentinel = object()
 
     with pytest.raises(AuthorizationError) as exc_info:
         with store.write_tx(internal_capability=ForgedCapability(), require_roles=("owner",)) as tx:
             tx.conn.execute("SELECT 1")
-    assert exc_info.value.code in {"INVALID_CAPABILITY", "AUTHENTICATION_FAILED"}
+    assert exc_info.value.code == "AUTHENTICATION_FAILED"
 
 
 def test_p0_auth_failed_authorization_leaves_no_partial_mutation(harness_env):

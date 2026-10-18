@@ -17,9 +17,9 @@ import json
 from typing import Any, Optional
 
 from research_harness import PROTOCOL_VERSION
-from research_harness.core.auth import Actor, InternalCapability, issue_internal_capability
+from research_harness.core.auth import Actor, InternalCapability, authenticate, load_actor
 from research_harness.core.canonical import canonical_json_hash, hmac_equal, hmac_hex, strict_json_loads
-from research_harness.core.errors import HarnessError
+from research_harness.core.errors import AuthorizationError, HarnessError
 from research_harness.core.model import OBJECT_TYPES, SERVER_ONLY_TYPES
 from research_harness.protocols.guards import secret_findings
 from research_harness.protocols.schema import PROPOSABLE_TYPES
@@ -84,25 +84,35 @@ def export_snapshot(
     scope: str = "full",
     *,
     token: Optional[str] = None,
-    internal_capability: Optional[InternalCapability] = None,
+    internal_capability: Optional[Any] = None,
 ) -> dict:
     if scope not in SCOPES:
         raise HarnessError("SCOPE_UNKNOWN", f"scope must be one of {sorted(SCOPES)}")
-    if token is None and internal_capability is None:
-        if actor is not None:
-            internal_capability = issue_internal_capability(actor.actor_id, "snapshot_export")
-        else:
-            raise HarnessError("UNAUTHORIZED", "exporting a snapshot requires an authenticated token or capability")
+    if internal_capability is not None:
+        raise AuthorizationError("AUTHENTICATION_FAILED", "internal capabilities cannot authorize snapshot export")
+
     key = store.hmac_key
-    with store.write_tx(
-        token=token,
-        internal_capability=internal_capability,
-        require_roles=("owner", "importer", "author"),
-        bump=False,
-    ) as tx:
-        actor = tx.actor
-        conn = tx.conn
-        rev = tx.base_revision
+    conn = store.connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        if token is not None:
+            authed_actor = authenticate(conn, token)
+            if not authed_actor:
+                raise AuthorizationError("AUTHENTICATION_FAILED", "invalid token")
+            if not authed_actor.has_role("owner", "importer", "author"):
+                raise AuthorizationError("ROLE_REQUIRED", "requires role owner, importer, or author")
+            actor = authed_actor
+        elif actor is not None:
+            loaded = load_actor(conn, actor.actor_id)
+            if not loaded:
+                raise AuthorizationError("AUTHENTICATION_FAILED", f"actor '{actor.actor_id}' not found or disabled")
+            if not loaded.has_role("owner", "importer", "author"):
+                raise AuthorizationError("ROLE_REQUIRED", "requires role owner, importer, or author")
+            actor = loaded
+        else:
+            raise AuthorizationError("AUTHENTICATION_FAILED", "exporting a snapshot requires an authenticated token or registered actor")
+
+        rev = conn.execute("SELECT MAX(revision) FROM state_revisions").fetchone()[0]
         state_sha = conn.execute("SELECT state_sha256 FROM state_revisions WHERE revision=?", (rev,)).fetchone()[0]
         types = SCOPES[scope]["read"]
         heads = conn.execute(
@@ -118,7 +128,7 @@ def export_snapshot(
                 neighbours.add(e["source_id"])
         referenced = []
         for oid in sorted(neighbours - included):
-            h = tx.head(oid)
+            h = conn.execute("SELECT * FROM object_heads WHERE object_id=?", (oid,)).fetchone()
             digest = conn.execute("SELECT content_digest FROM objects WHERE object_id=? AND revision=?",
                                   (oid, h["head_revision"])).fetchone()[0]
             referenced.append({"object_id": oid, "object_type": h["object_type"], "revision": h["head_revision"],
@@ -131,7 +141,7 @@ def export_snapshot(
         meta = snapshot_meta(sid, store.project_id, scope, rev, state_sha, permitted, object_revisions)
         body: dict[str, Any] = {
             "protocol_version": PROTOCOL_VERSION, "snapshot_id": sid, "project_id": store.project_id,
-            "scope": scope, "state_revision": rev, "state_sha256": state_sha, "exported_at": tx.at,
+            "scope": scope, "state_revision": rev, "state_sha256": state_sha, "exported_at": store.clock(),
             "exported_by": actor.actor_id, "objects": objects, "referenced_objects": referenced,
             "permitted_operations": permitted, "object_revisions": object_revisions,
             "notice": "Read-only context. Propose changes with the proposal protocol; this snapshot grants no "
@@ -143,10 +153,15 @@ def export_snapshot(
         conn.execute("INSERT INTO snapshots(snapshot_id,state_revision,state_sha256,scope,permitted_operations,"
                      "object_revisions,exported_at,exported_by,hmac_sha256) VALUES (?,?,?,?,?,?,?,?,?)",
                      (sid, rev, state_sha, scope, json.dumps(permitted, sort_keys=True),
-                      json.dumps(object_revisions, sort_keys=True), tx.at, actor.actor_id, meta_hmac))
+                      json.dumps(object_revisions, sort_keys=True), store.clock(), actor.actor_id, meta_hmac))
         conn.execute("INSERT INTO audit_log(at,actor_id,action,decision,proposal_id,detail) VALUES (?,?,?,?,?,?)",
-                     (tx.at, actor.actor_id, "snapshot_export", "OK", None,
+                     (store.clock(), actor.actor_id, "snapshot_export", "OK", None,
                       json.dumps({"snapshot_id": sid, "scope": scope, "state_revision": rev})))
+        conn.execute("COMMIT")
+    finally:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        conn.close()
     integrity = {
         "canonicalization": "json sorted keys, compact separators, UTF-8, ensure_ascii=false",
         "body_sha256": canonical_json_hash(body),
