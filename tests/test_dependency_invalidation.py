@@ -159,10 +159,11 @@ def test_cascading_invalidation_on_result_revision(harness_env):
 
 def test_cycle_tolerance_in_dependency_traversal(harness_env):
     store = harness_env["store"]
+    owner_token = harness_env["owner_token"]
 
     # In research workflows, object-level cycles (Theory -> Claim -> Theory v2) can occur.
     # The revision graph is DAG, but let's test traversal BFS with intentional cycles.
-    with store.write_tx("owner_alice") as tx:
+    with store.write_tx(token=owner_token) as tx:
         # Create T1 rev 1
         tx.add_revision(
             object_id="THEORY_CYCLE",
@@ -276,8 +277,9 @@ def test_unrelated_object_stability(harness_env):
 
 def test_stale_pinned_edge_detection(harness_env):
     store = harness_env["store"]
+    owner_token = harness_env["owner_token"]
 
-    with store.write_tx("owner_alice") as tx:
+    with store.write_tx(token=owner_token) as tx:
         # Create Target Object rev 1
         tx.add_revision(
             object_id="TARGET_OBJ",

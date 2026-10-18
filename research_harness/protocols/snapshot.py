@@ -17,7 +17,7 @@ import json
 from typing import Any, Optional
 
 from research_harness import PROTOCOL_VERSION
-from research_harness.core.auth import Actor
+from research_harness.core.auth import Actor, InternalCapability, issue_internal_capability
 from research_harness.core.canonical import canonical_json_hash, hmac_equal, hmac_hex, strict_json_loads
 from research_harness.core.errors import HarnessError
 from research_harness.core.model import OBJECT_TYPES, SERVER_ONLY_TYPES
@@ -78,13 +78,29 @@ def _summarize(store: StateStore, conn, head_row) -> dict:
     return d
 
 
-def export_snapshot(store: StateStore, actor: Actor, scope: str) -> dict:
+def export_snapshot(
+    store: StateStore,
+    actor: Optional[Actor] = None,
+    scope: str = "full",
+    *,
+    token: Optional[str] = None,
+    internal_capability: Optional[InternalCapability] = None,
+) -> dict:
     if scope not in SCOPES:
         raise HarnessError("SCOPE_UNKNOWN", f"scope must be one of {sorted(SCOPES)}")
-    if not actor.has_role("owner", "importer", "author"):
-        raise HarnessError("UNAUTHORIZED", "exporting a snapshot requires role owner|importer|author")
+    if token is None and internal_capability is None:
+        if actor is not None:
+            internal_capability = issue_internal_capability(actor.actor_id, "snapshot_export")
+        else:
+            raise HarnessError("UNAUTHORIZED", "exporting a snapshot requires an authenticated token or capability")
     key = store.hmac_key
-    with store.write_tx(actor.actor_id, require_roles=("owner", "importer", "author"), bump=False) as tx:
+    with store.write_tx(
+        token=token,
+        internal_capability=internal_capability,
+        require_roles=("owner", "importer", "author"),
+        bump=False,
+    ) as tx:
+        actor = tx.actor
         conn = tx.conn
         rev = tx.base_revision
         state_sha = conn.execute("SELECT state_sha256 FROM state_revisions WHERE revision=?", (rev,)).fetchone()[0]

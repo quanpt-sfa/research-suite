@@ -22,7 +22,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Optional
 
-from research_harness.core.auth import Actor
+from research_harness.core.auth import Actor, InternalCapability, issue_internal_capability
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.core.errors import HarnessError, utc_now
 from research_harness.core.model import CLAIM_TIERS, Decision, OriginKind, ReviewStatus
@@ -48,8 +48,10 @@ def _sha256_file(p: Path) -> str:
 def migrate_legacy_project(
     legacy_project_root: Path | str,
     target_store: StateStore,
-    actor: Actor,
+    actor: Optional[Actor] = None,
     *,
+    token: Optional[str] = None,
+    internal_capability: Optional[InternalCapability] = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Migrate a v8.4.4 LaTeX/research_harness project into a v9 StateStore."""
@@ -113,14 +115,37 @@ def migrate_legacy_project(
                 zf.write(f, arcname=f.relative_to(legacy_root).as_posix())
     backup_sha256 = _sha256_file(backup_zip)
 
+    # Avoid duplicate backup archives if an identical backup already exists
+    existing_backups = sorted(backup_dir.glob(f"legacy_backup_{target_store.project_id}_*.zip"))
+    for b in existing_backups:
+        if b != backup_zip and _sha256_file(b) == backup_sha256:
+            try:
+                backup_zip.unlink()
+            except OSError:
+                pass
+            backup_zip = b
+            break
+
     created_objects: list[str] = []
     created_objects_by_type: dict[str, int] = {}
+    repaired_objects: list[str] = []
+    repaired_objects_by_type: dict[str, int] = {}
+    skipped_unchanged: list[str] = []
+    content_mismatches: list[dict[str, Any]] = []
+    provenance_mismatches: list[dict[str, Any]] = []
     created_edges = 0
     missing_refs: list[dict[str, str]] = []
     unresolved_records: list[dict[str, Any]] = []
     unmapped_fields: dict[str, list[str]] = {}
 
-    with target_store.write_tx(actor.actor_id, require_roles=("owner", "importer")) as tx:
+    if token is None and internal_capability is None:
+        if actor is not None:
+            internal_capability = issue_internal_capability(actor.actor_id, "legacy_migration")
+        else:
+            raise HarnessError("UNAUTHORIZED", "migration requires an authenticated token or capability")
+
+    with target_store.write_tx(token=token, internal_capability=internal_capability, require_roles=("owner", "importer")) as tx:
+        actor = tx.actor
         existing_heads = {
             r[0] for r in tx.conn.execute("SELECT object_id FROM object_heads").fetchall()
         }
@@ -131,7 +156,10 @@ def migrate_legacy_project(
             unmapped_fields["research_questions.csv"] = sorted(set(rq_rows[0].keys()) - rq_mapped_fields)
         for r in rq_rows:
             rq_id = (r.get("rq_id") or "").strip()
-            if not rq_id or rq_id in existing_heads:
+            if not rq_id:
+                continue
+            if rq_id in existing_heads:
+                skipped_unchanged.append(rq_id)
                 continue
             content = {
                 "text": (r.get("rq_text") or r.get("text") or rq_id).strip(),
@@ -153,7 +181,10 @@ def migrate_legacy_project(
             unmapped_fields["construct_registry.csv"] = sorted(set(construct_rows[0].keys()) - const_mapped_fields)
         for r in construct_rows:
             cid = (r.get("construct_id") or "").strip()
-            if not cid or cid in existing_heads:
+            if not cid:
+                continue
+            if cid in existing_heads:
+                skipped_unchanged.append(cid)
                 continue
             content = {
                 "label": (r.get("canonical_name") or r.get("construct_label") or cid).strip(),
@@ -175,7 +206,10 @@ def migrate_legacy_project(
             unmapped_fields["source_registry.csv"] = sorted(set(source_rows[0].keys()) - src_mapped_fields)
         for r in source_rows:
             sid = (r.get("source_id") or "").strip()
-            if not sid or sid in existing_heads:
+            if not sid:
+                continue
+            if sid in existing_heads:
+                skipped_unchanged.append(sid)
                 continue
             content = {
                 "citation_key": (r.get("citation_key") or r.get("source_code") or sid).strip(),
@@ -194,7 +228,7 @@ def migrate_legacy_project(
             created_objects_by_type["Source"] = created_objects_by_type.get("Source", 0) + 1
             existing_heads.add(sid)
 
-        # 4. Migrate Propositions / Claims (Defects 1 & 3)
+        # 4. Migrate Propositions / Claims (Defects 1 & 3, plus Repair Strategy)
         # Note: Created BEFORE EvidencePassages so EvidencePassages can seal their `supports` edges
         # to Claims directly at revision creation time (audit finding A3).
         prop_mapped_fields = {"proposition_id", "proposition_text", "normalized_proposition", "claim_tier", "rq_id", "scientific_object_id", "status", "notes"}
@@ -202,19 +236,14 @@ def migrate_legacy_project(
             unmapped_fields["proposition_registry.csv"] = sorted(set(prop_rows[0].keys()) - prop_mapped_fields)
         for r in prop_rows:
             pid = (r.get("proposition_id") or "").strip()
-            if not pid or pid in existing_heads:
+            if not pid:
                 continue
-            # Defect 1 fix: prioritize proposition_text over normalized_proposition over pid
+            # Prioritize proposition_text over normalized_proposition over pid
             prop_text = (r.get("proposition_text") or r.get("normalized_proposition") or pid).strip()
             raw_tier = (r.get("claim_tier") or "").strip().lower()
             claim_tier = raw_tier if raw_tier in CLAIM_TIERS else "unclassified"
-            content = {
-                "text": prop_text,
-                "claim_tier": claim_tier,
-                "label": pid,
-            }
             tsha = text_sha(prop_text)
-            # Defect 3 fix: include all formation fields required by build_formation()
+
             formation = {
                 "first_recorded_at": tx.at,
                 "first_recorded_state_revision": tx.revision,
@@ -232,6 +261,78 @@ def migrate_legacy_project(
                     "state_revision": tx.revision,
                     "declared_formation_basis": "unknown",
                 }],
+            }
+
+            if pid in existing_heads:
+                head_claim = tx.get(pid)
+                c_content = head_claim.get("content", {})
+                c_origin = head_claim.get("origin", {})
+                c_formation = c_origin.get("formation", {})
+
+                # Check if this claim was imported by a defective earlier migration
+                text_mismatch = c_content.get("text") != prop_text
+                formation_missing = not c_formation or "first_recorded_text_sha256" not in c_formation or not c_formation.get("history")
+
+                if text_mismatch or formation_missing:
+                    if text_mismatch:
+                        content_mismatches.append({"object_id": pid, "current_text": c_content.get("text"), "authoritative_text": prop_text})
+                    if formation_missing:
+                        provenance_mismatches.append({"object_id": pid, "reason": "missing_formation_fields"})
+
+                    # Append a new attributable revision (repair revision) rather than overwriting historical records
+                    repaired_content = dict(c_content)
+                    repaired_content["text"] = prop_text
+                    repaired_content["label"] = pid
+                    if "claim_tier" not in repaired_content or repaired_content["claim_tier"] == "unclassified":
+                        repaired_content["claim_tier"] = claim_tier
+
+                    repaired_formation = dict(c_formation) if c_formation else formation
+                    repaired_formation.setdefault("first_recorded_text_sha256", tsha)
+                    repaired_formation.setdefault("ledger_results_at_first_recording", [])
+                    repaired_formation.setdefault("declared_formation_basis", "unknown")
+                    repaired_formation.setdefault("results_exposure", "UNKNOWN")
+                    repaired_formation.setdefault("inference_status", "UNKNOWN")
+                    repaired_formation.setdefault("first_recorded_at", tx.at)
+                    repaired_formation.setdefault("first_recorded_state_revision", tx.revision)
+
+                    new_rev = head_claim["head_revision"] + 1
+                    hist = list(repaired_formation.get("history", []))
+                    hist.append({
+                        "revision": new_rev,
+                        "text_sha256": tsha,
+                        "claim_tier": repaired_content["claim_tier"],
+                        "inference_status": "UNKNOWN",
+                        "recorded_at": tx.at,
+                        "state_revision": tx.revision,
+                        "declared_formation_basis": "unknown",
+                    })
+                    repaired_formation["history"] = hist
+
+                    repaired_origin = {
+                        "kind": "MIGRATION_REPAIRED",
+                        "repaired_from_revision": head_claim["head_revision"],
+                        "legacy_source_file": "00_master/proposition_registry.csv",
+                        "legacy_record": r,
+                        "formation": repaired_formation,
+                        "repair_reason": "RESTORE_AUTHORITATIVE_PROPOSITION_TEXT_AND_FORMATION",
+                    }
+
+                    # Re-attach outgoing edges from previous revision
+                    existing_edges = [
+                        (e["relation"], e["target_id"], e["target_revision"], e["provenance"])
+                        for e in target_store.edges_from(tx.conn, pid, head_claim["head_revision"])
+                    ]
+                    tx.add_revision(object_id=pid, object_type="Claim", content=repaired_content, origin=repaired_origin, edges=existing_edges)
+                    repaired_objects.append(pid)
+                    repaired_objects_by_type["Claim"] = repaired_objects_by_type.get("Claim", 0) + 1
+                else:
+                    skipped_unchanged.append(pid)
+                continue
+
+            content = {
+                "text": prop_text,
+                "claim_tier": claim_tier,
+                "label": pid,
             }
             origin = {
                 "kind": OriginKind.LEGACY_MIGRATED.value,
@@ -269,17 +370,49 @@ def migrate_legacy_project(
 
         for r in claim_source_rows:
             csid = (r.get("claim_source_id") or "").strip()
-            if not csid or csid in existing_heads:
+            if not csid:
                 continue
             sid = (r.get("source_id") or "").strip()
             loc_val = (r.get("evidence_locator") or r.get("page_pdf") or r.get("page_printed") or r.get("section_heading") or "loc").strip()
             loc_type = (r.get("locator_type") or "page").strip()
             locator = loc_val if loc_val.startswith(loc_type) else f"{loc_type}: {loc_val}"
+            expected_norm = (r.get("normalized_claim") or "").strip()
             content = {
                 "locator": locator,
-                "normalized_claim": (r.get("normalized_claim") or "").strip(),
+                "normalized_claim": expected_norm,
                 "label": csid,
             }
+
+            if csid in existing_heads:
+                head_cs = tx.get(csid)
+                cur_content = head_cs.get("content", {})
+                cur_loc = cur_content.get("locator", "")
+                cur_norm = cur_content.get("normalized_claim", "")
+                if cur_loc != locator or cur_norm != expected_norm:
+                    content_mismatches.append({
+                        "object_id": csid,
+                        "field": "locator_or_normalized_claim",
+                        "expected": {"locator": locator, "normalized_claim": expected_norm},
+                        "found": cur_content,
+                    })
+                    repaired_origin = {
+                        "kind": "MIGRATION_REPAIRED",
+                        "repaired_from_revision": head_cs["head_revision"],
+                        "legacy_source_file": "00_master/claim_source_registry.csv",
+                        "legacy_record": r,
+                        "repair_reason": "RESTORE_AUTHORITATIVE_LOCATOR_OR_NORMALIZED_CLAIM",
+                    }
+                    existing_edges = [
+                        (e["relation"], e["target_id"], e["target_revision"], e["provenance"])
+                        for e in target_store.edges_from(tx.conn, csid, head_cs["head_revision"])
+                    ]
+                    tx.add_revision(object_id=csid, object_type="EvidencePassage", content=content, origin=repaired_origin, edges=existing_edges)
+                    repaired_objects.append(csid)
+                    repaired_objects_by_type["EvidencePassage"] = repaired_objects_by_type.get("EvidencePassage", 0) + 1
+                else:
+                    skipped_unchanged.append(csid)
+                continue
+
             edges = []
             if sid:
                 if sid in existing_heads:
@@ -311,16 +444,17 @@ def migrate_legacy_project(
             created_objects_by_type["EvidencePassage"] = created_objects_by_type.get("EvidencePassage", 0) + 1
             existing_heads.add(csid)
 
-        # 6. Migrate Semantic Adjudications (Defect 2)
+        # 6. Migrate Semantic Adjudications (Defect 2 & Repair Strategy)
         adj_mapped_fields = {"semantic_adjudication_id", "adjudication_id", "proposition_id", "claim_source_id",
                             "assessment_kind", "verdict", "entailment_verdict", "rationale", "notes"}
         if adjudication_rows:
             unmapped_fields["semantic_adjudication_registry.csv"] = sorted(set(adjudication_rows[0].keys()) - adj_mapped_fields)
 
         adjudications_imported = 0
+        adjudications_repaired = 0
         for r in adjudication_rows:
             aid = (r.get("semantic_adjudication_id") or r.get("adjudication_id") or "").strip()
-            if not aid or aid in existing_heads:
+            if not aid:
                 continue
             pid = (r.get("proposition_id") or "").strip()
             csid = (r.get("claim_source_id") or "").strip()
@@ -356,6 +490,39 @@ def migrate_legacy_project(
                 "verdict": verdict,
                 "rationale": rationale,
             }
+
+            if aid in existing_heads:
+                head_adj = tx.get(aid)
+                cur_content = head_adj.get("content", {})
+                cur_v = cur_content.get("verdict", "")
+                cur_subj = cur_content.get("subject", {})
+                if cur_v != verdict or cur_subj.get("object_id") != subject.get("object_id"):
+                    content_mismatches.append({
+                        "object_id": aid,
+                        "field": "verdict_or_subject",
+                        "expected": {"verdict": verdict, "subject": subject},
+                        "found": cur_content,
+                    })
+                    repaired_origin = {
+                        "kind": "MIGRATION_REPAIRED",
+                        "repaired_from_revision": head_adj["head_revision"],
+                        "legacy_source_file": "00_master/semantic_adjudication_registry.csv",
+                        "legacy_record": r,
+                        "declared_historical_verdict": raw_v,
+                        "repair_reason": "RESTORE_AUTHORITATIVE_VERDICT_OR_SUBJECT",
+                    }
+                    existing_edges = [
+                        (e["relation"], e["target_id"], e["target_revision"], e["provenance"])
+                        for e in target_store.edges_from(tx.conn, aid, head_adj["head_revision"])
+                    ]
+                    tx.add_revision(object_id=aid, object_type="Adjudication", content=content, origin=repaired_origin, edges=existing_edges)
+                    repaired_objects.append(aid)
+                    repaired_objects_by_type["Adjudication"] = repaired_objects_by_type.get("Adjudication", 0) + 1
+                    adjudications_repaired += 1
+                else:
+                    skipped_unchanged.append(aid)
+                continue
+
             edges = []
             if csid and csid in existing_heads:
                 head_cs = tx.head(csid)
@@ -378,43 +545,108 @@ def migrate_legacy_project(
             existing_heads.add(aid)
             adjudications_imported += 1
 
-        tx.event("LEGACY_PROJECT_MIGRATED", {
-            "legacy_root": str(legacy_root),
-            "backup_zip": str(backup_zip),
-            "backup_sha256": backup_sha256,
-            "created_objects_count": len(created_objects),
-            "created_objects_by_type": created_objects_by_type,
-            "created_edges_count": created_edges,
-            "adjudications_imported_count": adjudications_imported,
-        })
+        if created_objects or repaired_objects:
+            tx.event("LEGACY_PROJECT_MIGRATED", {
+                "legacy_root": str(legacy_root),
+                "backup_zip": str(backup_zip),
+                "backup_sha256": backup_sha256,
+                "created_objects_count": len(created_objects),
+                "created_objects_by_type": created_objects_by_type,
+                "repaired_objects_count": len(repaired_objects),
+                "repaired_objects_by_type": repaired_objects_by_type,
+                "created_edges_count": created_edges,
+                "adjudications_imported_count": adjudications_imported,
+                "adjudications_repaired_count": adjudications_repaired,
+            })
+        else:
+            tx.bump = False
 
-    decision = "ACCEPTED"
-    if not created_objects and not created_edges and existing_heads:
+    if repaired_objects:
+        decision = "REPAIRED"
+    elif created_objects:
+        decision = "ACCEPTED"
+    else:
         decision = "ALREADY_MIGRATED"
 
-    # Pre/post content equivalence check
+    # Equivalence checks: each source registry accounted for
     equivalence_checks = {
-        "research_questions_complete": (len(rq_rows) == created_objects_by_type.get("ResearchQuestion", 0)) if decision == "ACCEPTED" else True,
-        "constructs_complete": (len(construct_rows) == created_objects_by_type.get("Construct", 0)) if decision == "ACCEPTED" else True,
-        "sources_complete": (len(source_rows) == created_objects_by_type.get("Source", 0)) if decision == "ACCEPTED" else True,
-        "claims_complete": (len(prop_rows) == created_objects_by_type.get("Claim", 0)) if decision == "ACCEPTED" else True,
-        "evidence_passages_complete": (len(claim_source_rows) == created_objects_by_type.get("EvidencePassage", 0)) if decision == "ACCEPTED" else True,
+        "research_questions_complete": len(rq_rows) == (
+            created_objects_by_type.get("ResearchQuestion", 0) +
+            repaired_objects_by_type.get("ResearchQuestion", 0) +
+            sum(1 for x in skipped_unchanged if x in {r.get("rq_id") for r in rq_rows})
+        ),
+        "constructs_complete": len(construct_rows) == (
+            created_objects_by_type.get("Construct", 0) +
+            repaired_objects_by_type.get("Construct", 0) +
+            sum(1 for x in skipped_unchanged if x in {r.get("construct_id") for r in construct_rows})
+        ),
+        "sources_complete": len(source_rows) == (
+            created_objects_by_type.get("Source", 0) +
+            repaired_objects_by_type.get("Source", 0) +
+            sum(1 for x in skipped_unchanged if x in {r.get("source_id") for r in source_rows})
+        ),
+        "claims_complete": len(prop_rows) == (
+            created_objects_by_type.get("Claim", 0) +
+            repaired_objects_by_type.get("Claim", 0) +
+            sum(1 for x in skipped_unchanged if x in {r.get("proposition_id") for r in prop_rows})
+        ),
+        "evidence_passages_complete": len(claim_source_rows) == (
+            created_objects_by_type.get("EvidencePassage", 0) +
+            repaired_objects_by_type.get("EvidencePassage", 0) +
+            sum(1 for x in skipped_unchanged if x in {r.get("claim_source_id") for r in claim_source_rows})
+        ),
+    }
+
+    full_equivalence = (
+        len(missing_refs) == 0
+        and len(unresolved_records) == 0
+        and all(equivalence_checks.values())
+    )
+
+    if missing_refs or unresolved_records or not all(equivalence_checks.values()):
+        status = "INCOMPLETE"
+    elif repaired_objects or content_mismatches or provenance_mismatches or unmapped_fields:
+        status = "PASS_WITH_WARNINGS"
+    else:
+        status = "PASS"
+
+    status_criteria = {
+        "FAILED": "Catastrophic error or database integrity violation prevented migration.",
+        "INCOMPLETE": "One or more mandatory source records had missing or unresolved references.",
+        "PASS_WITH_WARNINGS": "All records accounted for, but repairs, content mismatches, or unmapped source fields occurred.",
+        "PASS": "100% equivalence demonstrated: all records mapped, zero missing references, zero unresolved records.",
     }
 
     reconciliation_report = {
-        "status": "PASS",
+        "status": status,
+        "status_criteria": status_criteria,
         "decision": decision,
         "target_project_id": target_store.project_id,
         "legacy_root": str(legacy_root),
+        "source_record_count": sum(stats.values()),
         "source_registry_row_counts": stats,
+        "imported_object_count": len(created_objects),
         "imported_object_counts_by_type": created_objects_by_type,
-        "imported_edge_counts": created_edges,
+        "repaired_object_count": len(repaired_objects),
+        "repaired_object_counts_by_type": repaired_objects_by_type,
+        "skipped_unchanged_count": len(skipped_unchanged),
+        "skipped_unchanged": skipped_unchanged,
+        "imported_adjudications": adjudications_imported,
         "imported_adjudication_counts": adjudications_imported,
-        "unmapped_source_fields": unmapped_fields,
+        "repaired_adjudications": adjudications_repaired,
+        "repaired_adjudication_counts": adjudications_repaired,
+        "imported_edge_counts": created_edges,
+        "missing_references": missing_refs,
         "missing_or_malformed_references": missing_refs,
+        "unresolved_records": unresolved_records,
         "unresolved_migration_records": unresolved_records,
+        "content_mismatches": content_mismatches,
+        "provenance_mismatches": provenance_mismatches,
+        "unmapped_source_fields": unmapped_fields,
         "pre_post_content_equivalence": equivalence_checks,
+        "full_migration_equivalence_demonstrated": full_equivalence,
         "backup_location": str(backup_zip),
+        "backup_checksum": backup_sha256,
         "backup_integrity_hash": backup_sha256,
         "timestamp": target_store.clock(),
     }
@@ -430,6 +662,8 @@ def migrate_legacy_project(
         "created_objects_count": len(created_objects),
         "created_objects": created_objects,
         "created_edges_count": created_edges,
+        "repaired_objects_count": len(repaired_objects),
+        "repaired_objects": repaired_objects,
         "new_state_revision": tx.revision,
         "reconciliation_report_path": str(report_file),
     }

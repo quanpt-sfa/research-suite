@@ -65,7 +65,7 @@ def test_independent_review_rejected_when_reviewer_is_contributor(harness_env):
     owner_token = harness_env["owner_token"]
 
     # Give Carol both author and independent_reviewer roles
-    with store.write_tx("owner_alice", bump=False) as tx:
+    with store.write_tx(token=owner_token, bump=False) as tx:
         tx.conn.execute("UPDATE actors SET roles=? WHERE actor_id='rev_carol'", (json.dumps(["author", "importer", "independent_reviewer"]),))
 
     carol_token = harness_env["actors"]["carol"]["token"]

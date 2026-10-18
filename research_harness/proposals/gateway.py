@@ -179,7 +179,7 @@ def import_proposal(store: StateStore, raw: bytes | str, token: Optional[str], *
         if doc["project_id"] != store.project_id:
             reject("PROJECT_MISMATCH", "proposal targets a different project", expected=store.project_id,
                    actual=doc["project_id"])
-        with store.write_tx(actor.actor_id, require_roles=("importer", "owner"), commit=not dry_run) as tx:
+        with store.write_tx(token=token, require_roles=("importer", "owner"), commit=not dry_run) as tx:
             rec = _apply(store, tx, doc, raw_b, sha, dry_run)
     except AuthorizationError as e:  # actor disabled / role revoked between authentication and the transaction
         rec = _from_rejection(store, ProposalRejection(Decision.UNAUTHORIZED, e.code, e.message), doc, sha,

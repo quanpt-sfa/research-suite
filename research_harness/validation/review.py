@@ -79,16 +79,16 @@ def record_review(store: StateStore, token: Optional[str], *, object_id: str, re
     if not actor.has_role(*needed):
         return _refuse(store, actor, "ROLE_REQUIRED", f"{kind} requires role {' or '.join(needed)}", "UNAUTHORIZED")
     try:
-        return _record(store, actor, needed, object_id, revision, kind, decision, rationale, acknowledge_invalidations)
+        return _record(store, token, needed, object_id, revision, kind, decision, rationale, acknowledge_invalidations)
     except AuthorizationError as e:  # identity or role changed between the pre-check and the transaction
         return _refuse(store, actor, e.code, e.message or "authorization failed", "UNAUTHORIZED")
     except _Refused as r:
         return _refuse(store, actor, r.rule, r.message, **r.details)
 
 
-def _record(store: StateStore, pre_actor: Actor, needed: tuple, object_id: str, revision: int, kind: str,
+def _record(store: StateStore, token: str, needed: tuple, object_id: str, revision: int, kind: str,
             decision: str, rationale: str, acknowledge_invalidations: bool) -> dict:
-    with store.write_tx(pre_actor.actor_id, require_roles=needed) as tx:
+    with store.write_tx(token=token, require_roles=needed) as tx:
         actor = tx.actor  # identity/roles as stored inside this transaction
         conn = tx.conn
         head = tx.head(object_id)

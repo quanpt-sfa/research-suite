@@ -95,6 +95,12 @@ SQLite transactions cannot span raw filesystem file writes. To prevent dangling 
 - **`ARTIFACT_BLOB_CORRUPT`:** A blob exists on disk, but recomputing its SHA-256 hash does not match its filename digest.
 - **`ORPHAN_ARTIFACT_BLOB`:** An artifact blob exists on disk but is not referenced by any object or proposal. (Reported as an advisory `INFO` finding; reclaimable via `project recover`).
 
+### 3.3 Schema-Aware CAS References vs Text Fingerprints
+The integrity auditor strictly distinguishes between:
+1. **Genuine Physical CAS References:** Fields whose schema denotes local artifact storage (`artifact_sha256`, `blob_sha256`, `library_file_id`). These require an on-disk blob in `.research/artifacts/sha256/`.
+2. **Text Fingerprints:** Fields representing normalized string digests (`passage_norm_sha256`, `first_recorded_text_sha256`, `text_sha256`). These freeze text contents for non-monotonicity checks and are validated as cryptographic string formats without requiring physical CAS disk blobs.
+3. **External References:** DOI strings, external dataset hashes, and URLs are validated as bibliographic locators and are not treated as local CAS requirements.
+
 ---
 
 ## 4. Actor Attestation & Zero-Disk Credentials
