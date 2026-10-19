@@ -611,6 +611,137 @@ def cmd_schema_export(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Workflow commands
+# ---------------------------------------------------------------------------
+
+def _resolve_project_id(args: argparse.Namespace) -> str:
+    pid = getattr(args, "project", None) or getattr(args, "project_id", None)
+    if not pid:
+        raise ValueError("Project identifier must be provided via --project or positional argument")
+    return pid
+
+
+def cmd_workflow_list(args: argparse.Namespace) -> int:
+    from research_harness.workflows.registry import get_registry
+    registry = get_registry()
+    workflows = registry.list_workflows()
+    if args.json:
+        _json_out({"workflows": workflows, "total_count": len(workflows)})
+    else:
+        print(f"Registered Research Workflows ({len(workflows)} available):\n")
+        for wf in workflows:
+            print(f"  * {wf['name']} - {wf['title']}")
+            print(f"    Description: {wf['description']}")
+            print(f"    Inputs: {', '.join(wf['inputs'])}")
+            print(f"    Outputs: {', '.join(wf['outputs'])}")
+            print()
+    return 0
+
+
+def cmd_workflow_run(args: argparse.Namespace) -> int:
+    from research_harness.workflows.dispatcher import run_workflow
+    try:
+        pid = _resolve_project_id(args)
+        store = _resolve_store(pid, args.home)
+        claims = args.claims.split(",") if getattr(args, "claims", None) else None
+        budget = getattr(args, "budget", None) or 12000
+        output = run_workflow(
+            store,
+            args.workflow,
+            research_question_id=getattr(args, "question", None),
+            focus_claims=claims,
+            max_input_tokens=budget,
+            discipline_profile=getattr(args, "profile", None),
+            reuse_cached=not getattr(args, "no_cache", False),
+        )
+    except Exception as e:
+        sys.stderr.write(f"Workflow execution error: {e}\n")
+        return 1
+
+    if args.json:
+        _json_out(output.to_dict())
+    else:
+        print(f"Workflow: {output.workflow} [Status: {output.status}]")
+        print(f"Task ID: {output.task_id} (Project: {output.project_id})")
+        print(f"Usage: {output.usage.input_tokens or 0} in / {output.usage.output_tokens or 0} out tokens, {output.usage.reused_artifacts} reused artifact(s), {output.usage.elapsed_ms}ms")
+        print("\nSummary of Results:")
+        for k, v in output.result.items():
+            if isinstance(v, list):
+                print(f"  - {k}: {len(v)} item(s)")
+            elif isinstance(v, (str, int, float, bool)):
+                print(f"  - {k}: {v}")
+    return 0
+
+
+def cmd_context_preview(args: argparse.Namespace) -> int:
+    from research_harness.workflows.context import build_context
+    try:
+        pid = _resolve_project_id(args)
+        store = _resolve_store(pid, args.home)
+        claims = args.claims.split(",") if getattr(args, "claims", None) else None
+        budget = getattr(args, "budget", None) or 12000
+        ctx = build_context(
+            store,
+            args.workflow,
+            research_question_id=getattr(args, "question", None),
+            focus_claims=claims,
+            max_input_tokens=budget,
+            fulltext_policy=getattr(args, "fulltext", "on_demand"),
+            discipline_profile=getattr(args, "profile", None),
+        )
+    except Exception as e:
+        sys.stderr.write(f"Context preview error: {e}\n")
+        return 1
+
+    if args.json:
+        _json_out(ctx.to_dict())
+    else:
+        m = ctx.manifest
+        print(f"Context Preview for Workflow '{ctx.workflow}' in '{ctx.project_id}':")
+        print(f"  Budget Limit:           {m['budget_limit']} tokens")
+        print(f"  Estimated Tokens:       {m['estimated_tokens']} (estimated: {m['is_estimate']})")
+        print(f"  Context Payload Size:   {m['context_bytes']} bytes")
+        print(f"  Budget Status:          {m['budget_status']}")
+        print(f"  Included Objects:       {m['included_objects_count']} {m['included_by_type']}")
+        print(f"  Deduplicated Excerpts:  {m['deduped_excerpts_count']}")
+        print(f"  Full-Text Expansions:   {m['fulltext_expanded_count']}")
+        print(f"  Contradictory Evidence: {m['contradictory_evidence_count']}")
+        print(f"  Omitted Objects:        {m['omitted_objects_count']}")
+        if ctx.continuation_plan:
+            print(f"  Continuation Plan:      {ctx.continuation_plan.get('recommendation')}")
+    return 0
+
+
+def cmd_usage_report(args: argparse.Namespace) -> int:
+    from research_harness.workflows.instrumentation import UsageTracker
+    try:
+        pid = _resolve_project_id(args)
+        store = _resolve_store(pid, args.home)
+        tracker = UsageTracker(store)
+        summary = tracker.get_summary(workflow=getattr(args, "workflow", None))
+    except Exception as e:
+        sys.stderr.write(f"Usage report error: {e}\n")
+        return 1
+
+    if args.json:
+        _json_out(summary)
+    else:
+        print(f"Usage Report for Project '{summary['project_id']}':")
+        print(f"  Total Tasks Recorded:   {summary['tasks_recorded']}")
+        print(f"  Total Input Tokens:     {summary['total_input_tokens']}")
+        print(f"  Total Output Tokens:    {summary['total_output_tokens']}")
+        print(f"  Total Cached Reads:     {summary['total_cache_read_tokens']}")
+        print(f"  Total Reused Artifacts: {summary['total_reused_artifacts']}")
+        print(f"  Total Model Calls:      {summary['total_llm_calls']}")
+        print(f"  Total Elapsed Time:     {summary['total_elapsed_ms']}ms")
+        if summary.get("by_workflow"):
+            print("  Breakdown by Workflow:")
+            for wf, d in summary["by_workflow"].items():
+                print(f"    - {wf}: {d['tasks_count']} tasks, {d['input_tokens']} in / {d['output_tokens']} out, {d['reused_artifacts']} reused")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI Argument Parser Setup
 # ---------------------------------------------------------------------------
 
@@ -809,6 +940,53 @@ def build_parser() -> argparse.ArgumentParser:
     p_sexp2.add_argument("--dir", help="Target directory (default: schemas)")
     p_sexp2.add_argument("--json", action="store_true", help="Output JSON list of schemas")
     p_sexp2.set_defaults(func=cmd_schema_export)
+
+    # workflow
+    p_wf = sub.add_parser("workflow", help="Manage and execute modular research workflows")
+    s_wf = p_wf.add_subparsers(dest="workflow_cmd", required=True)
+
+    p_wflist = s_wf.add_parser("list", help="List registered research workflows")
+    p_wflist.add_argument("--json", action="store_true", help="Output JSON")
+    p_wflist.set_defaults(func=cmd_workflow_list)
+
+    p_wfrun = s_wf.add_parser("run", help="Run a modular research workflow")
+    p_wfrun.add_argument("workflow", choices=["contribution", "literature", "methods", "results", "discussion"], help="Workflow identifier")
+    p_wfrun.add_argument("--project", "--project-id", dest="project", required=True, help="Project identifier")
+    p_wfrun.add_argument("--question", "--question-id", dest="question", help="Target research question ID")
+    p_wfrun.add_argument("--claims", help="Comma-separated focus claim IDs")
+    p_wfrun.add_argument("--budget", type=int, default=12000, help="Maximum input token budget")
+    p_wfrun.add_argument("--profile", help="Discipline profile (accounting, finance, education)")
+    p_wfrun.add_argument("--no-cache", action="store_true", help="Bypass artifact cache")
+    p_wfrun.add_argument("--home", help="Base directory for research projects")
+    p_wfrun.add_argument("--json", action="store_true", help="Output JSON")
+    p_wfrun.set_defaults(func=cmd_workflow_run)
+
+    # context
+    p_ctx = sub.add_parser("context", help="Inspect and preview selective workflow contexts")
+    s_ctx = p_ctx.add_subparsers(dest="context_cmd", required=True)
+
+    p_ctxprev = s_ctx.add_parser("preview", help="Preview selective context manifest and token budget")
+    p_ctxprev.add_argument("--project", "--project-id", dest="project", required=True, help="Project identifier")
+    p_ctxprev.add_argument("--workflow", choices=["contribution", "literature", "methods", "results", "discussion"], required=True, help="Target workflow")
+    p_ctxprev.add_argument("--question", "--question-id", dest="question", help="Target research question ID")
+    p_ctxprev.add_argument("--claims", help="Comma-separated focus claim IDs")
+    p_ctxprev.add_argument("--budget", type=int, default=12000, help="Maximum input token budget")
+    p_ctxprev.add_argument("--fulltext", choices=["on_demand", "always", "never"], default="on_demand", help="Full-text expansion policy")
+    p_ctxprev.add_argument("--profile", help="Discipline profile (accounting, finance, education)")
+    p_ctxprev.add_argument("--home", help="Base directory for research projects")
+    p_ctxprev.add_argument("--json", action="store_true", help="Output JSON")
+    p_ctxprev.set_defaults(func=cmd_context_preview)
+
+    # usage
+    p_use = sub.add_parser("usage", help="Inspect token usage and workflow budgeting")
+    s_use = p_use.add_subparsers(dest="usage_cmd", required=True)
+
+    p_userep = s_use.add_parser("report", help="Report aggregated token and execution metrics")
+    p_userep.add_argument("--project", "--project-id", dest="project", required=True, help="Project identifier")
+    p_userep.add_argument("--workflow", help="Optional workflow filter")
+    p_userep.add_argument("--home", help="Base directory for research projects")
+    p_userep.add_argument("--json", action="store_true", help="Output JSON")
+    p_userep.set_defaults(func=cmd_usage_report)
 
     return parser
 

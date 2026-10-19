@@ -19,7 +19,10 @@ research = "research_harness.cli:main"
 include = ["research_harness*"]
 
 [tool.setuptools.package-data]
-research_harness = ["legacy/VENDORED.json"]
+research_harness = [
+    "legacy/VENDORED.json",
+    "workflows/skills/*/*.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

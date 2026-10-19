@@ -23,10 +23,11 @@ from research_harness.core.model import Decision, IntegrityStatus, ReleaseEligib
 from research_harness.graph.dependency import traverse
 from research_harness.proposals.gateway import import_proposal, static_check
 from research_harness.protocols.snapshot import export_snapshot, verify_snapshot_document
+from research_harness.state.actors import register_actor, update_actor
 from research_harness.state.store import StateStore
 from research_harness.validation.integrity import audit_project_integrity, release_check
 from research_harness.validation.project_status import get_object_history, get_project_status
-from research_harness.validation.review import record_review
+from research_harness.validation.review import record_adjudication, record_review
 
 
 def print_step(title: str) -> None:
@@ -43,20 +44,25 @@ def main() -> None:
         print(f"Owner: alice_owner (Token: {owner_token[:15]}...)")
 
         # Register Author (Bob) and Independent Reviewer (Carol)
-        bob_token = new_token()
-        carol_token = new_token()
-        with store.write_tx(token=owner_token, bump=False) as tx:
-            tx.conn.execute("UPDATE actors SET independence_group='org_owner' WHERE actor_id='alice_owner'")
-            tx.conn.execute(
-                "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ("bob_researcher", "Bob (AI Research Lead)", json.dumps(["author", "importer"]), "lab_mit", token_hash(bob_token), tx.at, "alice_owner"),
-            )
-            tx.conn.execute(
-                "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ("carol_reviewer", "Dr. Carol (External Peer Reviewer)", json.dumps(["independent_reviewer"]), "lab_oxford", token_hash(carol_token), tx.at, "alice_owner"),
-            )
+        update_actor(store, owner_token, actor_id="alice_owner", independence_group="org_owner")
+        bob_reg = register_actor(
+            store,
+            owner_token,
+            actor_id="bob_researcher",
+            display_name="Bob (AI Research Lead)",
+            roles=["author", "importer"],
+            independence_group="lab_mit",
+        )
+        bob_token = bob_reg["token"]
+        carol_reg = register_actor(
+            store,
+            owner_token,
+            actor_id="carol_reviewer",
+            display_name="Dr. Carol (External Peer Reviewer)",
+            roles=["independent_reviewer"],
+            independence_group="lab_oxford",
+        )
+        carol_token = carol_reg["token"]
         print("Actors registered: bob_researcher (author, importer, lab_mit), carol_reviewer (independent_reviewer, lab_oxford)")
 
         # Verify initial release check fails closed on empty project
@@ -65,9 +71,7 @@ def main() -> None:
         assert init_gate["release_eligibility"] == ReleaseEligibility.BLOCKED.value
 
         print_step("Step 2: Export Scoped Snapshot for ChatGPT Web")
-        with store.read() as conn:
-            bob_actor = authenticate(conn, bob_token)
-        snapshot = export_snapshot(store, bob_actor, scope="full")
+        snapshot = export_snapshot(store, token=bob_token, scope="full")
         print(f"Snapshot exported: {snapshot['snapshot_id']} (State Rev: {snapshot['state_revision']}, SHA: {snapshot['state_sha256'][:16]}...)")
         print(f"Server HMAC: {snapshot['integrity']['body_hmac_sha256'][:24]}...")
 
@@ -164,7 +168,7 @@ def main() -> None:
         print("Initial author approval recorded: status = AUTHOR_APPROVED")
 
         # Now researcher updates Proxy definition (rev 2)
-        snap2 = export_snapshot(store, bob_actor, scope="full")
+        snap2 = export_snapshot(store, token=bob_token, scope="full")
         revise_proxy_doc = {
             "protocol_version": PROTOCOL_VERSION,
             "proposal_id": "PROP_REVISE_PROXY_02",
@@ -271,13 +275,75 @@ def main() -> None:
             revision=1,
             kind="independent_review",
             decision="approve",
-            rationale="Audited revised proxy formula; causal connection to harness stability remains valid.",
+            rationale="Audited revised proxy formula; acknowledging intermediate invalidation.",
             acknowledge_invalidations=True,
         )
-        print(f"Independent review successfully recorded: {valid_rev['decision']}")
-        print(f"Approval Object Created: {valid_rev['approval_id']}")
-        print(f"New Claim Status: {valid_rev['new_review_status']}")
+        print(f"Independent review for rev 1 recorded: {valid_rev['decision']}")
+        print(f"Resolved invalidations: {valid_rev.get('resolved_invalidations')}")
         assert valid_rev["decision"] == "RECORDED"
+
+        # Author updates claim to revision 2 re-binding to updated Proxy (rev 2)
+        snap3 = export_snapshot(store, token=bob_token, scope="full")
+        revise_claim_doc = {
+            "protocol_version": PROTOCOL_VERSION,
+            "proposal_id": "PROP_REVISE_CLAIM_02",
+            "project_id": project_id,
+            "base": {
+                "snapshot_id": snap3["snapshot_id"],
+                "state_revision": snap3["state_revision"],
+                "state_sha256": snap3["state_sha256"],
+            },
+            "read_set": {"CLAIM_CORE_HYPOTHESIS": 1, "PROXY_TEST_FAILURES": 2, "RESULT_EMPIRICAL_RUN": 1},
+            "origin_channel": "human_cli",
+            "operations": [
+                {
+                    "operation": "revise_object",
+                    "object_id": "CLAIM_CORE_HYPOTHESIS",
+                    "base_revision": 1,
+                    "content": {
+                        "label": "Reasoning Model Stability Hypothesis",
+                        "text": "Integrating reasoning models directly reduces harness regression failures under weighted defect proxy.",
+                        "claim_tier": "causal",
+                    },
+                    "depends_on": ["PROXY_TEST_FAILURES", "RESULT_EMPIRICAL_RUN"],
+                    "relations": [
+                        {"relation": "depends_on", "target_id": "PROXY_TEST_FAILURES"},
+                        {"relation": "depends_on", "target_id": "RESULT_EMPIRICAL_RUN"},
+                    ],
+                }
+            ],
+        }
+        rec_claim = import_proposal(store, json.dumps(revise_claim_doc), bob_token)
+        print(f"Claim revised to rev 2: decision={rec_claim['decision']}")
+        assert rec_claim["decision"] == Decision.ACCEPTED.value
+
+        # Independent Reviewer Carol signs off and adjudicates Claim rev 2
+        rev2_eval = record_review(
+            store,
+            carol_token,
+            object_id="CLAIM_CORE_HYPOTHESIS",
+            revision=2,
+            kind="independent_review",
+            decision="approve",
+            rationale="Audited revised proxy formula and updated claim; causal connection verified.",
+            acknowledge_invalidations=True,
+        )
+        print(f"Independent review for rev 2 recorded: {rev2_eval['decision']}")
+        assert rev2_eval["decision"] == "RECORDED"
+
+        adj_res = record_adjudication(
+            store,
+            carol_token,
+            subject_id="CLAIM_CORE_HYPOTHESIS",
+            subject_revision=2,
+            assessment_kind="scientific_judgment",
+            verdict="SUPPORTED",
+            rationale="Audited empirical refactor run and revised proxy formula; causal connection verified.",
+            cited_evidence=[{"object_id": "RESULT_EMPIRICAL_RUN", "revision": 1}],
+            is_independent=True,
+        )
+        assert adj_res["decision"] == "RECORDED"
+        print(f"Independent Adjudication Recorded: {adj_res['adjudication_id']} (Verdict: {adj_res['verdict']})")
 
         print_step("Step 8: Final Integrity Audit & Release Gate Check")
         aud = audit_project_integrity(store)
@@ -290,6 +356,7 @@ def main() -> None:
         print(f"  Completeness:     {gate['workflow_status']}")
         print(f"  Review Status:    {gate['scientific_review_status']}")
         print(f"  Release Decision: {gate['release_eligibility']}")
+        print(f"  Block Reasons:    {gate.get('block_reasons')}")
         assert gate["release_eligibility"] == ReleaseEligibility.ELIGIBLE.value
 
         print_step("DEMONSTRATION COMPLETED SUCCESSFULLY")
