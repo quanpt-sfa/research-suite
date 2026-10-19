@@ -20,7 +20,7 @@ def test_cascading_invalidation_on_proxy_revision(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 1. Propose Construct and Proxy
     ops1 = [
@@ -65,7 +65,7 @@ def test_cascading_invalidation_on_proxy_revision(harness_env):
     assert rev_rec["new_review_status"] == ReviewStatus.AUTHOR_APPROVED.value
 
     # Export snapshot with current state
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # 2. Revise Proxy to revision 2
     ops2 = [
@@ -107,7 +107,7 @@ def test_cascading_invalidation_on_result_revision(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Create Result and dependent Claim
     ops1 = [
@@ -134,7 +134,7 @@ def test_cascading_invalidation_on_result_revision(harness_env):
     # Approve Claim
     record_review(store, owner_token, object_id="CLAIM_RES_001", revision=1, kind="author_approval", decision="approve")
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Revise Result
     ops2 = [
@@ -159,10 +159,11 @@ def test_cascading_invalidation_on_result_revision(harness_env):
 
 def test_cycle_tolerance_in_dependency_traversal(harness_env):
     store = harness_env["store"]
+    owner_token = harness_env["owner_token"]
 
     # In research workflows, object-level cycles (Theory -> Claim -> Theory v2) can occur.
     # The revision graph is DAG, but let's test traversal BFS with intentional cycles.
-    with store.write_tx("owner_alice") as tx:
+    with store.write_tx(token=owner_token) as tx:
         # Create T1 rev 1
         tx.add_revision(
             object_id="THEORY_CYCLE",
@@ -202,7 +203,7 @@ def test_unrelated_object_stability(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Two independent branches: Branch A (PA -> CA) and Branch B (PB -> CB)
     ops = [
@@ -244,7 +245,7 @@ def test_unrelated_object_stability(harness_env):
     record_review(store, owner_token, object_id="CLAIM_A", revision=1, kind="author_approval", decision="approve")
     record_review(store, owner_token, object_id="CLAIM_B", revision=1, kind="author_approval", decision="approve")
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Revise PROXY_A only
     ops_revA = [
@@ -276,8 +277,9 @@ def test_unrelated_object_stability(harness_env):
 
 def test_stale_pinned_edge_detection(harness_env):
     store = harness_env["store"]
+    owner_token = harness_env["owner_token"]
 
-    with store.write_tx("owner_alice") as tx:
+    with store.write_tx(token=owner_token) as tx:
         # Create Target Object rev 1
         tx.add_revision(
             object_id="TARGET_OBJ",

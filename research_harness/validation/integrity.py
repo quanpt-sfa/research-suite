@@ -23,6 +23,7 @@ from research_harness.core.model import (
     CLAIM_TIERS,
     IntegrityStatus,
     Lifecycle,
+    OriginKind,
     ReleaseEligibility,
     ReviewStatus,
     WorkflowStatus,
@@ -100,9 +101,9 @@ def verify_database_integrity(store: StateStore) -> list[dict]:
                         "stored": stored_cdig,
                         "actual": actual_cdig,
                     })
-                # Check for referenced CAS artifacts in content
+                # Check for referenced physical CAS artifacts in content (do not treat text fingerprints as CAS blobs)
                 if isinstance(c_data, dict):
-                    for k in ("artifact_sha256", "data_ref", "blob_sha256", "passage_norm_sha256"):
+                    for k in ("artifact_sha256", "blob_sha256"):
                         val = c_data.get(k)
                         if isinstance(val, str) and len(val) == 64:
                             referenced_artifacts.add(val)
@@ -280,7 +281,7 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
 
         # Active adjudications
         adjudication_rows = conn.execute(
-            """SELECT o.object_id, o.revision, o.content
+            """SELECT o.object_id, o.revision, o.content, o.origin
                FROM object_heads h
                JOIN objects o ON o.object_id = h.object_id AND o.revision = h.head_revision
                WHERE h.object_type = 'Adjudication' AND h.lifecycle_status = 'ACTIVE'"""
@@ -290,21 +291,58 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
     has_rq = type_counts.get("ResearchQuestion", 0) > 0
     has_claims = len(claims) > 0
 
-    # Index edges by source and target
-    edges_by_source: dict[str, list[tuple]] = {}
-    edges_by_target: dict[str, list[tuple]] = {}
-    for e in all_edges:
-        edges_by_source.setdefault(e[0], []).append(e)
-        edges_by_target.setdefault(e[3], []).append(e)
+    head_map = {h["object_id"]: h["head_revision"] for h in heads}
+    head_types = {h["object_id"]: h["object_type"] for h in heads}
 
-    # Index adjudications by subject object_id
-    adjudications_by_subject: dict[str, list[dict]] = {}
-    for a_id, a_rev, raw_c in adjudication_rows:
+    # Index edges strictly by (id, revision) for both source and target to prevent revision leakage
+    edges_by_source_rev: dict[tuple[str, int], list[tuple]] = {}
+    edges_by_target_rev: dict[tuple[str, int], list[tuple]] = {}
+    for e in all_edges:
+        edges_by_source_rev.setdefault((e[0], e[1]), []).append(e)
+        edges_by_target_rev.setdefault((e[3], e[4]), []).append(e)
+
+    # Index adjudications strictly by subject (object_id, revision) and classify them
+    adjudications_by_subject_rev: dict[tuple[str, int], list[dict]] = {}
+    adjudications_summary_total = {
+        "CURRENT_AUTHORIZED": 0,
+        "LEGACY_HISTORICAL": 0,
+        "SUPERSEDED": 0,
+        "UNRESOLVED": 0,
+        "UNAUTHORIZED_OR_UNVERIFIABLE": 0,
+    }
+
+    for a_id, a_rev, raw_c, raw_o in adjudication_rows:
         try:
-            a_data = json.loads(raw_c)
-            s_id = a_data.get("subject", {}).get("object_id")
-            if s_id:
-                adjudications_by_subject.setdefault(s_id, []).append({**a_data, "adjudication_id": a_id})
+            a_data = json.loads(raw_c) if isinstance(raw_c, str) else raw_c
+            a_orig = json.loads(raw_o) if isinstance(raw_o, str) else (raw_o or {})
+            orig_kind = a_orig.get("kind")
+            is_historical = bool(a_data.get("is_historical") or orig_kind == OriginKind.LEGACY_MIGRATED.value)
+            verdict = a_data.get("verdict")
+            subj = a_data.get("subject", {})
+            s_id = subj.get("object_id")
+            s_rev = subj.get("revision")
+
+            if orig_kind == OriginKind.PROPOSAL_IMPORTED.value:
+                classification = "UNAUTHORIZED_OR_UNVERIFIABLE"
+            elif s_id in head_map and s_rev is not None and int(s_rev) < head_map[s_id]:
+                classification = "SUPERSEDED"
+            elif verdict in {"UNCLEAR", "NOT_SUPPORTED"}:
+                classification = "UNRESOLVED"
+            elif is_historical:
+                classification = "LEGACY_HISTORICAL"
+            else:
+                classification = "CURRENT_AUTHORIZED"
+
+            adjudications_summary_total[classification] += 1
+
+            if s_id and s_rev is not None and classification != "UNAUTHORIZED_OR_UNVERIFIABLE":
+                adjudications_by_subject_rev.setdefault((s_id, int(s_rev)), []).append({
+                    **a_data,
+                    "adjudication_id": a_id,
+                    "origin_kind": orig_kind,
+                    "classification": classification,
+                    "is_historical": is_historical,
+                })
         except Exception:
             pass
 
@@ -325,7 +363,7 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
     else:
         workflow_status = WorkflowStatus.COMPLETE
 
-    # Claim-Proportional Adjudication & Evidence Evaluation
+    # Claim-Proportional Adjudication & Revision-Pinned Evidence Evaluation
     adjudication_statuses_found: set[str] = set()
 
     for c in claims:
@@ -341,68 +379,149 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         if formation.get("downgrade_reason"):
             provenance_status = "WARNING"
 
-        # Gather evidence linked to this claim:
-        # 1. Incoming 'supports' or 'tests' edges (where target is claim)
-        incoming = edges_by_target.get(cid, [])
+        # Gather evidence linked strictly to THIS claim revision:
+        # 1. Incoming 'supports' or 'tests' edges (where target is claim at revision crev)
+        incoming = edges_by_target_rev.get((cid, crev), [])
         supporting_sources = [e for e in incoming if e[2] in {"supports", "tests"}]
 
-        # 2. Outgoing 'depends_on' edges (where source is claim)
-        outgoing = edges_by_source.get(cid, [])
+        # 2. Outgoing 'depends_on' edges (where source is claim at revision crev)
+        outgoing = edges_by_source_rev.get((cid, crev), [])
         dependent_targets = [e for e in outgoing if e[2] in {"depends_on", "measures", "operationalizes"}]
 
-        # Filter direct linked objects to true evidence types (ResearchQuestion / Construct alone are not evidence)
-        linked_candidate_ids = {e[0] for e in supporting_sources} | {e[3] for e in dependent_targets}
-
-        # Check empirical results vs descriptive passages
+        # Check empirical results vs descriptive passages vs theoretical constructs
         has_empirical_result = False
         has_evidence_passage = False
         has_raw_source_only = False
+        has_theory_or_construct = False
+        has_construct = False
+        has_proxy = False
         evidence_ids: set[str] = set()
+        stale_evidence_found = False
 
-        with store.read() as conn:
-            for evid in linked_candidate_ids:
-                h = conn.execute("SELECT object_type FROM object_heads WHERE object_id=?", (evid,)).fetchone()
-                if h:
-                    obj_type = h[0]
-                    if obj_type in {"Result", "Analysis"}:
-                        has_empirical_result = True
-                        evidence_ids.add(evid)
-                    elif obj_type == "EvidencePassage":
-                        has_evidence_passage = True
-                        evidence_ids.add(evid)
-                    elif obj_type == "Source":
-                        has_raw_source_only = True
-                        evidence_ids.add(evid)
+        for e in supporting_sources:
+            evid, ev_rev = e[0], e[1]
+            obj_type = head_types.get(evid)
+            if head_map.get(evid) != ev_rev:
+                stale_evidence_found = True
+            if obj_type in {"Result", "Analysis"}:
+                has_empirical_result = True
+                evidence_ids.add(evid)
+            elif obj_type == "EvidencePassage":
+                has_evidence_passage = True
+                evidence_ids.add(evid)
+            elif obj_type == "Source":
+                has_raw_source_only = True
+                evidence_ids.add(evid)
 
-        # Check adjudications for this claim or for its supporting evidence passages
-        claim_adjudications = list(adjudications_by_subject.get(cid, []))
-        for evid in evidence_ids:
-            claim_adjudications.extend(adjudications_by_subject.get(evid, []))
+        for e in dependent_targets:
+            dep_id, dep_rev = e[3], e[4]
+            obj_type = head_types.get(dep_id)
+            if head_map.get(dep_id) != dep_rev:
+                stale_evidence_found = True
+            if obj_type in {"Theory", "Construct"}:
+                has_theory_or_construct = True
+            if obj_type == "Construct":
+                has_construct = True
+            elif obj_type == "Proxy":
+                has_proxy = True
+            elif obj_type in {"Result", "Analysis"}:
+                has_empirical_result = True
+                evidence_ids.add(dep_id)
+            elif obj_type == "EvidencePassage":
+                has_evidence_passage = True
+                evidence_ids.add(dep_id)
+            elif obj_type == "Source":
+                has_raw_source_only = True
+                evidence_ids.add(dep_id)
+
+        # Check adjudications strictly bound to THIS claim revision or its linked evidence revisions
+        claim_adjudications = list(adjudications_by_subject_rev.get((cid, crev), []))
+        for e in supporting_sources:
+            evid, ev_rev = e[0], e[1]
+            claim_adjudications.extend(adjudications_by_subject_rev.get((evid, ev_rev), []))
 
         # Determine claim-level eligibility
         claim_blocked_reasons: list[str] = []
 
-        # Tier-specific evidence rules:
-        if not evidence_ids:
-            claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Claim '{cid}' has no supporting evidence")
-        elif has_raw_source_only and not has_empirical_result and not has_evidence_passage:
-            claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Mere generic Source '{list(evidence_ids)[0]}' is insufficient evidence for Claim '{cid}'")
+        if stale_evidence_found:
+            claim_blocked_reasons.append(f"STALE_DEPENDENT_EVIDENCE: Claim '{cid}' links to superseded evidence revision")
 
+        # Check for Mechanism objects linked to this claim
+        has_mechanism = False
+        for e in dependent_targets:
+            dep_id = e[3]
+            if head_types.get(dep_id) == "Mechanism":
+                has_mechanism = True
+        for e in supporting_sources:
+            evid = e[0]
+            if head_types.get(evid) == "Mechanism":
+                has_mechanism = True
+
+        # Tier-specific evidence rules:
         if tier == "unclassified":
             claim_blocked_reasons.append(f"UNCLASSIFIED_CLAIM_TIER: Migrated claim '{cid}' must be classified before release")
-        elif tier == "causal":
-            # Causal claim rule: cannot be accepted using ONLY descriptive evidence without empirical result or adjudication
+        elif tier == "conceptual":
+            if not has_theory_or_construct:
+                claim_blocked_reasons.append(f"CONCEPTUAL_CLAIM_LACKS_THEORY_OR_CONSTRUCT: Conceptual claim '{cid}' requires theoretical construct or theory linkage")
+        elif tier == "measurement_validation":
+            if not (has_construct and has_proxy):
+                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_OPERATIONALIZATION: Measurement validation claim '{cid}' requires construct and proxy operationalization")
             if not has_empirical_result:
-                # Must have formal supported adjudication if relying solely on literature evidence
-                supported_adjs = [a for a in claim_adjudications if a.get("verdict") == "SUPPORTED"]
-                if not supported_adjs:
+                claim_blocked_reasons.append(f"MEASUREMENT_CLAIM_LACKS_VALIDATION_RESULT: Measurement validation claim '{cid}' requires empirical Result demonstrating instrument validation")
+        elif tier == "causal":
+            current_supported_adjs = [
+                a for a in claim_adjudications
+                if a.get("classification") == "CURRENT_AUTHORIZED" and a.get("verdict") == "SUPPORTED"
+            ]
+            historical_supported_adjs = [
+                a for a in claim_adjudications
+                if a.get("classification") == "LEGACY_HISTORICAL" and a.get("verdict") == "SUPPORTED"
+            ]
+            if not has_empirical_result:
+                claim_blocked_reasons.append(
+                    f"CAUSAL_CLAIM_LACKS_EMPIRICAL_SUPPORT: Causal claim '{cid}' requires empirical Result (experiment, quasi-experiment, or causal inference)"
+                )
+            if not current_supported_adjs:
+                if historical_supported_adjs and not policy.get("allow_historical_adjudication", False):
                     claim_blocked_reasons.append(
-                        f"CAUSAL_CLAIM_LACKS_EMPIRICAL_OR_ADJUDICATED_SUPPORT: Causal claim '{cid}' lacks empirical result or verified adjudication"
+                        f"HISTORICAL_ADJUDICATION_NOT_CURRENT: Causal claim '{cid}' has historical adjudication {historical_supported_adjs[0].get('adjudication_id')} but default policy requires current authenticated adjudication"
                     )
+                elif not (historical_supported_adjs and policy.get("allow_historical_adjudication", False)):
+                    claim_blocked_reasons.append(
+                        f"CAUSAL_CLAIM_LACKS_ADJUDICATION: Causal claim '{cid}' requires an authorized scientific Adjudication with verdict SUPPORTED"
+                    )
+        elif tier == "mechanism_consistent":
+            if not has_mechanism:
+                claim_blocked_reasons.append(f"MECHANISM_CLAIM_LACKS_MECHANISM_LINK: Mechanism-consistent claim '{cid}' requires linkage to a Mechanism object")
+            if not (has_empirical_result or has_evidence_passage):
+                claim_blocked_reasons.append(f"MECHANISM_CLAIM_LACKS_EMPIRICAL_SUPPORT: Mechanism-consistent claim '{cid}' requires supporting empirical Result or EvidencePassage")
+        elif tier == "predictive":
+            if not has_empirical_result:
+                claim_blocked_reasons.append(f"PREDICTIVE_CLAIM_LACKS_VALIDATION_RESULTS: Predictive claim '{cid}' requires empirical Result evaluating predictive validation")
+        elif tier == "associational":
+            if not has_empirical_result and not has_evidence_passage:
+                claim_blocked_reasons.append(f"ASSOCIATIONAL_CLAIM_LACKS_SUPPORT: Associational claim '{cid}' requires empirical result or evidence passage")
+        elif tier == "descriptive":
+            if not has_empirical_result and not has_evidence_passage:
+                if has_raw_source_only:
+                    claim_blocked_reasons.append(
+                        f"CLAIM_UNSUPPORTED_DESCRIPTIVE_SOURCE_ONLY: Mere generic Source '{list(evidence_ids)[0]}' is insufficient evidence for Claim '{cid}'; requires EvidencePassage"
+                    )
+                else:
+                    claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Descriptive claim '{cid}' has no supporting evidence")
+        else:
+            if not evidence_ids and not has_theory_or_construct:
+                claim_blocked_reasons.append(f"CLAIM_UNSUPPORTED: Claim '{cid}' has no supporting evidence")
 
         # Adjudication checks
-        if require_adjudication_for_all and not claim_adjudications:
-            claim_blocked_reasons.append(f"REQUIRED_ADJUDICATION_MISSING: Claim '{cid}' requires semantic adjudication")
+        if require_adjudication_for_all:
+            curr_supp = [a for a in claim_adjudications if a.get("classification") == "CURRENT_AUTHORIZED" and a.get("verdict") == "SUPPORTED"]
+            hist_supp = [a for a in claim_adjudications if a.get("classification") == "LEGACY_HISTORICAL" and a.get("verdict") == "SUPPORTED"]
+            if not curr_supp:
+                if hist_supp and not policy.get("allow_historical_adjudication", False):
+                    claim_blocked_reasons.append(f"HISTORICAL_ADJUDICATION_NOT_CURRENT: Claim '{cid}' requires current authenticated adjudication")
+                elif not hist_supp and not curr_supp:
+                    claim_blocked_reasons.append(f"REQUIRED_ADJUDICATION_MISSING: Claim '{cid}' requires semantic adjudication")
 
         for adj in claim_adjudications:
             v = adj.get("verdict")
@@ -425,6 +544,12 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
             "review_status": cstatus,
             "linked_evidence_count": len(evidence_ids),
             "adjudications_count": len(claim_adjudications),
+            "adjudications_summary": {
+                "current_authorized": len([a for a in claim_adjudications if a.get("classification") == "CURRENT_AUTHORIZED"]),
+                "legacy_historical": len([a for a in claim_adjudications if a.get("classification") == "LEGACY_HISTORICAL"]),
+                "unresolved": len([a for a in claim_adjudications if a.get("classification") == "UNRESOLVED"]),
+                "superseded": len([a for a in claim_adjudications if a.get("classification") == "SUPERSEDED"]),
+            },
             "eligible": len(claim_blocked_reasons) == 0,
             "reasons": claim_blocked_reasons,
         })
@@ -495,6 +620,10 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
     if stale_deps_count > 0:
         block_reasons.append(f"STALE_DEPENDENCIES_PINNED: {stale_deps_count} edge(s) point to superseded revisions")
 
+    allow_warnings = policy.get("allow_warnings", True)
+    if not allow_warnings and provenance_status == "WARNING":
+        block_reasons.append("PROVENANCE_WARNING_NOT_PERMITTED: provenance warnings exist and release policy specifies allow_warnings=False")
+
     # Release Eligibility Determination
     permitted_review = {ReviewStatus.INDEPENDENTLY_REVIEWED} if require_independent_review else {
         ReviewStatus.AUTHOR_APPROVED, ReviewStatus.INDEPENDENTLY_REVIEWED
@@ -524,6 +653,8 @@ def release_check(store: StateStore, policy: Optional[dict[str, Any]] = None) ->
         "claims_count": len(claims),
         "open_invalidations_count": len(open_invalidations),
         "claims_evaluation": claims_evaluation,
+        "adjudications_summary": adjudications_summary_total,
+        "historical_adjudications_accepted": bool(policy.get("allow_historical_adjudication", False)),
         "policy_applied": policy.get("name", "claim_proportional_default"),
         "notes": [
             "IntegrityStatus checks cryptographic, relational, and CAS storage consistency.",

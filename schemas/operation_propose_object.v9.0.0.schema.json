@@ -17,8 +17,7 @@
         "Analysis",
         "Result",
         "Claim",
-        "ManuscriptArtifact",
-        "Adjudication"
+        "ManuscriptArtifact"
       ]
     },
     "operation": {

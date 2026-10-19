@@ -11,7 +11,7 @@ from research_harness.core.model import Decision, IntegrityStatus, ReleaseEligib
 from research_harness.proposals.gateway import import_proposal
 from research_harness.protocols.snapshot import export_snapshot
 from research_harness.validation.integrity import audit_project_integrity, release_check, verify_database_integrity
-from research_harness.validation.review import record_review
+from research_harness.validation.review import record_review, record_adjudication
 from tests.conftest import make_proposal
 
 
@@ -37,7 +37,7 @@ def test_complete_and_reviewed_project_release_check(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Populate core scientific objects: ResearchQuestion, Proxy, Result, Claim
     ops = [
@@ -84,6 +84,17 @@ def test_complete_and_reviewed_project_release_check(harness_env):
         decision="approve",
         rationale="Empirical results and causality verified independently.",
     )
+    adj_res = record_adjudication(
+        store,
+        carol_token,
+        subject_id="CLAIM_COMPLETE_01",
+        subject_revision=1,
+        assessment_kind="semantic_entailment",
+        verdict="SUPPORTED",
+        rationale="Empirical results and causality verified independently.",
+        cited_evidence=[{"object_id": "RESULT_COMPLETE_01", "revision": 1}],
+        is_independent=True,
+    )
 
     # Release check should now be ELIGIBLE
     res = release_check(store)
@@ -101,7 +112,7 @@ def test_tampered_database_fails_integrity_audit(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -146,7 +157,7 @@ def test_tampered_artifact_blob_fails_audit(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {

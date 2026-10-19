@@ -17,7 +17,16 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from research_harness import SCHEMA_VERSION, __version__
-from research_harness.core.auth import Actor, authenticate, load_actor, new_token, token_fingerprint, token_hash, validate_roles
+from research_harness.core.auth import (
+    Actor,
+    InternalCapability,
+    authenticate,
+    load_actor,
+    new_token,
+    token_fingerprint,
+    token_hash,
+    validate_roles,
+)
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.core.errors import AuthorizationError, Clock, HarnessError, utc_now
 from research_harness.core.model import PROJECT_ID_RE, Lifecycle, ReviewStatus
@@ -329,7 +338,7 @@ class StateStore:
                 try:
                     c = json.loads(row[0])
                     if isinstance(c, dict):
-                        for k in ("artifact_sha256", "data_ref", "blob_sha256", "passage_norm_sha256", "library_file_id"):
+                        for k in ("artifact_sha256", "blob_sha256"):
                             v = c.get(k)
                             if isinstance(v, str) and len(v) == 64:
                                 known_artifacts.add(v)
@@ -369,18 +378,20 @@ class StateStore:
 
     @contextmanager
     def write_tx(self, actor_id: Optional[str] = None, *, token: Optional[str] = None,
+                 internal_capability: Optional[Any] = None,
                  require_roles: tuple = (), bump: bool = True, commit: bool = True):
         """Open the single-writer transaction.
 
-        Authorization is evaluated INSIDE ``BEGIN IMMEDIATE`` (no check/use gap): either ``token`` is
-        authenticated, or ``actor_id`` is re-verified (must exist, not disabled). ``require_roles``
-        (any-of) is checked against the roles stored *now*, not against a caller-supplied copy.
+        Authorization is evaluated INSIDE ``BEGIN IMMEDIATE`` (no check/use gap): ``token`` is
+        strictly authenticated. Plain string actor_ids and unauthenticated internal capabilities
+        are NEVER accepted for runtime authorization. ``require_roles`` (any-of) is checked
+        against the roles stored *now*, not against a caller-supplied copy.
         Raises ``AuthorizationError`` before any mutation; nothing is written in that case.
         """
         conn = self.connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            actor = self._authorize(conn, actor_id, token, tuple(require_roles))
+            actor = self._authorize(conn, actor_id, token, tuple(require_roles), internal_capability)
             base = conn.execute("SELECT MAX(revision) FROM state_revisions").fetchone()[0]
             tx = Tx(self, conn, actor.actor_id, base, bump, actor)
             try:
@@ -399,15 +410,25 @@ class StateStore:
 
     @staticmethod
     def _authorize(conn: sqlite3.Connection, actor_id: Optional[str], token: Optional[str],
-                   require_roles: tuple) -> Actor:
-        if token is not None:
-            actor = authenticate(conn, token)
-        elif actor_id is not None:
-            actor = load_actor(conn, actor_id)
-        else:
-            actor = None
+                   require_roles: tuple,
+                   internal_capability: Optional[Any] = None) -> Actor:
+        if internal_capability is not None:
+            raise AuthorizationError(
+                "AUTHENTICATION_FAILED",
+                "Internal capabilities are not authorized for runtime mutations; authenticated bearer token required"
+            )
+        if token is None:
+            raise AuthorizationError(
+                "AUTHENTICATION_FAILED",
+                "Authentication token required; plain actor_id or unauthenticated capability cannot be used for authentication"
+            )
+
+        actor = authenticate(conn, token)
         if actor is None:
-            raise AuthorizationError("AUTHENTICATION_FAILED", "missing, unknown or disabled actor")
+            raise AuthorizationError("AUTHENTICATION_FAILED", "invalid, unknown or disabled actor token")
+        if actor_id is not None and actor.actor_id != actor_id:
+            raise AuthorizationError("IDENTITY_MISMATCH", f"authenticated actor '{actor.actor_id}' does not match requested '{actor_id}'")
+
         if require_roles and not actor.has_role(*require_roles):
             raise AuthorizationError("ROLE_REQUIRED", "requires role " + " or ".join(require_roles))
         return actor

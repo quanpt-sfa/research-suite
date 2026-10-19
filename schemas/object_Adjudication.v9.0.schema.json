@@ -59,6 +59,48 @@
         "NOT_SUPPORTED",
         "UNCLEAR"
       ]
+    },
+    "adjudicator_actor_id": {
+      "type": ["string", "null"]
+    },
+    "adjudicator_roles": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "independence_level": {
+      "enum": [
+        "author",
+        "independent"
+      ]
+    },
+    "independence_group": {
+      "type": ["string", "null"]
+    },
+    "cited_evidence": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "subject_revision_digest": {
+      "type": ["string", "null"]
+    },
+    "adjudicated_at": {
+      "type": ["string", "null"]
+    },
+    "is_historical": {
+      "type": "boolean"
+    },
+    "raw_legacy_verdict": {
+      "type": ["string", "null"]
+    },
+    "source_registry": {
+      "type": ["string", "null"]
+    },
+    "legacy_record_id": {
+      "type": ["string", "null"]
     }
   },
   "required": [

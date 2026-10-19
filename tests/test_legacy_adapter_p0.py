@@ -76,7 +76,7 @@ def test_migration_preserves_proposition_text(harness_env, legacy_project_with_a
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    res = migrate_legacy_project(legacy_project_with_adjudications, store, actor, dry_run=False)
+    res = migrate_legacy_project(legacy_project_with_adjudications, store, actor, token=owner_token, dry_run=False)
     assert res["decision"] == "ACCEPTED"
     assert "PROP_P0" in res["created_objects"]
 
@@ -94,7 +94,7 @@ def test_migration_imports_semantic_adjudications(harness_env, legacy_project_wi
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    res = migrate_legacy_project(legacy_project_with_adjudications, store, actor, dry_run=False)
+    res = migrate_legacy_project(legacy_project_with_adjudications, store, actor, token=owner_token, dry_run=False)
     assert res["imported_adjudication_counts"] == 1
     assert "ADJ_P0" in res["created_objects"]
 
@@ -117,10 +117,10 @@ def test_migrated_claim_can_subsequently_be_revised(harness_env, legacy_project_
         actor = authenticate(conn, owner_token)
 
     # 1. Migrate
-    migrate_legacy_project(legacy_project_with_adjudications, store, actor, dry_run=False)
+    migrate_legacy_project(legacy_project_with_adjudications, store, actor, token=owner_token, dry_run=False)
 
     # 2. Export snapshot
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, token=owner_token, scope="full")
 
     # 3. Propose a revision to the migrated claim PROP_P0
     # Prior to fix, this crashed with KeyError: 'first_recorded_text_sha256' in build_formation()
@@ -156,7 +156,7 @@ def test_revision_digest_and_sealed_edges(harness_env, legacy_project_with_adjud
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    migrate_legacy_project(legacy_project_with_adjudications, store, actor, dry_run=False)
+    migrate_legacy_project(legacy_project_with_adjudications, store, actor, token=owner_token, dry_run=False)
 
     with store.read() as conn:
         # Check EvidencePassage CS_P0
@@ -182,7 +182,7 @@ def test_migration_reconciliation_report_fields(harness_env, legacy_project_with
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    receipt = migrate_legacy_project(legacy_project_with_adjudications, store, actor, dry_run=False)
+    receipt = migrate_legacy_project(legacy_project_with_adjudications, store, actor, token=owner_token, dry_run=False)
 
     # Check required report fields
     assert "source_registry_row_counts" in receipt

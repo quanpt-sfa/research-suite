@@ -45,7 +45,7 @@ def main() -> None:
         # Register Author (Bob) and Independent Reviewer (Carol)
         bob_token = new_token()
         carol_token = new_token()
-        with store.write_tx("alice_owner", bump=False) as tx:
+        with store.write_tx(token=owner_token, bump=False) as tx:
             tx.conn.execute("UPDATE actors SET independence_group='org_owner' WHERE actor_id='alice_owner'")
             tx.conn.execute(
                 "INSERT INTO actors(actor_id, display_name, roles, independence_group, token_sha256, created_at, created_by) "

@@ -33,7 +33,7 @@ def test_fault_injection_atomicity_after_apply(harness_env, monkeypatch):
         init_objs = conn.execute("SELECT count(*) FROM objects").fetchone()[0]
         init_rev = conn.execute("SELECT max(revision) FROM state_revisions").fetchone()[0] or 0
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -79,7 +79,7 @@ def test_fault_injection_atomicity_after_blob(harness_env, monkeypatch):
         init_objs = conn.execute("SELECT count(*) FROM objects").fetchone()[0]
         init_rev = conn.execute("SELECT max(revision) FROM state_revisions").fetchone()[0] or 0
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -120,7 +120,7 @@ def test_stale_snapshot_optimistic_concurrency_conflict(harness_env):
         actor = authenticate(conn, owner_token)
 
     # Create an initial object
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
     prop0 = make_proposal(store.project_id, snap0, "PROP_BASE", [
         {
             "operation": "propose_object",
@@ -134,8 +134,8 @@ def test_stale_snapshot_optimistic_concurrency_conflict(harness_env):
     assert rec0["decision"] == Decision.ACCEPTED.value
 
     # Agent A and Agent B both take snapshot at state revision 1
-    snap_a = export_snapshot(store, actor, scope="full")
-    snap_b = export_snapshot(store, actor, scope="full")
+    snap_a = export_snapshot(store, actor, scope="full", token=owner_token)
+    snap_b = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Agent A proposes revising RQ_STALE_01
     prop_a = make_proposal(
@@ -187,7 +187,7 @@ def test_concurrent_threads_proposal_import(harness_env):
         actor = authenticate(conn, owner_token)
 
     # Take snapshot
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     num_concurrent = 5
     proposals = []
@@ -239,7 +239,7 @@ def test_crash_injection_before_commit_subprocess(harness_env, tmp_path):
         init_objs = conn.execute("SELECT count(*) FROM objects").fetchone()[0]
         init_rev = conn.execute("SELECT max(revision) FROM state_revisions").fetchone()[0] or 0
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
     prop = make_proposal(store.project_id, snap, "PROP_CRASH_BEFORE", [
         {
             "operation": "propose_object",
@@ -300,7 +300,7 @@ def test_crash_injection_after_blob_subprocess(harness_env, tmp_path):
         init_objs = conn.execute("SELECT count(*) FROM objects").fetchone()[0]
         init_rev = conn.execute("SELECT max(revision) FROM state_revisions").fetchone()[0] or 0
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
     prop = make_proposal(store.project_id, snap, "PROP_CRASH_AFTER_BLOB", [
         {
             "operation": "propose_object",
@@ -361,7 +361,7 @@ def test_repeated_proposal_import_idempotency(harness_env):
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
     prop = make_proposal(store.project_id, snap, "PROP_IDEMP_01", [
         {
             "operation": "propose_object",
@@ -433,7 +433,7 @@ def test_multiprocess_concurrent_proposal_import(harness_env, tmp_path):
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
 
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     num_procs = 4
     prop_files = []

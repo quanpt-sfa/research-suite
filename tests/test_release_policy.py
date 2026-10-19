@@ -24,7 +24,7 @@ from research_harness.core.model import ReleaseEligibility, ReviewStatus, Workfl
 from research_harness.proposals.gateway import import_proposal
 from research_harness.protocols.snapshot import export_snapshot
 from research_harness.validation.integrity import release_check
-from research_harness.validation.review import record_review
+from research_harness.validation.review import record_adjudication, record_review
 from tests.conftest import make_proposal
 
 
@@ -44,7 +44,7 @@ def test_unsupported_claim_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose RQ and an isolated Claim with no evidence relations (only depends on RQ)
     ops = [
@@ -86,7 +86,7 @@ def test_claim_with_unrelated_source_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Propose RQ, a generic Source, and a Claim that doesn't reference the Source
     ops = [
@@ -133,7 +133,7 @@ def test_required_adjudication_missing_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -191,7 +191,7 @@ def test_required_adjudication_unresolved_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -226,22 +226,20 @@ def test_required_adjudication_unresolved_blocked(harness_env):
                 {"relation": "depends_on", "target_id": "EP_ADJ_02"},
             ],
         },
-        {
-            "operation": "propose_object",
-            "proposed_id": "ADJ_UNCLEAR_01",
-            "object_type": "Adjudication",
-            "content": {
-                "subject": {"object_id": "CLAIM_ADJ_02", "revision": 1},
-                "assessment_kind": "semantic_entailment",
-                "verdict": "UNCLEAR",
-                "rationale": "Evidence text is ambiguous regarding claim scope",
-            },
-            "relations": [{"relation": "depends_on", "target_id": "EP_ADJ_02"}],
-        },
     ]
     prop = make_proposal(store.project_id, snap, "PROP_ADJ_UNCLEAR", ops)
     rec = import_proposal(store, json.dumps(prop), bob_token)
     assert rec["decision"] == "ACCEPTED"
+
+    record_adjudication(
+        store,
+        carol_token,
+        object_id="CLAIM_ADJ_02",
+        revision=1,
+        verdict="UNCLEAR",
+        rationale="Evidence text is ambiguous regarding claim scope",
+        assessment_kind="semantic_entailment",
+    )
 
     record_review(store, carol_token, object_id="CLAIM_ADJ_02", revision=1,
                   kind="independent_review", decision="approve", rationale="Approved")
@@ -260,7 +258,7 @@ def test_rejected_claim_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -310,7 +308,7 @@ def test_unreviewed_claim_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -358,7 +356,7 @@ def test_stale_dependent_evidence_blocked(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops1 = [
         {
@@ -395,7 +393,7 @@ def test_stale_dependent_evidence_blocked(harness_env):
                   kind="independent_review", decision="approve", rationale="Approved v1")
 
     # Now revise RES_STALE_01 to revision 2!
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
     ops2 = [
         {
             "operation": "revise_object",
@@ -423,7 +421,7 @@ def test_properly_supported_descriptive_claim_eligible(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Descriptive research: Literature question, source, evidence passage, and descriptive claim
     ops = [
@@ -483,7 +481,7 @@ def test_properly_supported_predictive_claim_eligible(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -533,7 +531,7 @@ def test_causal_claim_rejected_with_only_descriptive_evidence(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # A CAUSAL claim supported ONLY by an unadjudicated descriptive EvidencePassage
     ops = [
@@ -580,7 +578,7 @@ def test_causal_claim_rejected_with_only_descriptive_evidence(harness_env):
     res = release_check(store)
     # MUST BE BLOCKED: causal claim lacks empirical identification or verified adjudication
     assert res["release_eligibility"] == ReleaseEligibility.BLOCKED.value
-    assert any("CAUSAL_CLAIM_LACKS_EMPIRICAL_OR_ADJUDICATED_SUPPORT" in r for r in res["block_reasons"])
+    assert any("CAUSAL_CLAIM_LACKS_EMPIRICAL" in r for r in res["block_reasons"])
 
 
 def test_fully_compliant_project_eligible(harness_env):
@@ -591,7 +589,7 @@ def test_fully_compliant_project_eligible(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Complete causal project with empirical result and valid causal identification
     ops = [
@@ -627,6 +625,17 @@ def test_fully_compliant_project_eligible(harness_env):
 
     record_review(store, carol_token, object_id="CLAIM_COMPLIANT_01", revision=1,
                   kind="independent_review", decision="approve", rationale="Verified with RCT design.")
+    record_adjudication(
+        store,
+        carol_token,
+        subject_id="CLAIM_COMPLIANT_01",
+        subject_revision=1,
+        assessment_kind="semantic_entailment",
+        verdict="SUPPORTED",
+        rationale="Verified with RCT design.",
+        cited_evidence=[{"object_id": "RES_COMPLIANT_01", "revision": 1}],
+        is_independent=True,
+    )
 
     res = release_check(store)
     assert res["integrity_status"] == "PASS"

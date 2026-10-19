@@ -64,7 +64,7 @@ OBJECT_TYPES = (
     "EvidencePassage", "Analysis", "Result", "Claim", "ManuscriptArtifact", "Adjudication",
     "Approval",
 )
-SERVER_ONLY_TYPES = frozenset({"Approval"})  # can never be created through a proposal
+SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication"})  # can never be created through a proposal
 
 CLAIM_TIERS = (
     "descriptive", "associational", "predictive", "mechanism_consistent", "causal",

@@ -280,7 +280,8 @@ def cmd_project_migrate_v8(args: argparse.Namespace) -> int:
         res = migrate_legacy_project(
             args.legacy_root,
             store,
-            actor,
+            actor=actor,
+            token=token,
             dry_run=args.dry_run,
         )
     except Exception as e:
@@ -337,7 +338,7 @@ def cmd_snapshot_export(args: argparse.Namespace) -> int:
         if not actor:
             sys.stderr.write("Error: Invalid or disabled actor token.\n")
             return 1
-        snapshot = export_snapshot(store, actor, args.scope)
+        snapshot = export_snapshot(store, actor, args.scope, token=token)
     except Exception as e:
         sys.stderr.write(f"Snapshot export failed: {e}\n")
         return 1

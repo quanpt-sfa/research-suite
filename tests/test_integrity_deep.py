@@ -37,7 +37,7 @@ def populated_project(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap = export_snapshot(store, actor, scope="full")
+    snap = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Store a CAS artifact
     sample_bytes = b"Sample artifact raw data for semantic testing"

@@ -246,7 +246,9 @@ def upgrade_schema(store, token: str | None = None) -> dict:
         if current_version == DB_SCHEMA_VERSION:
             return {"status": "NOOP", "version": current_version, "message": "schema already at latest version"}
         # Upgrade to 9.0.2: apply edge seal trigger if missing and attest actors
-        conn.executescript(EDGE_SEAL_TRIGGER)
+        # Note: Use conn.execute on single DDL statement to preserve transaction atomicity;
+        # conn.executescript() implicitly issues a COMMIT in sqlite3, breaking transaction boundaries.
+        conn.execute(EDGE_SEAL_TRIGGER.strip())
         conn.execute("UPDATE meta SET value=? WHERE key='db_schema_version'", (DB_SCHEMA_VERSION,))
         attest_registry_in_tx(tx)
         return {"status": "UPGRADED", "from_version": current_version, "to_version": DB_SCHEMA_VERSION}

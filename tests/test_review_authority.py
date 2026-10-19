@@ -19,7 +19,7 @@ def test_unauthenticated_and_unauthorized_review_rejected(harness_env):
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Create Claim
     ops = [
@@ -65,14 +65,14 @@ def test_independent_review_rejected_when_reviewer_is_contributor(harness_env):
     owner_token = harness_env["owner_token"]
 
     # Give Carol both author and independent_reviewer roles
-    with store.write_tx("owner_alice", bump=False) as tx:
+    with store.write_tx(token=owner_token, bump=False) as tx:
         tx.conn.execute("UPDATE actors SET roles=? WHERE actor_id='rev_carol'", (json.dumps(["author", "importer", "independent_reviewer"]),))
 
     carol_token = harness_env["actors"]["carol"]["token"]
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Carol submits a claim
     ops = [
@@ -110,7 +110,7 @@ def test_independent_review_rejected_when_sharing_independence_group(harness_env
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Bob (group_alpha) submits claim
     ops = [
@@ -148,7 +148,7 @@ def test_independent_review_accepted_for_bona_fide_independent_reviewer(harness_
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     ops = [
         {
@@ -190,7 +190,7 @@ def test_review_refused_on_open_invalidations_without_acknowledgment(harness_env
 
     with store.read() as conn:
         actor = authenticate(conn, owner_token)
-    snap0 = export_snapshot(store, actor, scope="full")
+    snap0 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Setup Proxy and Claim
     ops1 = [
@@ -216,7 +216,7 @@ def test_review_refused_on_open_invalidations_without_acknowledgment(harness_env
     # Initial Author Approval
     record_review(store, owner_token, object_id="CLAIM_TO_INVALIDATE", revision=1, kind="author_approval", decision="approve")
 
-    snap1 = export_snapshot(store, actor, scope="full")
+    snap1 = export_snapshot(store, actor, scope="full", token=owner_token)
 
     # Revise Proxy -> triggers invalidation of CLAIM_TO_INVALIDATE
     ops2 = [
