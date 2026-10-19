@@ -2,6 +2,8 @@
 
 Organizes reproducible empirical analyses, interprets computational outputs, and detects
 changed results affecting dependent scientific claims via graph traversal.
+Follows Part B4 rules: unknown random seeds, scripts, and estimators remain None;
+unexecuted results are flagged COMPUTATIONAL_REPRODUCTION_NOT_VERIFIED.
 """
 from __future__ import annotations
 
@@ -55,6 +57,7 @@ def execute_results_workflow(
             "summary": summary,
             "metrics": metrics,
             "analysis_id": c.get("analysis_id"),
+            "contradictory": bool(c.get("contradictory")),
         })
 
         if c.get("artifact_sha256"):
@@ -68,17 +71,17 @@ def execute_results_workflow(
         if summary:
             supported_findings.append(f"[{rid}:rev{rev}] {summary}")
 
-    # 2. Extract Input and Parameter References from Analyses and Datasets
+    # 2. Extract Input and Parameter References from Analyses and Datasets (Part B4: No fabricated paths/estimators)
     for a in analyses:
+        c_a = a.get("content", {})
         input_params.append({
             "analysis_id": a["object_id"],
-            "script_path": a["content"].get("script_path", "analysis_script.py"),
-            "estimator": a["content"].get("estimator", "OLS / Fixed Effects"),
-            "parameters": a["content"].get("parameters", {}),
+            "script_path": c_a.get("script_path"),  # None if unspecified
+            "estimator": c_a.get("estimator"),      # None if unspecified
+            "parameters": c_a.get("parameters", {}),
         })
 
     # 3. Detect Changed Results and Affected Claims
-    # Group results by object_id to compare multiple revisions
     by_oid: dict[str, list[dict[str, Any]]] = {}
     for r in results:
         by_oid.setdefault(r["object_id"], []).append(r)
@@ -91,7 +94,7 @@ def execute_results_workflow(
         if len(sorted_revs) > 1:
             prev = sorted_revs[-2]
             curr = sorted_revs[-1]
-            diff_note = f"Revision {prev['revision']} -> {curr['revision']}: {prev['content'].get('summary', '')} changed to {curr['content'].get('summary', '')}"
+            diff_note = f"Revision {prev['revision']} -> {curr['revision']}: '{prev['content'].get('summary', '')}' changed to '{curr['content'].get('summary', '')}'"
             result_comparisons.append({
                 "result_id": oid,
                 "prior_revision": prev["revision"],
@@ -126,13 +129,26 @@ def execute_results_workflow(
         }
     ]
 
-    # 5. Reproducibility Metadata
+    # 5. Reproducibility Metadata (Part B4: No fabricated seeds or assumed verification)
     meta = run_metadata or {}
+    has_verified_computation = bool(meta.get("verified_computation") or meta.get("execution_verified"))
+    has_dataset_hashes = any(d.get("content_digest") for d in datasets)
+
+    if not has_verified_computation:
+        rep_status = "COMPUTATIONAL_REPRODUCTION_NOT_VERIFIED"
+    elif not has_dataset_hashes:
+        rep_status = "INPUT_PROVENANCE_INCOMPLETE"
+    else:
+        rep_status = "VERIFIED_COMPUTATIONAL_RUN"
+
     reproducibility = {
-        "runtime_environment": meta.get("environment", "Python 3.10+ / SQLite 3"),
-        "random_seed": meta.get("random_seed", 42),
+        "runtime_environment": meta.get("environment"),
+        "random_seed": meta.get("random_seed"),  # None if not provided
+        "script_path": meta.get("script_path"),
+        "estimator": meta.get("estimator"),
         "dataset_hashes": [{d["object_id"]: d.get("content_digest")} for d in datasets],
-        "deterministic_verification": True,
+        "deterministic_verification": False if not has_verified_computation else True,
+        "reproducibility_status": rep_status,
     }
 
     result_data = ResultsInterpretationResult(
@@ -146,13 +162,16 @@ def execute_results_workflow(
         changed_results_and_affected_claims=changed_results_affected,
     )
 
+    out_dict = result_data.to_dict()
+    out_dict["changed_results_affecting_claims"] = changed_results_affected
+
     elapsed_ms = int((time.time() - start_time) * 1000)
     usage = TaskUsage(
         workflow="results",
         task_id=tid,
         model=None,
         input_tokens=context.estimated_tokens,
-        output_tokens=estimate_tokens(json.dumps(result_data.to_dict()))[0],
+        output_tokens=estimate_tokens(json.dumps(out_dict))[0],
         cache_read_tokens=None,
         llm_calls=0,
         context_objects=len(context.objects),
@@ -161,13 +180,20 @@ def execute_results_workflow(
         usage_source="estimated" if context.is_token_estimate else "provider",
     )
 
+    if context.budget_status == "INCOMPLETE_EXCEEDED":
+        status_val = "INCOMPLETE_CONTEXT"
+    elif rep_status != "VERIFIED_COMPUTATIONAL_RUN":
+        status_val = "REQUIRES_VERIFICATION"
+    else:
+        status_val = "SUCCESS"
+
     return WorkflowOutput(
         workflow="results",
         task_id=tid,
         project_id=context.project_id,
-        status="INCOMPLETE_CONTEXT" if context.budget_status == "INCOMPLETE_EXCEEDED" else "SUCCESS",
-        result=result_data.to_dict(),
+        status=status_val,
+        result=out_dict,
         usage=usage,
         provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-        notes=["Results organized with exact parameter references, reproducibility metadata, and DAG claim impact."],
+        notes=["Results organized with exact parameter references, without fabricated execution metadata."],
     )

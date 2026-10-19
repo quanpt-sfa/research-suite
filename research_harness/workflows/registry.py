@@ -9,6 +9,7 @@ Inspired by Deep Agents SkillsMiddleware:
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -124,6 +125,11 @@ class WorkflowRegistry:
         self._instructions_cache[canonical] = instructions
         return instructions
 
+    def get_skill_digest(self, name: str) -> str:
+        """Compute SHA-256 digest of active SKILL.md instructions."""
+        inst = load_skill_instructions(name)
+        return hashlib.sha256(inst.encode("utf-8")).hexdigest()
+
     def get_prompt_for_workflow(self, name: str) -> str:
         """Construct full specialized prompt for this workflow alone."""
         meta = self.get_metadata(name)
@@ -183,3 +189,8 @@ def get_workflow_definition(name: str) -> WorkflowDefinition:
 def load_skill_instructions(name: str) -> str:
     """Load full skill instructions for a workflow."""
     return get_registry().load_skill_instructions(name)
+
+
+def get_skill_digest(name: str) -> str:
+    """Compute SHA-256 digest of active SKILL.md instructions."""
+    return get_registry().get_skill_digest(name)

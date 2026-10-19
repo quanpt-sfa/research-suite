@@ -163,6 +163,8 @@ All 142 modern tests and 10 workflow scenarios pass with a 100% pass rate.
 
 Comprehensive architecture, workflow, and verification documentation:
 
+- [Workflow 9.1.1 Acceptance Report](docs/WORKFLOW_9_1_1_ACCEPTANCE.md) (`docs/WORKFLOW_9_1_1_ACCEPTANCE.md`): Final verification report for gates A–J, scientific regression testing, and measured context efficiency.
+- [Deep Agents Reference Alignment](docs/DEEPAGENTS_REFERENCE_ALIGNMENT.md) (`docs/DEEPAGENTS_REFERENCE_ALIGNMENT.md`): Source-to-source mapping against LangChain Deep Agents (`12f70f27cc2e96ac715f4563e05b205be7adc275`).
 - [Modular Workflows Architecture & Benchmark](docs/MODULAR_WORKFLOWS_V9_1.md) (`docs/MODULAR_WORKFLOWS_V9_1.md`): Deep Agents patterns adopted vs. rejected, Context Builder design, benchmark metrics, and workflow contracts.
 - [Architecture Overview](docs/ARCHITECTURE.md) (`docs/ARCHITECTURE.md`): Core layering and protocol specification.
 - [P0 Remediation Report](docs/P0_REMEDIATION_REPORT.md) (`docs/P0_REMEDIATION_REPORT.md`): Detailed root-cause fixes for defects A1–A4.

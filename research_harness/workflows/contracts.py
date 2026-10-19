@@ -119,6 +119,9 @@ class ContextPackage:
     is_token_estimate: bool
     manifest: dict[str, Any]
     budget_status: Literal["OK", "INCOMPLETE_EXCEEDED"] = "OK"
+    skill_instructions: str = ""
+    skill_digest: str = ""
+    selection_strategy: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -155,26 +158,45 @@ class ContextPackage:
 
     @property
     def formatted_prompt(self) -> str:
-        """Render formatted markdown prompt representation of the context package."""
-        parts = [f"# Research Context Package: {self.workflow.upper()} (Project: {self.project_id})"]
+        """Render formatted markdown prompt representation of the context package and active skill instructions."""
+        parts = [f"# Research Workflow: {self.workflow.upper()} (Project: {self.project_id}, Skill Digest: {self.skill_digest[:16] if self.skill_digest else 'none'})"]
         if self.research_question_id:
             parts.append(f"Research Question: {self.research_question_id}")
+        if self.selection_strategy:
+            parts.append(f"Selection Strategy: {self.selection_strategy}")
         if self.focus_claims:
             parts.append(f"Focus Claims: {', '.join(self.focus_claims)}")
         if self.budget_status == "INCOMPLETE_EXCEEDED":
             parts.append("\n> [!WARNING]\n> Context budget exceeded. Low priority context omitted.")
+
+        if self.skill_instructions:
+            parts.append(f"\n## Operational Skill Instructions:\n{self.skill_instructions.strip()}")
+
         parts.append("\n## Selected Objects:")
         for obj in self.objects:
             content_str = json.dumps(obj.get("content", {}), sort_keys=True, ensure_ascii=False)
             parts.append(f"- [{obj.get('object_type')}] {obj.get('object_id')} (rev {obj.get('revision')}): {content_str}")
+
         if self.excerpts:
             parts.append("\n## Evidence Excerpts:")
             for exc in self.excerpts:
-                parts.append(f"- {exc.get('object_id')}: \"{exc.get('quote')}\" ({exc.get('locator')})")
+                pid = exc.get("passage_id") or exc.get("object_id") or "UNKNOWN_PASSAGE"
+                rev = exc.get("revision", 1)
+                sid = exc.get("source_id", "UNKNOWN_SOURCE")
+                loc = exc.get("locator") or "MISSING_LOCATOR"
+                quote = exc.get("excerpt") or exc.get("quote") or exc.get("normalized_claim") or ""
+                parts.append(f"- [{pid}:rev{rev}] (Source: {sid}, Locator: {loc}):\n  \"{quote}\"")
+
         if self.full_texts:
             parts.append("\n## Expanded Full Texts:")
             for ft in self.full_texts:
-                parts.append(f"### {ft.get('object_id')}\n{ft.get('full_text')}")
+                oid = ft.get("object_id") or ft.get("source_id") or "UNKNOWN_DOC"
+                status = ft.get("fulltext_status", "FULLTEXT_LOADED")
+                text = ft.get("full_text")
+                if text:
+                    parts.append(f"### {oid} (Status: {status})\n{text}")
+                else:
+                    parts.append(f"### {oid} (Status: {status})\n[Full text not loaded into context: {status}]")
         return "\n".join(parts)
 
 

@@ -2,6 +2,9 @@
 
 Designs, formalizes, and evaluates research methods, empirical specifications, construct
 operationalizations, and diagnostic checks, integrating optional discipline profiles.
+Follows Part B3 rules: methods remain conditional candidate designs (CANDIDATE_METHOD)
+rather than justified designs, and checklist items are not marked ADDRESSED_IN_SPECIFICATION
+merely for being displayed.
 """
 from __future__ import annotations
 
@@ -40,34 +43,44 @@ def execute_methods_workflow(
     datasets = [o for o in context.objects if o["object_type"] == "Dataset"]
     claims = [o for o in context.objects if o["object_type"] == "Claim"]
 
-    # 1. Candidate Research Designs
+    # 1. Candidate Research Designs (Part B3: Conditional candidates, not justified methods)
     candidate_designs: list[dict[str, Any]] = []
     methods_requested = candidate_methods or []
 
-    # Infer appropriate designs based on claim tiers present
     claim_tiers = {c["content"].get("claim_tier", "descriptive") for c in claims}
 
     if "causal" in claim_tiers or "causal" in [m.lower() for m in methods_requested]:
         candidate_designs.append({
             "design_name": "Quasi-Experimental Difference-in-Differences",
             "type": "quasi_experimental",
-            "treatment_definition": "Exogenous policy, regulatory, or technological intervention event",
-            "control_group": "Unexposed matched peer units",
+            "status": "CANDIDATE_METHOD",
+            "justified": False,
+            "required_information": [
+                "Explicit exogenous intervention event with known timing",
+                "Observable unexposed comparison group",
+                "Pre-treatment period data for parallel trends evaluation",
+            ],
             "target_claim_tier": "causal",
-            "rationale": "Mitigates time-invariant unobserved confounders and common macroeconomic trends.",
+            "rationale": "Candidate method for mitigating time-invariant confounders if parallel trends hold.",
         })
         candidate_designs.append({
             "design_name": "Instrumental Variables (2SLS)",
             "type": "instrumental_variable",
-            "treatment_definition": "Endogenous focal explanatory variable",
-            "instrument": "Exogenous variation satisfying relevance and exclusion restrictions",
+            "status": "CANDIDATE_METHOD",
+            "justified": False,
+            "required_information": [
+                "Exogenous instrument satisfying relevance (F > 10) and exclusion restriction",
+            ],
             "target_claim_tier": "causal",
-            "rationale": "Addresses reverse causality and omitted variable bias.",
+            "rationale": "Candidate method if valid exogenous instrument is identified and defensible.",
         })
     elif "predictive" in claim_tiers:
         candidate_designs.append({
             "design_name": "Cross-Validated Predictive Model (Train/Validation/Test)",
             "type": "machine_learning_predictive",
+            "status": "CANDIDATE_METHOD",
+            "justified": False,
+            "required_information": ["Temporal or clustered partition scheme", "Pre-specified performance metrics"],
             "target_claim_tier": "predictive",
             "evaluation_metrics": ["RMSE", "AUC-ROC", "Out-of-sample R2"],
             "rationale": "Evaluates out-of-sample generalization without in-sample overfitting.",
@@ -76,8 +89,11 @@ def execute_methods_workflow(
         candidate_designs.append({
             "design_name": "Panel Regression with Multi-Way Fixed Effects",
             "type": "panel_econometric",
+            "status": "CANDIDATE_METHOD",
+            "justified": False,
+            "required_information": ["Panel unit identifier", "Time index", "Attrition diagnostics"],
             "target_claim_tier": "associational",
-            "rationale": "Controls for entity-level and temporal unobserved heterogeneity.",
+            "rationale": "Candidate design to control for time-invariant unit heterogeneity.",
         })
 
     # 2. Key Assumptions
@@ -107,13 +123,14 @@ def execute_methods_workflow(
     # 4. Specification Plans
     specification_plans: list[dict[str, Any]] = [
         {
-            "specification_name": "Baseline Model",
+            "specification_name": "Proposed Baseline Model",
             "dependent_variable": proxies[0]["content"].get("label", "DependentVariable") if proxies else "Y",
             "primary_regressors": [proxies[1]["content"].get("label", "TreatmentRegressor")] if len(proxies) > 1 else ["X"],
             "controls": ["Size", "Leverage", "PriorPerformance", "MacroTrend"],
             "fixed_effects": ["Entity/Firm FE", "Year/Period FE"],
             "clustering": "Two-way clustered by entity and time period",
             "datasets_used": [d["content"].get("label", d["object_id"]) for d in datasets] if datasets else ["Primary dataset"],
+            "status": "PROPOSED",
         }
     ]
 
@@ -123,20 +140,23 @@ def execute_methods_workflow(
             "test_name": "Placebo Timing / Lead-Lag Test",
             "purpose": "Verify lack of pre-treatment anticipatory trends",
             "success_criterion": "Coefficients on pre-treatment leads are statistically indistinguishable from zero",
+            "status": "REQUIRES_INFORMATION",
         },
         {
             "test_name": "Alternative Proxy Sensitivity",
             "purpose": "Check sensitivity to proxy measurement choices",
             "success_criterion": "Core coefficients maintain direction and significance under secondary proxy definitions",
+            "status": "REQUIRES_INFORMATION",
         },
         {
             "test_name": "Cluster-Robust Variance Check",
             "purpose": "Rule out artificial significance from correlated residuals",
             "success_criterion": "Standard errors remain robust under alternative clustering structures",
+            "status": "REQUIRES_INFORMATION",
         },
     ]
 
-    # 6. Discipline Profile Integration
+    # 6. Discipline Profile Integration (Part B3: Never ADDRESSED_IN_SPECIFICATION merely because displayed)
     prof_id = discipline_profile or kwargs.get("discipline") or (context.manifest.get("profile") or {}).get("profile_id")
     profile_results = None
     if prof_id:
@@ -149,7 +169,7 @@ def execute_methods_workflow(
                     {
                         "item": item["item"],
                         "prompt": item["prompt"],
-                        "compliance_status": "ADDRESSED_IN_SPECIFICATION",
+                        "compliance_status": "REQUIRES_INFORMATION",
                     }
                     for item in prof.methodological_checklist
                 ],
@@ -160,8 +180,8 @@ def execute_methods_workflow(
 
     # 7. Limitations and Unresolved Choices
     limitations = [
-        "Unobserved time-varying confounders may bias coefficients if exogenous event timing is imperfect.",
-        "External validity is constrained by the sample composition of the underlying datasets.",
+        "Candidate econometric methods require verified institutional events; causality cannot be claimed from specification structure alone.",
+        "External validity is constrained by sample composition of underlying datasets.",
     ]
 
     result_data = MethodsEvaluationResult(
@@ -175,13 +195,15 @@ def execute_methods_workflow(
         profile_checklist_results=profile_results,
     )
 
+    out_dict = result_data.to_dict()
+
     elapsed_ms = int((time.time() - start_time) * 1000)
     usage = TaskUsage(
         workflow="methods",
         task_id=tid,
         model=None,
         input_tokens=context.estimated_tokens,
-        output_tokens=estimate_tokens(json.dumps(result_data.to_dict()))[0],
+        output_tokens=estimate_tokens(json.dumps(out_dict))[0],
         cache_read_tokens=None,
         llm_calls=0,
         context_objects=len(context.objects),
@@ -190,13 +212,20 @@ def execute_methods_workflow(
         usage_source="estimated" if context.is_token_estimate else "provider",
     )
 
+    if context.budget_status == "INCOMPLETE_EXCEEDED":
+        status_val = "INCOMPLETE_CONTEXT"
+    elif any(d.get("status") == "CANDIDATE_METHOD" for d in candidate_designs):
+        status_val = "REQUIRES_VERIFICATION"
+    else:
+        status_val = "SUCCESS"
+
     return WorkflowOutput(
         workflow="methods",
         task_id=tid,
         project_id=context.project_id,
-        status="INCOMPLETE_CONTEXT" if context.budget_status == "INCOMPLETE_EXCEEDED" else "SUCCESS",
-        result=result_data.to_dict(),
+        status=status_val,
+        result=out_dict,
         usage=usage,
         provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-        notes=["Methods evaluated according to claim-tier requirements without forced single-method orthodoxy."],
+        notes=["Candidate research designs evaluated conditionally without premature methodological justification."],
     )
