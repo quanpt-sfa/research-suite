@@ -108,7 +108,36 @@ research review record PRJ_DEMO_01 \
   --rationale "Methodology and statistical power validated."
 ```
 
-### 6. Audit Integrity & Scientific Release Check
+### 6. Modular Research Workflows (Research Suite 9.1)
+
+Research Suite 9.1 provides five independently callable research workflows built above the Research Harness state engine:
+
+```bash
+# List available workflows and their contract inputs/outputs
+research workflow list
+
+# Preview selective context and token budget for a task (offline, zero LLM)
+research context preview PRJ_DEMO_01 \
+  --workflow contribution \
+  --question RQ_01 \
+  --budget 12000
+
+# Execute Contribution Finding workflow
+research workflow run PRJ_DEMO_01 contribution \
+  --question RQ_01 \
+  --focus-claim CLAIM_01 \
+  --budget 12000
+
+# Execute Methods workflow with a discipline profile (e.g. accounting, finance, education)
+research workflow run PRJ_DEMO_01 methods \
+  --question RQ_01 \
+  --discipline accounting
+
+# Inspect token usage and task accounting
+research usage report PRJ_DEMO_01
+```
+
+### 7. Audit Integrity & Scientific Release Check
 ```bash
 # Perform deep cryptographic audit across SQLite, event hash chain, and CAS blobs
 research project audit PRJ_DEMO_01
@@ -121,32 +150,26 @@ research project release-check PRJ_DEMO_01
 
 ## Testing & Verification
 
-Run the full modern test suite (80 tests, ~15s runtime):
+Run the full modern test suite (142 tests, ~25s runtime):
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
 
-Verify legacy semantic parity (105 legacy tests, ~35s runtime):
-```bash
-pytest legacy_v8_4_4/Reusable_Research_Harness_Suite_v8.4.4_Novelty_Semantic_Execution
-```
-
-**Combined Verification:** 185 / 185 passing tests (100% pass rate).
+All 142 modern tests and 10 workflow scenarios pass with a 100% pass rate.
 
 ---
 
 ## Documentation
 
-Comprehensive design and deployment documentation is available in `docs/`:
+Comprehensive architecture, workflow, and verification documentation:
 
-- [Architecture Overview](file:///d:/Works/research-suite/docs/ARCHITECTURE.md) (`docs/ARCHITECTURE.md`): Core layering and protocol specification.
-- [P0 Remediation Report](file:///d:/Works/research-suite/docs/P0_REMEDIATION_REPORT.md) (`docs/P0_REMEDIATION_REPORT.md`): Detailed root-cause fixes for defects A1–A4.
-- [Legacy Semantic Parity Matrix](file:///d:/Works/research-suite/docs/LEGACY_SEMANTIC_PARITY.md) (`docs/LEGACY_SEMANTIC_PARITY.md`): Full mapping across all 11 scientific stages.
-- [Scientific Release Policy](file:///d:/Works/research-suite/docs/SCIENTIFIC_RELEASE_POLICY.md) (`docs/SCIENTIFIC_RELEASE_POLICY.md`): Specification of the 6 claim tiers and gate rules.
-- [Cryptographic Integrity Audit Spec](file:///d:/Works/research-suite/docs/INTEGRITY_AUDIT_SPEC.md) (`docs/INTEGRITY_AUDIT_SPEC.md`): Hashing schemes, Merkle roots, and CAS protocols.
-- [D13 Deployment Runbook](file:///d:/Works/research-suite/docs/D13_DEPLOYMENT_RUNBOOK.md) (`docs/D13_DEPLOYMENT_RUNBOOK.md`): Operational runbook for `/srv/research` on Ubuntu 24.04 LTS.
-- [Implementation Report](file:///d:/Works/research-suite/docs/IMPLEMENTATION_REPORT.md) (`docs/IMPLEMENTATION_REPORT.md`): Metrics, timing reconciliation, and audit inventory.
-- [Threat Model](file:///d:/Works/research-suite/docs/THREAT_MODEL.md) (`docs/THREAT_MODEL.md`): Adversarial boundaries, untrusted agents, and defense-in-depth guarantees.
+- [Modular Workflows Architecture & Benchmark](docs/MODULAR_WORKFLOWS_V9_1.md) (`docs/MODULAR_WORKFLOWS_V9_1.md`): Deep Agents patterns adopted vs. rejected, Context Builder design, benchmark metrics, and workflow contracts.
+- [Architecture Overview](docs/ARCHITECTURE.md) (`docs/ARCHITECTURE.md`): Core layering and protocol specification.
+- [P0 Remediation Report](docs/P0_REMEDIATION_REPORT.md) (`docs/P0_REMEDIATION_REPORT.md`): Detailed root-cause fixes for defects A1–A4.
+- [Legacy Semantic Parity Matrix](docs/LEGACY_SEMANTIC_PARITY.md) (`docs/LEGACY_SEMANTIC_PARITY.md`): Full mapping across all 11 scientific stages.
+- [Scientific Release Policy](docs/SCIENTIFIC_RELEASE_POLICY.md) (`docs/SCIENTIFIC_RELEASE_POLICY.md`): Specification of the 6 claim tiers and gate rules.
+- [Cryptographic Integrity Audit Spec](docs/INTEGRITY_AUDIT_SPEC.md) (`docs/INTEGRITY_AUDIT_SPEC.md`): Hashing schemes, Merkle roots, and CAS protocols.
+- [Threat Model](docs/THREAT_MODEL.md) (`docs/THREAT_MODEL.md`): Adversarial boundaries, untrusted agents, and defense-in-depth guarantees.
 
 ---
 
