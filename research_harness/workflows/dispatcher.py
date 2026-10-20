@@ -19,12 +19,10 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-import os
-import tempfile
 import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from research_harness.state import workflow_runs
 from research_harness.state.store import StateStore
 from research_harness.workflows.adapters import (
     ModelOutputTruncated,
@@ -59,6 +57,10 @@ from research_harness.workflows.status import (
     axes_from_legacy,
 )
 
+# Bumped whenever an executor's logic changes, so outputs of older logic are never reused.
+EXECUTOR_VERSIONS = {"contribution": "9.2.0", "literature": "9.2.0", "methods": "9.2.0", "results": "9.2.0",
+                     "discussion": "9.2.0"}
+
 _EXECUTORS = {
     "contribution": execute_contribution_workflow,
     "literature": execute_literature_workflow,
@@ -78,6 +80,32 @@ class WorkflowPersistenceError(RuntimeError):
     """A workflow output could not be written to the content-addressed store."""
 
 
+def _upstream_digest(art: Any) -> str:
+    """Digest of what a downstream workflow reads from an upstream output: its workflow, status axes and result.
+    Never its timestamp, task id or run id, which differ between identical runs."""
+    if hasattr(art, "output_digest"):
+        return art.output_digest
+    if isinstance(art, dict) and "output_digest" in art:
+        return art["output_digest"]
+    if hasattr(art, "result") and hasattr(art, "axes"):
+        body = {"workflow": art.workflow, "axes": art.axes.to_dict(), "result": art.result}
+    elif isinstance(art, dict):
+        body = {"workflow": art.get("workflow"), "axes": art.get("status_axes") or art.get("status"),
+                "result": art.get("result")}
+    else:
+        return hashlib.sha256(str(art).encode("utf-8")).hexdigest()
+    return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def _upstream_run_ids(arts: Sequence[Any]) -> list[str]:
+    ids = []
+    for art in arts or []:
+        meta = art.get("metadata") if isinstance(art, dict) else getattr(art, "metadata", None)
+        if isinstance(meta, dict) and meta.get("run_id"):
+            ids.append(meta["run_id"])
+    return ids
+
+
 def _compute_input_fingerprint(
     workflow: str,
     context: ContextPackage,
@@ -95,17 +123,7 @@ def _compute_input_fingerprint(
             if k in _ADAPTER_KEYS:
                 continue
             if k == "upstream_artifacts" and isinstance(v, (list, tuple)):
-                for art in v:
-                    if hasattr(art, "output_digest"):
-                        upstream_digests.append(art.output_digest)
-                    elif isinstance(art, dict) and "output_digest" in art:
-                        upstream_digests.append(art["output_digest"])
-                    elif hasattr(art, "to_dict"):
-                        upstream_digests.append(
-                            hashlib.sha256(json.dumps(art.to_dict(), sort_keys=True).encode()).hexdigest()
-                        )
-                    else:
-                        upstream_digests.append(str(art))
+                upstream_digests.extend(_upstream_digest(art) for art in v)
             elif hasattr(v, "to_dict"):
                 safe_config[k] = v.to_dict()
             elif isinstance(v, (str, int, float, bool, type(None), list, dict)):
@@ -134,7 +152,7 @@ def _compute_input_fingerprint(
 
     payload = {
         "workflow": workflow,
-        "workflow_version": "9.1.1",
+        "executor_version": EXECUTOR_VERSIONS.get(workflow, "unknown"),
         "output_schema_version": "1.0",
         "skill_digest": context.skill_digest,
         "rq_id": context.research_question_id,
@@ -142,8 +160,9 @@ def _compute_input_fingerprint(
         "object_revisions": obj_fingerprints,
         "fulltext_fingerprints": fulltext_fingerprints,
         "omitted_fingerprints": omitted_fingerprints,
-        "budget_limit": context.manifest.get("budget_limit"),
-        "budget_status": context.manifest.get("budget_status"),
+        # What the budget selected is already in the object/full-text/omission fingerprints above; the budget
+        # number itself is deliberately not hashed (a different limit that selects the same context is a hit).
+        "coverage": context.coverage,
         "profile": context.manifest.get("profile"),
         "upstream_artifacts": upstream_digests,
         "extra_config": safe_config,
@@ -155,12 +174,6 @@ def _compute_input_fingerprint(
     }
     raw = json.dumps(payload, sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
-def _get_cache_dir(store: StateStore) -> Path:
-    cd = store.paths.root / "workflow_cache"
-    cd.mkdir(parents=True, exist_ok=True)
-    return cd
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -217,6 +230,14 @@ def _execute_model_step(
     system_prompt = build_system_prompt(workflow, context.skill_instructions, schema)
     user_prompt = context.formatted_user_prompt
     request_tokens, token_basis = adapter_token_count(adapter, system_prompt, user_prompt)
+    # The exact request that is (or would have been) sent, for audit and replay.
+    try:
+        prompt_sha = state_store.artifacts.put(json.dumps(
+            {"system_prompt": system_prompt, "user_prompt": user_prompt, "output_schema_digest": schema_digest(workflow),
+             "request_tokens": request_tokens, "token_count_basis": token_basis},
+            sort_keys=True, ensure_ascii=False).encode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise WorkflowPersistenceError(f"could not store the {workflow} request: {type(exc).__name__}: {exc}") from exc
     provenance = [{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects]
     omitted = tuple(f"{o.get('object_id')}@{o.get('revision')}" for o in context.omitted_items)
     ctx_status = ContextStatus(context.context_status)
@@ -234,7 +255,8 @@ def _execute_model_step(
             workflow=workflow, task_id=tid, project_id=state_store.project_id, status=status, result=result,
             usage=usage, provenance_refs=provenance, notes=notes, status_axes=axes,
             metadata={"model_backed": True, "model_id": model_id, "model": identity,
-                      "request_tokens": request_tokens, "token_count_basis": token_basis, **meta})
+                      "request_tokens": request_tokens, "token_count_basis": token_basis,
+                      "prompt_sha256": prompt_sha, **meta})
 
     # Never send a request that does not fit, nor one missing must-have evidence, whatever allow_incomplete says
     # (I4). Relevant-but-omitted evidence (PARTIAL_T1) needs allow_incomplete; omitted background (PARTIAL_T2) does not.
@@ -317,9 +339,8 @@ def _execute_model_step(
 # persistence
 # ---------------------------------------------------------------------------------------------------
 
-def _persist_output(store: StateStore, output: WorkflowOutput, cache_dir: Path, cache_file: Path) -> None:
-    """Store the output in the content-addressed store (failure is an error) and, when the status allows,
-    in the disposable JSON cache (failure is recorded, not fatal)."""
+def _persist_output(store: StateStore, output: WorkflowOutput) -> None:
+    """Store the output in the content-addressed store. A storage failure is an error, never swallowed."""
     try:
         out_bytes = json.dumps(output.to_dict(), indent=2, sort_keys=True).encode("utf-8")
         artifact_sha = store.artifacts.put(out_bytes)
@@ -329,15 +350,73 @@ def _persist_output(store: StateStore, output: WorkflowOutput, cache_dir: Path, 
     output.metadata["artifact_sha256"] = artifact_sha
     output.metadata["artifact_id"] = f"WFO_{output.workflow.upper()}_{artifact_sha[:12]}"
 
-    if output.status not in _CACHEABLE_STATUSES:
-        return
+
+def _axes_columns(axes: Status) -> dict[str, Any]:
+    return {"execution_status": axes.execution.value, "context_status": axes.context.value,
+            "assessment_status": axes.assessment.value, "applicability": axes.applicability.value,
+            "status_reason": axes.reason}
+
+
+def _register_run(store: StateStore, output: WorkflowOutput, context: ContextPackage, fingerprint: str, *,
+                  executor: str, model_descriptor: Optional[dict], upstream_run_ids: list[str],
+                  reused_from_run_id: Optional[str] = None, artifact_sha256: Optional[str] = None) -> str:
+    """Append the run to the registry (and store its context manifest). Failure is an error."""
     try:
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=str(cache_dir), prefix="wfc_", suffix=".tmp")
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(output.to_dict(), indent=2, sort_keys=True))
-        os.replace(tmp_path, str(cache_file))
+        manifest_sha = store.artifacts.put(json.dumps(
+            {"manifest": context.manifest, "selection_strategy": context.selection_strategy,
+             "objects": [{"object_id": o["object_id"], "revision": o["revision"], "content_digest": o.get("content_digest")}
+                         for o in context.objects], "omitted_items": context.omitted_items,
+             "relations": context.relations}, sort_keys=True, default=str).encode("utf-8"))
+        with store.read() as conn:
+            parent = None if reused_from_run_id else workflow_runs.previous_run_id(
+                conn, output.workflow, context.research_question_id, context.focus_claims)
+        row = {
+            "workflow": output.workflow, "research_question_id": context.research_question_id,
+            "focus_claims": sorted(context.focus_claims), "input_fingerprint": fingerprint,
+            "input_revisions": [{"object_id": o["object_id"], "revision": o["revision"],
+                                 "content_digest": o.get("content_digest")} for o in context.objects],
+            "skill_digest": context.skill_digest, "executor": executor, "model_descriptor": model_descriptor,
+            "context_manifest_sha256": manifest_sha, "prompt_sha256": output.metadata.get("prompt_sha256"),
+            "artifact_sha256": artifact_sha256 or output.metadata.get("artifact_sha256"),
+            "legacy_status": output.status, "usage": output.usage.to_dict(),
+            "reused_from_run_id": reused_from_run_id, "parent_run_id": parent, "upstream_run_ids": upstream_run_ids,
+            **_axes_columns(output.axes),
+        }
+        run_id = workflow_runs.append_run(store, row)
     except Exception as exc:  # noqa: BLE001
-        output.metadata["cache_write_error"] = f"{type(exc).__name__}: {exc}"
+        raise WorkflowPersistenceError(
+            f"could not register the {output.workflow} run: {type(exc).__name__}: {exc}") from exc
+    output.metadata["run_id"] = run_id
+    return run_id
+
+
+def _try_reuse(store: StateStore, row: dict[str, Any], *, workflow: str, task_id: Optional[str], context: ContextPackage,
+               fingerprint: str, tracker: UsageTracker, executor: str, model_descriptor: Optional[dict],
+               upstream_run_ids: list[str]) -> Optional[WorkflowOutput]:
+    """Serve a stored run if its output still verifies; otherwise None (the caller recomputes)."""
+    sha = row.get("artifact_sha256")
+    if not sha or not store.artifacts.has(sha) or not store.artifacts.verify(sha):
+        return None
+    try:
+        data = json.loads(store.artifacts.get_bytes(sha))
+    except ValueError:
+        return None
+    stored = WorkflowOutput.from_dict(data)
+    usage = TaskUsage(
+        workflow=workflow, task_id=task_id or f"TASK_{workflow.upper()}_REUSED", model=None, input_tokens=0,
+        output_tokens=0, cache_read_tokens=None,  # a local reuse is NOT provider cache-read tokens
+        llm_calls=0, context_objects=len(context.objects), reused_artifacts=1, elapsed_ms=1, usage_source="offline_cache")
+    tracker.record_task(usage)
+    out = WorkflowOutput(
+        workflow=workflow, task_id=usage.task_id, project_id=store.project_id, status="REUSED", result=stored.result,
+        usage=usage, input_fingerprint=fingerprint, provenance_refs=stored.provenance_refs,
+        notes=["Reused a stored workflow run; input revisions and configuration are unchanged."],
+        metadata={"reused": True, "artifact_sha256": sha, "original_status": row["legacy_status"],
+                  "reused_from_run_id": row["run_id"]},
+        status_axes=stored.axes)  # all four axes exactly as stored (reuse is not a status)
+    _register_run(store, out, context, fingerprint, executor=executor, model_descriptor=model_descriptor,
+                  upstream_run_ids=upstream_run_ids, reused_from_run_id=row["run_id"], artifact_sha256=sha)
+    return out
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -410,6 +489,9 @@ def run_workflow(
     if profile and canonical_wf == "methods":
         executor_kwargs.setdefault("discipline_profile", profile)
 
+    with state_store.read() as conn:
+        workflow_runs.require_registry(conn)
+
     # Build selective context package
     context = build_context(
         state_store,
@@ -428,51 +510,21 @@ def run_workflow(
         fingerprint_config["model_adapter"] = adapter
         fingerprint_config["allow_incomplete"] = allow_incomplete
     fingerprint = _compute_input_fingerprint(canonical_wf, context, fingerprint_config)
-    cache_dir = _get_cache_dir(state_store)
-    cache_file = cache_dir / f"{canonical_wf}_{fingerprint[:16]}.json"
-
     tracker = UsageTracker(state_store)
+    executor_label = f"deterministic@{EXECUTOR_VERSIONS[canonical_wf]}" if adapter is None else f"model@{CONTRACT_VERSION}"
+    model_descriptor = None if adapter is None else adapter_identity(adapter)
+    upstream_ids = _upstream_run_ids(upstream_artifacts or [])
 
-    # 1. Check Artifact Reuse / Caching (a cache hit does NOT fabricate provider cache tokens)
-    if reuse_cached and cache_file.exists():
-        try:
-            cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
-            reused_usage = TaskUsage(
-                workflow=canonical_wf,
-                task_id=task_id or f"TASK_{canonical_wf.upper()}_REUSED",
-                model=None,
-                input_tokens=0,
-                output_tokens=0,
-                cache_read_tokens=None,  # Local JSON cache reuse is NOT provider billed cache read tokens!
-                llm_calls=0,
-                context_objects=len(context.objects),
-                reused_artifacts=1,
-                elapsed_ms=1,
-                usage_source="offline_cache",
-            )
-            tracker.record_task(reused_usage)
-
-            original_status = cached_data.get("status")
-            try:
-                original_axes = axes_from_legacy(original_status) if original_status else None
-            except ValueError:
-                original_axes = None
-            return WorkflowOutput(
-                workflow=canonical_wf,
-                task_id=reused_usage.task_id,
-                project_id=state_store.project_id,
-                status="REUSED",
-                result=cached_data.get("result", {}),
-                usage=reused_usage,
-                input_fingerprint=fingerprint,
-                provenance_refs=cached_data.get("provenance_refs", []),
-                notes=["Reused valid cached workflow artifact; input revisions and configuration unchanged."],
-                metadata={"reused": True, "artifact_sha256": cached_data.get("metadata", {}).get("artifact_sha256"),
-                          "original_status": original_status},
-                status_axes=original_axes,
-            )
-        except Exception:
-            pass  # Fall back to live execution if cache read fails
+    # 1. Reuse a stored run (the registry decides what is reusable: complete, verified, non-legacy outputs only)
+    if reuse_cached:
+        with state_store.read() as conn:
+            row = workflow_runs.latest_reusable(conn, canonical_wf, fingerprint, sorted(_CACHEABLE_STATUSES))
+        if row is not None:
+            reused = _try_reuse(state_store, row, workflow=canonical_wf, task_id=task_id, context=context,
+                                fingerprint=fingerprint, tracker=tracker, executor=executor_label,
+                                model_descriptor=model_descriptor, upstream_run_ids=upstream_ids)
+            if reused is not None:
+                return reused
 
     # 2. Execute selected workflow: model-backed, or the deterministic executor
     if adapter is not None:
@@ -484,8 +536,10 @@ def run_workflow(
         output = _EXECUTORS[canonical_wf](context, task_id=task_id, **executor_kwargs)
     output.input_fingerprint = fingerprint
 
-    # 3. Persist (CAS is required; the JSON cache is disposable) and record instrumentation
-    _persist_output(state_store, output, cache_dir, cache_file)
+    # 3. Persist (CAS), register the run, record instrumentation
+    _persist_output(state_store, output)
+    _register_run(state_store, output, context, fingerprint, executor=executor_label,
+                  model_descriptor=model_descriptor, upstream_run_ids=upstream_ids)
     tracker.record_task(output.usage)
     return output
 

@@ -43,7 +43,8 @@ class WorkflowRegistry:
             self._skills_dir = skills_dir
 
         self._cache: dict[str, WorkflowMetadata] = {}
-        self._instructions_cache: dict[str, str] = {}
+        # name -> ((mtime_ns, size), instructions). Keyed by the file's stat so an edit is seen at the next call.
+        self._instructions_cache: dict[str, tuple[tuple[int, int], str]] = {}
         self._initialize_metadata()
 
     def _initialize_metadata(self) -> None:
@@ -106,13 +107,15 @@ class WorkflowRegistry:
     def load_skill_instructions(self, name: str) -> str:
         """Progressively load full skill instructions on demand."""
         canonical = name.strip().lower()
-        if canonical in self._instructions_cache:
-            return self._instructions_cache[canonical]
-
         meta = self.get_metadata(canonical)
         p = Path(meta.skill_path)
         if not p.is_file():
             raise FileNotFoundError(f"SKILL.md for workflow '{name}' not found at {p}")
+        st = p.stat()
+        stamp = (st.st_mtime_ns, st.st_size)
+        cached = self._instructions_cache.get(canonical)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
 
         raw = p.read_text(encoding="utf-8")
         # Strip frontmatter if present to get markdown instruction body
@@ -122,12 +125,12 @@ class WorkflowRegistry:
         else:
             instructions = raw.strip()
 
-        self._instructions_cache[canonical] = instructions
+        self._instructions_cache[canonical] = (stamp, instructions)
         return instructions
 
     def get_skill_digest(self, name: str) -> str:
         """Compute SHA-256 digest of active SKILL.md instructions."""
-        inst = load_skill_instructions(name)
+        inst = self.load_skill_instructions(name)
         return hashlib.sha256(inst.encode("utf-8")).hexdigest()
 
     def get_prompt_for_workflow(self, name: str) -> str:

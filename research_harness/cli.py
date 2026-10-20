@@ -638,6 +638,83 @@ def cmd_workflow_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _runs_store(args: argparse.Namespace) -> StateStore:
+    return _resolve_store(_resolve_project_id(args), getattr(args, "home", None))
+
+
+def cmd_workflow_runs(args: argparse.Namespace) -> int:
+    from research_harness.workflows.runs import list_workflow_runs
+    try:
+        legacy = True if getattr(args, "legacy", False) else None
+        rows = list_workflow_runs(_runs_store(args), workflow=getattr(args, "workflow", None),
+                                  research_question_id=getattr(args, "question", None), legacy=legacy,
+                                  limit=getattr(args, "limit", None))
+    except Exception as e:
+        sys.stderr.write(f"Workflow runs error: {e}\n")
+        return 1
+    if args.json:
+        _json_out({"runs": rows, "total_count": len(rows)})
+        return 0
+    print(f"{len(rows)} workflow run(s), newest first:\n")
+    for r in rows:
+        tags = ("legacy " if r["legacy"] else "") + (f"reuse-of:{r['reused_from_run_id']} " if r["reused_from_run_id"] else "")
+        print(f"  {r['run_id']}  {r['workflow']:<12} {r['legacy_status']:<22} "
+              f"exec={r['execution_status']} ctx={r['context_status']} assess={r['assessment_status']}  {tags}".rstrip())
+    return 0
+
+
+def cmd_workflow_show(args: argparse.Namespace) -> int:
+    from research_harness.workflows.runs import get_workflow_run, load_run_prompt, load_workflow_output
+    try:
+        store = _runs_store(args)
+        row = get_workflow_run(store, args.run_id)
+        prompt = load_run_prompt(store, args.run_id) if args.prompt else None
+        output = load_workflow_output(store, args.run_id) if args.json else None
+    except Exception as e:
+        sys.stderr.write(f"Workflow show error: {e}\n")
+        return 1
+    if args.json:
+        _json_out({"run": row, "output": output.to_dict() if output else None, "prompt": prompt})
+        return 0
+    print(f"Run {row['run_id']} ({row['workflow']}, {row['executor']}) at {row['created_at']}")
+    print(f"  Status:      execution={row['execution_status']} context={row['context_status']} "
+          f"assessment={row['assessment_status']} applicability={row['applicability']} ({row['legacy_status']})")
+    print(f"  Question:    {row['research_question_id']}   Focus claims: {row['focus_claims']}")
+    print(f"  Fingerprint: {row['input_fingerprint'][:16]}...   Skill digest: {(row['skill_digest'] or '')[:16]}")
+    print(f"  Artifact:    {row['artifact_sha256']}")
+    print(f"  Parent run:  {row['parent_run_id']}   Reused from: {row['reused_from_run_id']}   Upstream: {row['upstream_run_ids']}")
+    if row["legacy"]:
+        print(f"  LEGACY (9.1.1, unverified, never reused). Known defects: {', '.join(row['known_defects'])}")
+    if args.prompt:
+        if prompt is None:
+            print("  (this run has no model request)")
+        else:
+            print(f"\n--- system prompt ---\n{prompt['system_prompt']}\n--- user prompt ---\n{prompt['user_prompt']}")
+    return 0
+
+
+def cmd_workflow_diff(args: argparse.Namespace) -> int:
+    from research_harness.workflows.runs import diff_runs
+    try:
+        d = diff_runs(_runs_store(args), args.run_a, args.run_b)
+    except Exception as e:
+        sys.stderr.write(f"Workflow diff error: {e}\n")
+        return 1
+    if args.json:
+        _json_out(d)
+        return 0
+    print(f"Diff {d['run_a']} -> {d['run_b']} ({d['workflow_a']} / {d['workflow_b']})")
+    for sc in d["status_changes"]:
+        print(f"  status  {sc['path']}: {sc.get('before')} -> {sc.get('after')}")
+    for ic in d["input_changes"]:
+        print(f"  input   {ic['object_id']}: rev {ic['before']} -> {ic['after']}")
+    for rc in d["result_changes"]:
+        print(f"  result  {rc['path']} ({rc['change']})")
+    if not (d["status_changes"] or d["input_changes"] or d["result_changes"]):
+        print("  (no differences)")
+    return 0
+
+
 def cmd_workflow_run(args: argparse.Namespace) -> int:
     from research_harness.workflows.dispatcher import run_workflow
     try:
@@ -962,6 +1039,31 @@ def build_parser() -> argparse.ArgumentParser:
     p_wfrun.add_argument("--home", help="Base directory for research projects")
     p_wfrun.add_argument("--json", action="store_true", help="Output JSON")
     p_wfrun.set_defaults(func=cmd_workflow_run)
+
+    def _run_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--project", "--project-id", dest="project", required=True, help="Project identifier")
+        p.add_argument("--home", help="Base directory for research projects")
+        p.add_argument("--json", action="store_true", help="Output JSON")
+
+    p_wfruns = s_wf.add_parser("runs", help="List recorded workflow runs (newest first)")
+    _run_args(p_wfruns)
+    p_wfruns.add_argument("--workflow", choices=["contribution", "literature", "methods", "results", "discussion"])
+    p_wfruns.add_argument("--question", "--question-id", dest="question", help="Only runs for this research question")
+    p_wfruns.add_argument("--legacy", action="store_true", help="Only legacy 9.1.1 runs (unverified history)")
+    p_wfruns.add_argument("--limit", type=int)
+    p_wfruns.set_defaults(func=cmd_workflow_runs)
+
+    p_wfshow = s_wf.add_parser("show", help="Show one recorded run; --prompt prints the exact model request")
+    p_wfshow.add_argument("run_id")
+    _run_args(p_wfshow)
+    p_wfshow.add_argument("--prompt", action="store_true", help="Print the system and user prompt that were sent")
+    p_wfshow.set_defaults(func=cmd_workflow_show)
+
+    p_wfdiff = s_wf.add_parser("diff", help="Field-level differences between two runs")
+    p_wfdiff.add_argument("run_a")
+    p_wfdiff.add_argument("run_b")
+    _run_args(p_wfdiff)
+    p_wfdiff.set_defaults(func=cmd_workflow_diff)
 
     # context
     p_ctx = sub.add_parser("context", help="Inspect and preview selective workflow contexts")

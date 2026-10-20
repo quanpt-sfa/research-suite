@@ -400,7 +400,6 @@ def test_e_incomplete_assessment_is_not_reused_as_a_complete_one(proj):
     assert second.status == "INCOMPLETE_CONTEXT"
 
 
-@xfail("P1-4 (E1)")
 def test_e1_skill_edit_on_disk_invalidates_cache_in_the_same_process(proj, tmp_path, monkeypatch):
     seed_all(proj)
     skills = tmp_path / "skills"
@@ -412,7 +411,6 @@ def test_e1_skill_edit_on_disk_invalidates_cache_in_the_same_process(proj, tmp_p
     assert run(proj, "methods", reuse_cached=True).status != "REUSED"
 
 
-@xfail("P1-4 (E4)")
 def test_e4_budget_value_alone_does_not_invalidate_when_selection_is_identical(proj):
     seed_all(proj)
     run(proj, "literature", reuse_cached=True)
@@ -447,7 +445,6 @@ def test_e9_model_identity_is_a_stable_part_of_the_fingerprint(proj):
     assert _compute_input_fingerprint("contribution", ctx, {"model_adapter": a1}) != fp_before
 
 
-@xfail("P1-4 (E10)")
 def test_e10_identical_handoff_sequence_is_fully_reused(proj):
     seed_all(proj)
     store, _ = proj
@@ -460,7 +457,6 @@ def test_e10_identical_handoff_sequence_is_fully_reused(proj):
 # F — persistence in the Research Core
 # ==================================================================================================
 
-@xfail("P1-1 (F1)")
 def test_f1_research_core_has_a_workflow_run_registry(proj):
     store, _ = proj
     with store.read() as c:
@@ -468,24 +464,22 @@ def test_f1_research_core_has_a_workflow_run_registry(proj):
     assert "workflow_runs" in tables
 
 
-@xfail("P1-1 (F2)")
 def test_f2_workflow_output_is_discoverable_in_the_core_without_cache_files(proj):
     seed_all(proj)
     store, _ = proj
     out = run(proj, "discussion")
     sha = out.metadata["artifact_sha256"]
-    shutil.rmtree(store.paths.root / "workflow_cache")
+    shutil.rmtree(store.paths.root / "workflow_cache", ignore_errors=True)  # nothing may depend on cache files
     reopened = StateStore(store.paths)
     assert core_references(reopened, sha) > 0
     assert sha not in reopened.recover()["orphan_artifacts"]
 
 
-@xfail("P1-1 (F3)")
 def test_f3_identical_request_is_reused_after_cache_files_are_deleted(proj):
     seed_all(proj)
     store, _ = proj
     run(proj, "discussion", reuse_cached=True)
-    shutil.rmtree(store.paths.root / "workflow_cache")
+    shutil.rmtree(store.paths.root / "workflow_cache", ignore_errors=True)  # nothing may depend on cache files
     assert run(proj, "discussion", reuse_cached=True).status == "REUSED"
 
 

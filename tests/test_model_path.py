@@ -332,10 +332,10 @@ def test_persistence_failure_is_an_error_not_silent(proj, monkeypatch):
         run(proj, "contribution", ScriptedModelAdapter(default_response=valid_answer("contribution")))
 
 
-def test_cache_write_failure_is_recorded_not_fatal(proj, monkeypatch):
-    monkeypatch.setattr(dispatcher_mod.tempfile, "mkstemp", lambda **kw: (_ for _ in ()).throw(OSError("read-only")))
-    out = run(proj, "contribution", ScriptedModelAdapter(default_response=valid_answer("contribution")))
-    assert out.status == "REQUIRES_VERIFICATION" and "read-only" in out.metadata["cache_write_error"]
+def test_run_registration_failure_is_an_error_not_silent(proj, monkeypatch):
+    monkeypatch.setattr(dispatcher_mod.workflow_runs, "append_run", lambda *a, **k: (_ for _ in ()).throw(OSError("db locked")))
+    with pytest.raises(WorkflowPersistenceError, match="could not register.*db locked"):
+        run(proj, "contribution", ScriptedModelAdapter(default_response=valid_answer("contribution")))
 
 
 # --------------------------------------------------------------------------------------------------

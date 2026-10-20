@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from research_harness.graph.relations import RELATIONS
 
-DB_SCHEMA_VERSION = "9.0.2"
+DB_SCHEMA_VERSION = "9.0.3"
+
+# 9.0.3: append-only registry of workflow runs (derived data: it is not part of the state digest, so the scientific
+# integrity hashes are unchanged). Written by the workflow layer without bumping the state revision.
 
 # 9.0.2: an edge may only be inserted in the state revision that created its source revision.
 # (Revision digests cover the outgoing edge set; late edges would silently change it.)
@@ -27,6 +30,44 @@ BEGIN
   END;
 END;
 """
+
+WORKFLOW_RUNS_DDL = """CREATE TABLE IF NOT EXISTS workflow_runs(
+  run_id TEXT PRIMARY KEY,
+  workflow TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  state_revision INTEGER NOT NULL,
+  research_question_id TEXT,
+  focus_claims TEXT NOT NULL DEFAULT '[]',
+  input_fingerprint TEXT NOT NULL,
+  input_revisions TEXT NOT NULL DEFAULT '[]',
+  skill_digest TEXT,
+  executor TEXT NOT NULL,
+  model_descriptor TEXT,
+  context_manifest_sha256 TEXT,
+  prompt_sha256 TEXT,
+  artifact_sha256 TEXT,
+  execution_status TEXT NOT NULL,
+  context_status TEXT NOT NULL,
+  assessment_status TEXT NOT NULL,
+  applicability TEXT NOT NULL,
+  legacy_status TEXT NOT NULL,
+  status_reason TEXT,
+  usage TEXT NOT NULL DEFAULT '{}',
+  reused_from_run_id TEXT REFERENCES workflow_runs(run_id),
+  parent_run_id TEXT REFERENCES workflow_runs(run_id),
+  upstream_run_ids TEXT NOT NULL DEFAULT '[]',
+  plan_id TEXT,
+  step_id TEXT,
+  domain_step_id TEXT,
+  domain_workflow_pin TEXT,
+  playbook_pins TEXT NOT NULL DEFAULT '[]',
+  journal_policy_pins TEXT NOT NULL DEFAULT '[]',
+  closure_digest TEXT,
+  legacy INTEGER NOT NULL DEFAULT 0 CHECK(legacy IN (0,1)),
+  known_defects TEXT NOT NULL DEFAULT '[]'
+)"""
+WORKFLOW_RUNS_INDEX = ("CREATE INDEX IF NOT EXISTS workflow_runs_fingerprint "
+                       "ON workflow_runs(workflow, input_fingerprint, created_at)")
 
 _REL_CHECK = ",".join(f"'{r}'" for r in RELATIONS)
 
@@ -185,10 +226,13 @@ CREATE TABLE audit_log(
   proposal_id TEXT,
   detail TEXT NOT NULL
 );
+
+{WORKFLOW_RUNS_DDL};
+{WORKFLOW_RUNS_INDEX};
 """
 
 _APPEND_ONLY = ["objects", "edges", "events", "status_log", "state_revisions",
-                "proposals", "snapshots", "audit_log"]
+                "proposals", "snapshots", "audit_log", "workflow_runs"]
 _NO_DELETE = ["object_heads", "object_status", "invalidations", "actors", "meta"]
 
 
@@ -231,25 +275,51 @@ BEGIN SELECT CASE WHEN NEW.head_revision <> OLD.head_revision + 1
 
 SQL_SCHEMA = _TABLES + _triggers()
 
+WORKFLOW_RUNS_UPGRADE_STATEMENTS = [
+    WORKFLOW_RUNS_DDL,
+    WORKFLOW_RUNS_INDEX,
+    "CREATE TRIGGER IF NOT EXISTS workflow_runs_no_update BEFORE UPDATE ON workflow_runs "
+    "BEGIN SELECT RAISE(ABORT,'workflow_runs is append-only'); END",
+    "CREATE TRIGGER IF NOT EXISTS workflow_runs_no_delete BEFORE DELETE ON workflow_runs "
+    "BEGIN SELECT RAISE(ABORT,'workflow_runs rows cannot be deleted'); END",
+]
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in version.split("."))
+
 
 def upgrade_schema(store, token: str | None = None) -> dict:
     """Explicitly upgrade an existing database schema to DB_SCHEMA_VERSION.
 
-    Requires an authenticated owner token. Re-applies missing triggers (such as EDGE_SEAL_TRIGGER),
-    attests the actor registry into the event log, and bumps meta.db_schema_version.
+    Requires an authenticated owner token. Steps, each idempotent:
+      * 9.0.1 -> 9.0.2: re-apply EDGE_SEAL_TRIGGER and attest the actor registry into the event log;
+      * 9.0.2 -> 9.0.3: create the append-only `workflow_runs` registry and import any 9.1.1 `workflow_cache/*.json`
+        outputs into it as legacy/unverified history (kept, never reused; the files are moved to
+        `workflow_cache_legacy/` after the transaction commits).
+    Finally bumps meta.db_schema_version.
     """
     from research_harness.state.actors import attest_registry_in_tx
+    from research_harness.state import workflow_runs
+
+    legacy_files: list = []
     with store.write_tx(token=token, require_roles=("owner",), bump=False) as tx:
         conn = tx.conn
         row = conn.execute("SELECT value FROM meta WHERE key='db_schema_version'").fetchone()
         current_version = row[0] if row else "9.0.1"
-        if current_version == DB_SCHEMA_VERSION:
+        if _version_tuple(current_version) >= _version_tuple(DB_SCHEMA_VERSION):
             return {"status": "NOOP", "version": current_version, "message": "schema already at latest version"}
-        # Upgrade to 9.0.2: apply edge seal trigger if missing and attest actors
-        # Note: Use conn.execute on single DDL statement to preserve transaction atomicity;
+        result: dict = {"status": "UPGRADED", "from_version": current_version, "to_version": DB_SCHEMA_VERSION}
+        # Note: use conn.execute on single DDL statements to preserve transaction atomicity;
         # conn.executescript() implicitly issues a COMMIT in sqlite3, breaking transaction boundaries.
-        conn.execute(EDGE_SEAL_TRIGGER.strip())
+        if _version_tuple(current_version) < (9, 0, 2):
+            conn.execute(EDGE_SEAL_TRIGGER.strip())
+            attest_registry_in_tx(tx)
+        if _version_tuple(current_version) < (9, 0, 3):
+            for statement in WORKFLOW_RUNS_UPGRADE_STATEMENTS:
+                conn.execute(statement)
+            imported, legacy_files = workflow_runs.import_legacy_cache(store, conn)
+            result["legacy_runs_imported"] = imported
         conn.execute("UPDATE meta SET value=? WHERE key='db_schema_version'", (DB_SCHEMA_VERSION,))
-        attest_registry_in_tx(tx)
-        return {"status": "UPGRADED", "from_version": current_version, "to_version": DB_SCHEMA_VERSION}
-
+    workflow_runs.archive_legacy_cache(store, legacy_files)
+    return result

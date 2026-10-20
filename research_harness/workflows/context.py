@@ -25,6 +25,7 @@ priority; only structure (edges, explicit structured flags) does.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -167,7 +168,7 @@ def build_context(
 
     # Progressive disclosure: only the selected workflow's skill is loaded.
     skill_instructions = registry.load_skill_instructions(canonical_wf)
-    skill_digest = registry.get_skill_digest(canonical_wf)
+    skill_digest = hashlib.sha256(skill_instructions.encode("utf-8")).hexdigest()  # of the text actually sent
     if canonical_wf not in _EXPANSION:
         raise KeyError(f"Unknown workflow '{workflow}'. Available: {sorted(_EXPANSION)}")
     spec = _EXPANSION[canonical_wf]

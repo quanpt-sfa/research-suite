@@ -345,6 +345,9 @@ class StateStore:
                 except Exception:
                     pass
 
+            from research_harness.state import workflow_runs
+            known_artifacts |= workflow_runs.artifact_digests(conn)
+
         all_blobs = set(self.artifacts.blobs())
         orphans = sorted(all_blobs - known_artifacts)
 

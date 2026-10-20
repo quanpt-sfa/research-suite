@@ -318,7 +318,7 @@ def test_p0_schema_upgrade_atomic_and_idempotent(tmp_path):
     # 1. Perform upgrade
     res1 = upgrade_schema(store, owner_token)
     assert res1["status"] == "UPGRADED"
-    assert res1["to_version"] == "9.0.2"
+    assert res1["to_version"] == DB_SCHEMA_VERSION
 
     # Verify trigger exists in DB and meta is updated
     conn = store.connect()
@@ -326,7 +326,7 @@ def test_p0_schema_upgrade_atomic_and_idempotent(tmp_path):
         row = conn.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='edges_sealed_at_revision_creation'").fetchone()
         assert row is not None
         vrow = conn.execute("SELECT value FROM meta WHERE key='db_schema_version'").fetchone()
-        assert vrow[0] == "9.0.2"
+        assert vrow[0] == DB_SCHEMA_VERSION
     finally:
         conn.close()
 

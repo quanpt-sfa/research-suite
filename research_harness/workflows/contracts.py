@@ -6,6 +6,7 @@ clean separation of concerns and reproducible artifact derivation.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -55,6 +56,11 @@ class TaskUsage:
     usage_source: Literal["provider", "scripted", "estimated", "offline_cache", "not_available"] = "not_available"
     # Provider prompt-cache writes (billed above the base input rate). None when the provider reports none.
     cache_creation_tokens: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TaskUsage":
+        known = {f.name for f in dataclasses.fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in known})
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -469,6 +475,17 @@ class WorkflowOutput:
     metadata: dict[str, Any] = field(default_factory=dict)
     # Authoritative four-axis status when the producer knows it. `status` stays as the legacy combined string.
     status_axes: Optional[Status] = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowOutput":
+        """Rebuild an output from its stored JSON (`to_dict` is the inverse)."""
+        axes = data.get("status_axes")
+        return cls(
+            workflow=data["workflow"], task_id=data["task_id"], project_id=data["project_id"], status=data["status"],
+            result=data.get("result", {}), usage=TaskUsage.from_dict(data.get("usage") or {}),
+            timestamp=data.get("timestamp", ""), input_fingerprint=data.get("input_fingerprint"),
+            provenance_refs=data.get("provenance_refs", []), notes=data.get("notes", []),
+            metadata=data.get("metadata", {}), status_axes=Status.from_dict(axes) if axes else None)
 
     @property
     def axes(self) -> Status:
