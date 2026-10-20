@@ -48,7 +48,7 @@ class Applicability(str, Enum):
 
 
 EXECUTION_REASONS = frozenset({
-    "exception", "invalid_output", "budget_refused", "missing_runtime", "upstream_failed", "not_applicable",
+    "exception", "invalid_output", "budget_refused", "missing_runtime", "upstream_failed", "not_applicable", "refusal",
 })
 
 # Rank used for "may not exceed" comparisons. CONTESTED is a state, not a rank.
@@ -194,6 +194,12 @@ def axes_from_legacy(legacy_status: str) -> Status:
     if s == "INCOMPLETE_CONTEXT":
         return Status(ok, ContextStatus.PARTIAL, AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE,
                       reason="legacy_incomplete_context")
+    if s == "INSUFFICIENT_EVIDENCE":
+        return Status(ok, ContextStatus.INSUFFICIENT, AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE,
+                      reason="legacy_insufficient_evidence")
+    if s == "INVALID_OUTPUT":
+        return Status(ExecutionStatus.FAILED, ContextStatus.COMPLETE, AssessmentStatus.NOT_ASSESSED,
+                      Applicability.APPLICABLE, reason="invalid_output")
     if s == "BLOCKED":
         return Status(ExecutionStatus.BLOCKED, ContextStatus.INSUFFICIENT, AssessmentStatus.NOT_ASSESSED,
                       Applicability.APPLICABLE, reason="upstream_failed")

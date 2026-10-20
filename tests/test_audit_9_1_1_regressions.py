@@ -94,7 +94,6 @@ def core_references(store, needle):
 # B — model-backed execution (P0-1, P0-2, P1-3, P1-7)
 # ==================================================================================================
 
-@xfail("P0-1")
 @pytest.mark.parametrize("wf", WORKFLOWS)
 def test_b1_scripted_adapter_reaches_model_through_run_workflow(proj, wf):
     seed_all(proj)
@@ -104,7 +103,6 @@ def test_b1_scripted_adapter_reaches_model_through_run_workflow(proj, wf):
     assert isinstance(out.result, dict)
 
 
-@xfail("P0-1/P1-3")
 def test_b2_adapter_reported_usage_is_recorded_verbatim(proj):
     seed_all(proj)
     adapter = ScriptedModelAdapter(default_response={"x": 1}, input_token_cost=777, output_token_cost=11)
@@ -112,7 +110,6 @@ def test_b2_adapter_reported_usage_is_recorded_verbatim(proj):
     assert (out.usage.input_tokens, out.usage.output_tokens) == (777, 11)
 
 
-@xfail("P1-7")
 def test_b3c_output_schema_is_sent_to_the_model(proj):
     seed_all(proj)
     adapter = ScriptedModelAdapter(default_response={"x": 1})
@@ -120,7 +117,6 @@ def test_b3c_output_schema_is_sent_to_the_model(proj):
     assert adapter.recorded_requests[0].expected_schema is not None
 
 
-@xfail("P0-2")
 def test_b3e_schema_less_model_output_is_not_a_complete_assessment(proj):
     seed_all(proj)
     adapter = ScriptedModelAdapter(default_response={"assessment": "REQUIRES_VERIFICATION", "evidence_refs": []})
@@ -128,7 +124,6 @@ def test_b3e_schema_less_model_output_is_not_a_complete_assessment(proj):
     assert out.status != "SUCCESS"
 
 
-@xfail("P0-2")
 def test_b3g_over_budget_request_is_not_sent_to_the_model(proj):
     seed_all(proj)
     adapter = ScriptedModelAdapter(default_response={"x": 1})
@@ -137,7 +132,6 @@ def test_b3g_over_budget_request_is_not_sent_to_the_model(proj):
     assert out.status != "SUCCESS"
 
 
-@xfail("P1-3")
 def test_p13_zero_llm_calls_never_reported_as_provider_usage(proj, monkeypatch):
     """With an exact tokenizer (tiktoken) the executors labelled offline runs 'provider'."""
     from research_harness.workflows import context as ctx_mod
@@ -403,7 +397,6 @@ def test_d5b_explicit_research_question_scopes_claims(proj):
 # E — cache
 # ==================================================================================================
 
-@xfail("P0-6")
 def test_e_incomplete_assessment_is_not_reused_as_a_complete_one(proj):
     seed_all(proj)
     first = run(proj, "contribution", max_input_tokens=150, reuse_cached=True)
@@ -450,7 +443,6 @@ def test_e6_new_contradictory_passage_on_an_rq_linked_source_invalidates_contrib
     assert run(proj, "contribution", reuse_cached=True).status != "REUSED"
 
 
-@xfail("P1-4 (E9)")
 def test_e9_model_identity_is_a_stable_part_of_the_fingerprint(proj):
     seed_all(proj)
     ctx = build_context(proj[0], "contribution", research_question_id="RQ_TEST")

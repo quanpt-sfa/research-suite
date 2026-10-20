@@ -52,7 +52,9 @@ class TaskUsage:
     context_objects: int = 0
     reused_artifacts: int = 0
     elapsed_ms: int = 0
-    usage_source: Literal["provider", "estimated", "not_available"] = "not_available"
+    usage_source: Literal["provider", "scripted", "estimated", "offline_cache", "not_available"] = "not_available"
+    # Provider prompt-cache writes (billed above the base input rate). None when the provider reports none.
+    cache_creation_tokens: Optional[int] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +69,7 @@ class TaskUsage:
             "reused_artifacts": self.reused_artifacts,
             "elapsed_ms": self.elapsed_ms,
             "usage_source": self.usage_source,
+            "cache_creation_tokens": self.cache_creation_tokens,
         }
 
 
@@ -167,23 +170,24 @@ class ContextPackage:
         """Claim objects present in context."""
         return [o for o in self.objects if o.get("object_type") == "Claim"]
 
-    @property
-    def formatted_prompt(self) -> str:
-        """Render formatted markdown prompt representation of the context package and active skill instructions."""
-        parts = [f"# Research Workflow: {self.workflow.upper()} (Project: {self.project_id}, Skill Digest: {self.skill_digest[:16] if self.skill_digest else 'none'})"]
+    def _prompt_sections(self) -> tuple[list[str], list[str], list[str]]:
+        """(header, skill block, body). `formatted_prompt` is their concatenation; a model request carries the
+        skill block in the system prompt and the header + body in the user prompt."""
+        header = [f"# Research Workflow: {self.workflow.upper()} (Project: {self.project_id}, Skill Digest: {self.skill_digest[:16] if self.skill_digest else 'none'})"]
         if self.research_question_id:
-            parts.append(f"Research Question: {self.research_question_id}")
+            header.append(f"Research Question: {self.research_question_id}")
         if self.selection_strategy:
-            parts.append(f"Selection Strategy: {self.selection_strategy}")
+            header.append(f"Selection Strategy: {self.selection_strategy}")
         if self.focus_claims:
-            parts.append(f"Focus Claims: {', '.join(self.focus_claims)}")
+            header.append(f"Focus Claims: {', '.join(self.focus_claims)}")
         if self.budget_status == "INCOMPLETE_EXCEEDED":
-            parts.append("\n> [!WARNING]\n> Context budget exceeded. Low priority context omitted.")
+            header.append("\n> [!WARNING]\n> Context budget exceeded. Low priority context omitted.")
 
+        skill: list[str] = []
         if self.skill_instructions:
-            parts.append(f"\n## Operational Skill Instructions:\n{self.skill_instructions.strip()}")
+            skill.append(f"\n## Operational Skill Instructions:\n{self.skill_instructions.strip()}")
 
-        parts.append("\n## Selected Objects:")
+        parts = ["\n## Selected Objects:"]
         for obj in self.objects:
             content_str = json.dumps(obj.get("content", {}), sort_keys=True, ensure_ascii=False)
             parts.append(f"- [{obj.get('object_type')}] {obj.get('object_id')} (rev {obj.get('revision')}): {content_str}")
@@ -208,7 +212,19 @@ class ContextPackage:
                     parts.append(f"### {oid} (Status: {status})\n{text}")
                 else:
                     parts.append(f"### {oid} (Status: {status})\n[Full text not loaded into context: {status}]")
-        return "\n".join(parts)
+        return header, skill, parts
+
+    @property
+    def formatted_prompt(self) -> str:
+        """Render formatted markdown prompt representation of the context package and active skill instructions."""
+        header, skill, body = self._prompt_sections()
+        return "\n".join(header + skill + body)
+
+    @property
+    def formatted_user_prompt(self) -> str:
+        """Evidence-only part of the request (no skill text). Model-backed runs send the skill in the system prompt."""
+        header, _skill, body = self._prompt_sections()
+        return "\n".join(header + body)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -380,7 +396,8 @@ class WorkflowOutput:
     workflow: str
     task_id: str
     project_id: str
-    status: Literal["SUCCESS", "REUSED", "INCOMPLETE_CONTEXT", "BLOCKED", "FAILED"]
+    status: Literal["SUCCESS", "REUSED", "REQUIRES_VERIFICATION", "INCOMPLETE_CONTEXT", "INSUFFICIENT_EVIDENCE",
+                    "INVALID_OUTPUT", "BLOCKED", "FAILED"]
     result: dict[str, Any]
     usage: TaskUsage
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -388,11 +405,13 @@ class WorkflowOutput:
     provenance_refs: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Authoritative four-axis status when the producer knows it. `status` stays as the legacy combined string.
+    status_axes: Optional[Status] = None
 
     @property
     def axes(self) -> Status:
-        """Four-axis view of the combined legacy `status` (compatibility adapter, see `axes_from_legacy`)."""
-        return axes_from_legacy(self.status)
+        """Four-axis status: the producer's own when set, otherwise the legacy mapping (`axes_from_legacy`)."""
+        return self.status_axes if self.status_axes is not None else axes_from_legacy(self.status)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -407,4 +426,5 @@ class WorkflowOutput:
             "provenance_refs": self.provenance_refs,
             "notes": self.notes,
             "metadata": self.metadata,
+            "status_axes": self.axes.to_dict(),
         }

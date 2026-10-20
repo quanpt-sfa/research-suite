@@ -219,7 +219,7 @@ def execute_discussion_workflow(
         context_objects=len(context.objects),
         reused_artifacts=0,
         elapsed_ms=elapsed_ms,
-        usage_source="estimated" if context.is_token_estimate else "provider",
+        usage_source="estimated",
     )
 
     if context.budget_status == "INCOMPLETE_EXCEEDED":

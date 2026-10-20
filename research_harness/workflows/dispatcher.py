@@ -2,14 +2,21 @@
 
 Inspired by Deep Agents isolated contexts and progressive disclosure:
 - Selective orchestration: runs a single workflow or specified sequence.
-- Preserves token efficiency by reusing valid cached outputs when input revisions haven't changed.
-- Propagates result changes to affected downstream claims and workflows.
+- Reuses cached outputs when input revisions and configuration have not changed; incomplete or invalid
+  outputs are never cached.
 - Records task instrumentation into the project's persistent usage log.
 - Supports structured cross-workflow handoffs (Results -> Discussion -> Contribution).
-- Supports injectable ModelAdapter for model-backed reasoning.
+- Model-backed execution through an injectable `ModelAdapter` (see `adapters.py`):
+    * the request is built from the selected skill, an output contract and the budgeted evidence;
+    * a request that does not fit `max_input_tokens` is never sent;
+    * the answer must satisfy the schema, cite only evidence present in the request, and quote it verbatim
+      (`model_io.validate_model_output`); otherwise the run is INVALID_OUTPUT;
+    * usage is exactly what the adapter reported, nothing is estimated or defaulted;
+    * a valid model answer is PROVISIONAL, never verified (it has not been adjudicated).
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -19,15 +26,38 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from research_harness.state.store import StateStore
+from research_harness.workflows.adapters import (
+    ModelOutputTruncated,
+    ModelRefusal,
+    adapter_identity,
+    adapter_token_count,
+)
 from research_harness.workflows.context import build_context
 from research_harness.workflows.contracts import ContextPackage, TaskUsage, WorkflowOutput
 from research_harness.workflows.instrumentation import UsageTracker
+from research_harness.workflows.model_io import (
+    CONTRACT_VERSION,
+    build_system_prompt,
+    detect_gate_conflicts,
+    output_schema,
+    schema_digest,
+    validate_model_output,
+)
 from research_harness.workflows.registry import get_registry
 from research_harness.workflows.skills.contribution import execute_contribution_workflow
 from research_harness.workflows.skills.discussion import execute_discussion_workflow
 from research_harness.workflows.skills.literature import execute_literature_workflow
 from research_harness.workflows.skills.methods import execute_methods_workflow
 from research_harness.workflows.skills.results import execute_results_workflow
+from research_harness.workflows.status import (
+    Applicability,
+    AssessmentStatus,
+    ContextStatus,
+    ExecutionStatus,
+    Status,
+    apply_caps,
+    axes_from_legacy,
+)
 
 _EXECUTORS = {
     "contribution": execute_contribution_workflow,
@@ -36,6 +66,16 @@ _EXECUTORS = {
     "results": execute_results_workflow,
     "discussion": execute_discussion_workflow,
 }
+
+# Only outputs that are complete enough to stand in for a re-run are cached. INCOMPLETE_CONTEXT,
+# INVALID_OUTPUT and FAILED are recomputed every time.
+_CACHEABLE_STATUSES = frozenset({"SUCCESS", "REQUIRES_VERIFICATION"})
+_ADAPTER_KEYS = ("model_adapter", "adapter")
+_MAX_RAW_OUTPUT_CHARS = 20000
+
+
+class WorkflowPersistenceError(RuntimeError):
+    """A workflow output could not be written to the content-addressed store."""
 
 
 def _compute_input_fingerprint(
@@ -46,8 +86,14 @@ def _compute_input_fingerprint(
     """Compute deterministic SHA-256 fingerprint over all input object revisions, skills, full-text policies, and configuration."""
     safe_config: dict[str, Any] = {}
     upstream_digests: list[str] = []
+    adapter: Any = None
+    for key in _ADAPTER_KEYS:
+        if extra_config and extra_config.get(key) is not None:
+            adapter = extra_config[key]
     if extra_config:
         for k, v in extra_config.items():
+            if k in _ADAPTER_KEYS:
+                continue
             if k == "upstream_artifacts" and isinstance(v, (list, tuple)):
                 for art in v:
                     if hasattr(art, "output_digest"):
@@ -101,6 +147,11 @@ def _compute_input_fingerprint(
         "profile": context.manifest.get("profile"),
         "upstream_artifacts": upstream_digests,
         "extra_config": safe_config,
+        # Who produced the answer. An adapter is identified by its declared configuration (never by repr()),
+        # so identical adapters share cache entries and any change of model or setting is a miss.
+        "executor": "deterministic" if adapter is None else "model",
+        "model": None if adapter is None else adapter_identity(adapter),
+        "model_contract": None if adapter is None else {"version": CONTRACT_VERSION, "schema": schema_digest(workflow)},
     }
     raw = json.dumps(payload, sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -111,6 +162,180 @@ def _get_cache_dir(store: StateStore) -> Path:
     cd.mkdir(parents=True, exist_ok=True)
     return cd
 
+
+# ---------------------------------------------------------------------------------------------------
+# model-backed execution
+# ---------------------------------------------------------------------------------------------------
+
+def _gate_summary(gates: WorkflowOutput) -> dict[str, Any]:
+    """The part of the deterministic evidence gate a model answer may not contradict."""
+    res = gates.result or {}
+    summary: dict[str, Any] = {"status": gates.status}
+    for key in ("identification_status", "novelty_status", "missing_verification", "missing_fulltext_competitors",
+                "questions_requiring_fulltext_verification", "limitations_and_unresolved_choices"):
+        if key in res:
+            summary[key] = res[key]
+    repro = res.get("reproducibility_metadata")
+    if isinstance(repro, dict) and "reproducibility_status" in repro:
+        summary["reproducibility_status"] = repro["reproducibility_status"]
+    return summary
+
+
+def _normalize_usage(reported: Any, *, workflow: str, task_id: str, context: ContextPackage, model_id: Optional[str],
+                     elapsed_ms: int) -> TaskUsage:
+    """Re-label what an adapter reported with this run's identity. Token figures are copied verbatim; a figure the
+    adapter did not report stays None (nothing is estimated or defaulted here)."""
+    common = dict(workflow=workflow, task_id=task_id, context_objects=len(context.objects), reused_artifacts=0,
+                  elapsed_ms=elapsed_ms)
+    if isinstance(reported, TaskUsage):
+        return dataclasses.replace(reported, model=reported.model or model_id, **common)
+    if isinstance(reported, dict):
+        return TaskUsage(
+            model=reported.get("model") or model_id, input_tokens=reported.get("input_tokens"),
+            output_tokens=reported.get("output_tokens"), cache_read_tokens=reported.get("cache_read_tokens"),
+            cache_creation_tokens=reported.get("cache_creation_tokens"), llm_calls=int(reported.get("llm_calls", 1)),
+            usage_source=reported.get("usage_source", "not_available"), **common)
+    return TaskUsage(model=model_id, llm_calls=1, usage_source="not_available", **common)
+
+
+def _execute_model_step(
+    adapter: Any,
+    context: ContextPackage,
+    workflow: str,
+    *,
+    task_id: Optional[str],
+    start_time: float,
+    max_input_tokens: int,
+    allow_incomplete: bool,
+    state_store: StateStore,
+    executor_kwargs: dict[str, Any],
+) -> WorkflowOutput:
+    tid = task_id or f"TASK_{workflow.upper()}_MODEL"
+    identity = adapter_identity(adapter)
+    model_id = identity.get("model_id") or getattr(adapter, "model_id", None)
+    schema = output_schema(workflow)
+    system_prompt = build_system_prompt(workflow, context.skill_instructions, schema)
+    user_prompt = context.formatted_user_prompt
+    request_tokens, token_basis = adapter_token_count(adapter, system_prompt, user_prompt)
+    provenance = [{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects]
+    omitted = tuple(f"{o.get('object_id')}@{o.get('revision')}" for o in context.omitted_items)
+    ctx_status = ContextStatus.COMPLETE if context.budget_status == "OK" else ContextStatus.PARTIAL
+
+    def elapsed() -> int:
+        return int((time.time() - start_time) * 1000)
+
+    def no_call_usage() -> TaskUsage:
+        return TaskUsage(workflow=workflow, task_id=tid, model=model_id, llm_calls=0,
+                         context_objects=len(context.objects), elapsed_ms=elapsed(), usage_source="not_available")
+
+    def build(status: str, result: dict[str, Any], usage: TaskUsage, axes: Status, notes: list[str],
+              **meta: Any) -> WorkflowOutput:
+        return WorkflowOutput(
+            workflow=workflow, task_id=tid, project_id=state_store.project_id, status=status, result=result,
+            usage=usage, provenance_refs=provenance, notes=notes, status_axes=axes,
+            metadata={"model_backed": True, "model_id": model_id, "model": identity,
+                      "request_tokens": request_tokens, "token_count_basis": token_basis, **meta})
+
+    # Never send a request that does not fit, whatever allow_incomplete says (I4).
+    overflow = request_tokens > max_input_tokens
+    if overflow or (context.budget_status != "OK" and not allow_incomplete):
+        reason = (f"assembled request is {request_tokens} tokens ({token_basis}) against max_input_tokens="
+                  f"{max_input_tokens}" if overflow else
+                  "selected context is incomplete (evidence omitted for budget) and allow_incomplete is False")
+        result = {"refused": True, "reason": reason, "request_tokens": request_tokens,
+                  "max_input_tokens": max_input_tokens, "token_count_basis": token_basis,
+                  "omitted_items": context.omitted_items, "continuation_plan": context.continuation_plan}
+        axes = Status(ExecutionStatus.NOT_RUN, ContextStatus.INSUFFICIENT if overflow else ctx_status,
+                      AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE, reason="budget_refused", omissions=omitted)
+        return build("INCOMPLETE_CONTEXT", result, no_call_usage(), axes,
+                     ["Model call refused: the request would exceed the input budget or rest on omitted evidence."])
+
+    call_started = time.time()
+    raw: Any = None
+    reported_usage: Any = None
+    failure: Optional[tuple[str, str, str]] = None  # (legacy status, execution reason, message)
+    try:
+        returned = adapter.generate(system_prompt, user_prompt, expected_schema=schema, temperature=0.0)
+        if isinstance(returned, tuple) and len(returned) == 2:
+            raw, reported_usage = returned
+        else:
+            raw = returned
+    except ModelRefusal as exc:
+        reported_usage, raw = exc.usage, exc.partial_output
+        failure = ("FAILED", "refusal", f"refused ({exc.category or 'no category'}): {exc}")
+    except ModelOutputTruncated as exc:
+        reported_usage, raw = exc.usage, exc.partial_output
+        failure = ("INVALID_OUTPUT", "invalid_output", f"truncated: {exc}")
+    except Exception as exc:  # noqa: BLE001  (an adapter may raise anything; the run is recorded as FAILED)
+        reported_usage = getattr(exc, "usage", None)
+        failure = ("FAILED", "exception", f"{type(exc).__name__}: {exc}")
+    usage = _normalize_usage(reported_usage, workflow=workflow, task_id=tid, context=context, model_id=model_id,
+                             elapsed_ms=int((time.time() - call_started) * 1000))
+
+    if failure is not None:
+        legacy, reason, message = failure
+        result = {"error": message}
+        if isinstance(raw, str) and raw:
+            result["partial_output"] = raw[:_MAX_RAW_OUTPUT_CHARS]
+        axes = Status(ExecutionStatus.FAILED, ctx_status, AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE,
+                      reason=reason, omissions=omitted)
+        return build(legacy, result, usage, axes, [f"Model call did not produce a usable answer: {message}"])
+
+    outcome = validate_model_output(workflow, raw, context, schema)
+    if not outcome.ok:
+        raw_text = raw if isinstance(raw, str) else json.dumps(raw, default=str)
+        result = {"validation_errors": outcome.errors, "raw_output": raw_text[:_MAX_RAW_OUTPUT_CHARS]}
+        axes = Status(ExecutionStatus.FAILED, ctx_status, AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE,
+                      reason="invalid_output", omissions=omitted)
+        return build("INVALID_OUTPUT", result, usage, axes,
+                     [f"Model answer rejected ({len(outcome.errors)} validation error(s)); it is stored but not usable."])
+
+    gates = _EXECUTORS[workflow](context, task_id=f"{tid}_GATES", **executor_kwargs)
+    gate = _gate_summary(gates)
+    conflicts = detect_gate_conflicts(outcome.result or {}, gate)
+    result = dict(outcome.result or {})
+    result["deterministic_gates"] = gate
+    result["gate_conflicts"] = conflicts
+    result["model_generated"] = True
+    result["validation"] = {"refs_checked": outcome.refs_checked, "spans_verified": outcome.spans_verified}
+    assessment = apply_caps(AssessmentStatus.PROVISIONAL, context=ctx_status, generated_by=f"model:{model_id}")
+    axes = Status(ExecutionStatus.SUCCEEDED, ctx_status, assessment, Applicability.APPLICABLE, omissions=omitted)
+    notes = ["Model-backed assessment: well-formed and cites only evidence present in the request, but not adjudicated, so PROVISIONAL."]
+    if conflicts:
+        notes.append("The answer conflicts with a deterministic evidence gate; see result.gate_conflicts.")
+    return build("REQUIRES_VERIFICATION", result, usage, axes, notes)
+
+
+# ---------------------------------------------------------------------------------------------------
+# persistence
+# ---------------------------------------------------------------------------------------------------
+
+def _persist_output(store: StateStore, output: WorkflowOutput, cache_dir: Path, cache_file: Path) -> None:
+    """Store the output in the content-addressed store (failure is an error) and, when the status allows,
+    in the disposable JSON cache (failure is recorded, not fatal)."""
+    try:
+        out_bytes = json.dumps(output.to_dict(), indent=2, sort_keys=True).encode("utf-8")
+        artifact_sha = store.artifacts.put(out_bytes)
+    except Exception as exc:  # noqa: BLE001
+        raise WorkflowPersistenceError(
+            f"could not store the {output.workflow} output (status {output.status}): {type(exc).__name__}: {exc}") from exc
+    output.metadata["artifact_sha256"] = artifact_sha
+    output.metadata["artifact_id"] = f"WFO_{output.workflow.upper()}_{artifact_sha[:12]}"
+
+    if output.status not in _CACHEABLE_STATUSES:
+        return
+    try:
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=str(cache_dir), prefix="wfc_", suffix=".tmp")
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(output.to_dict(), indent=2, sort_keys=True))
+        os.replace(tmp_path, str(cache_file))
+    except Exception as exc:  # noqa: BLE001
+        output.metadata["cache_write_error"] = f"{type(exc).__name__}: {exc}"
+
+
+# ---------------------------------------------------------------------------------------------------
+# entry point
+# ---------------------------------------------------------------------------------------------------
 
 def run_workflow(
     arg1: Any = None,
@@ -131,9 +356,15 @@ def run_workflow(
     extra_kwargs: Optional[dict[str, Any]] = None,
     upstream_artifacts: Optional[list[Any]] = None,
     model_adapter: Optional[Any] = None,
+    allow_incomplete: bool = False,
     **kwargs: Any,
 ) -> WorkflowOutput:
-    """Run an individual research workflow with selective context, optional artifact reuse, and model adapter support."""
+    """Run an individual research workflow with selective context, optional artifact reuse, and model adapter support.
+
+    With `model_adapter`, the workflow is executed by the model (see module docstring); `allow_incomplete` lets a
+    request go out when low-priority evidence was omitted for budget, but never when the request itself exceeds
+    `max_input_tokens`.
+    """
     start_time = time.time()
     if isinstance(arg1, StateStore):
         state_store = arg1
@@ -161,9 +392,16 @@ def run_workflow(
         combined_extra["discipline_profile"] = profile
     if upstream_artifacts:
         combined_extra["upstream_artifacts"] = upstream_artifacts
-    if model_adapter:
+    if model_adapter is not None:
         combined_extra["model_adapter"] = model_adapter
     combined_extra.update(kwargs)
+
+    adapter = None
+    for key in _ADAPTER_KEYS:
+        adapter = combined_extra.pop(key, None) or adapter
+    executor_kwargs = dict(combined_extra)
+    if profile and canonical_wf == "methods":
+        executor_kwargs.setdefault("discipline_profile", profile)
 
     # Build selective context package
     context = build_context(
@@ -178,13 +416,17 @@ def run_workflow(
         discipline_profile=profile,
     )
 
-    fingerprint = _compute_input_fingerprint(canonical_wf, context, combined_extra)
+    fingerprint_config = dict(combined_extra)
+    if adapter is not None:
+        fingerprint_config["model_adapter"] = adapter
+        fingerprint_config["allow_incomplete"] = allow_incomplete
+    fingerprint = _compute_input_fingerprint(canonical_wf, context, fingerprint_config)
     cache_dir = _get_cache_dir(state_store)
     cache_file = cache_dir / f"{canonical_wf}_{fingerprint[:16]}.json"
 
     tracker = UsageTracker(state_store)
 
-    # 1. Check Artifact Reuse / Caching (Part G1: Cache hit does NOT fabricate provider cache tokens)
+    # 1. Check Artifact Reuse / Caching (a cache hit does NOT fabricate provider cache tokens)
     if reuse_cached and cache_file.exists():
         try:
             cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
@@ -203,6 +445,11 @@ def run_workflow(
             )
             tracker.record_task(reused_usage)
 
+            original_status = cached_data.get("status")
+            try:
+                original_axes = axes_from_legacy(original_status) if original_status else None
+            except ValueError:
+                original_axes = None
             return WorkflowOutput(
                 workflow=canonical_wf,
                 task_id=reused_usage.task_id,
@@ -213,87 +460,26 @@ def run_workflow(
                 input_fingerprint=fingerprint,
                 provenance_refs=cached_data.get("provenance_refs", []),
                 notes=["Reused valid cached workflow artifact; input revisions and configuration unchanged."],
-                metadata={"reused": True, "artifact_sha256": cached_data.get("metadata", {}).get("artifact_sha256")},
+                metadata={"reused": True, "artifact_sha256": cached_data.get("metadata", {}).get("artifact_sha256"),
+                          "original_status": original_status},
+                status_axes=original_axes,
             )
         except Exception:
             pass  # Fall back to live execution if cache read fails
 
-    # 2. Execute selected workflow (Check for model adapter vs deterministic executor)
-    adapter = combined_extra.pop("model_adapter", None) or combined_extra.pop("adapter", None)
+    # 2. Execute selected workflow: model-backed, or the deterministic executor
     if adapter is not None:
-        adapter_res = adapter.generate(
-            prompt=context.formatted_prompt,
-            workflow=canonical_wf,
-            schema_version="1.0",
-        )
-        adapter_usage = getattr(adapter_res, "usage", {}) or {}
-        model_id = getattr(adapter, "model_id", getattr(adapter, "name", "scripted-model"))
-        elapsed_ms = int((time.time() - start_time) * 1000)
-
-        usage = TaskUsage(
-            workflow=canonical_wf,
-            task_id=task_id or f"TASK_{canonical_wf.upper()}_MODEL",
-            model=model_id,
-            input_tokens=adapter_usage.get("input_tokens", context.estimated_tokens),
-            output_tokens=adapter_usage.get("output_tokens", 50),
-            cache_read_tokens=adapter_usage.get("cache_read_tokens"),
-            llm_calls=adapter_usage.get("llm_calls", 1),
-            context_objects=len(context.objects),
-            reused_artifacts=0,
-            elapsed_ms=elapsed_ms,
-            usage_source="provider",
-        )
-
-        res_payload = getattr(adapter_res, "result", adapter_res)
-        if isinstance(res_payload, str):
-            try:
-                res_payload = json.loads(res_payload)
-            except Exception:
-                res_payload = {"raw_output": res_payload}
-
-        output = WorkflowOutput(
-            workflow=canonical_wf,
-            task_id=usage.task_id,
-            project_id=state_store.project_id,
-            status="SUCCESS",
-            result=res_payload,
-            usage=usage,
-            input_fingerprint=fingerprint,
-            provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-            notes=["Model-backed assessment generated via ModelAdapter."],
-            metadata={"model_backed": True, "model_id": model_id},
-        )
+        output = _execute_model_step(
+            adapter, context, canonical_wf, task_id=task_id, start_time=start_time,
+            max_input_tokens=max_input_tokens, allow_incomplete=allow_incomplete, state_store=state_store,
+            executor_kwargs=executor_kwargs)
     else:
-        executor = _EXECUTORS[canonical_wf]
-        call_kwargs = dict(combined_extra)
-        if profile and canonical_wf == "methods":
-            call_kwargs.setdefault("discipline_profile", profile)
+        output = _EXECUTORS[canonical_wf](context, task_id=task_id, **executor_kwargs)
+    output.input_fingerprint = fingerprint
 
-        output = executor(context, task_id=task_id, **call_kwargs)
-        output.input_fingerprint = fingerprint
-
-    # 3. Persist Output into StateStore CAS (Acceptance Gate F)
-    try:
-        out_dict = output.to_dict()
-        out_bytes = json.dumps(out_dict, indent=2, sort_keys=True).encode("utf-8")
-        artifact_sha = state_store.artifacts.put(out_bytes)
-        output.metadata["artifact_sha256"] = artifact_sha
-        output.metadata["artifact_id"] = f"WFO_{canonical_wf.upper()}_{artifact_sha[:12]}"
-    except Exception:
-        pass
-
-    # 4. Persist Cache Artifact atomically
-    try:
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=str(cache_dir), prefix="wfc_", suffix=".tmp")
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(output.to_dict(), indent=2, sort_keys=True))
-        os.replace(tmp_path, str(cache_file))
-    except Exception:
-        pass
-
-    # 5. Record Instrumentation
+    # 3. Persist (CAS is required; the JSON cache is disposable) and record instrumentation
+    _persist_output(state_store, output, cache_dir, cache_file)
     tracker.record_task(output.usage)
-
     return output
 
 
