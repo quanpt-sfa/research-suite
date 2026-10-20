@@ -25,6 +25,7 @@ research_harness = [
     "workflows/skills/*/*.md",
     "taxonomy/*.json",
     "workflows/domain_specs/*.json",
+    "workflows/protocols_data/*.json",
 ]
 
 [tool.pytest.ini_options]

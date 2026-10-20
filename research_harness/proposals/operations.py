@@ -108,7 +108,13 @@ def _claim_observed(ctx: Ctx, op: dict) -> None:
             reject("OBSERVED_RESULT_INVALID", f"{rid} is not a Result in this project", object_id=rid)
 
 
+LIBRARY_ID_PREFIX = "LIB_"
+
+
 def _new_id_free(ctx: Ctx, object_id: str) -> None:
+    if object_id.startswith(LIBRARY_ID_PREFIX):
+        reject("LIBRARY_ID_RESERVED", f"{object_id}: the {LIBRARY_ID_PREFIX} prefix is reserved for objects imported "
+               "from the knowledge library (`research library use`)", Decision.REJECTED, object_id=object_id)
     head = ctx.tx.head(object_id)
     if head is not None or object_id in ctx.created:
         reject("ID_ALREADY_EXISTS", f"{object_id} already exists", Decision.CONFLICT,
