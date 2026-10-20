@@ -1,0 +1,8 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "eca_equivalence": ["EQUIVALENT", "NARROWER", "BROADER", "DIFFERENT", "CONTRADICTS", "UNRESOLVED"],
+    "eca_verdict": ["SUPPORTED_AS_STATED", "SUPPORTED_IF_QUALIFIED", "NOT_SUPPORTED", "UNRESOLVED"],
+    "eca_risk_tier": ["HIGH", "STANDARD"]
+  }
+}

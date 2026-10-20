@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "journal_policy_type": ["official_requirement", "reporting_standard", "published_precedent", "editorial_feedback"]
+  }
+}

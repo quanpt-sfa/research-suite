@@ -1,0 +1,8 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "study_design": ["archival", "experimental_lab", "field_experiment", "quasi_experimental", "survey",
+                     "qualitative_interview", "case_study", "design_based", "mixed_methods", "analytical_model",
+                     "predictive_modeling", "conceptual", "systematic_review", "narrative_review"]
+  }
+}

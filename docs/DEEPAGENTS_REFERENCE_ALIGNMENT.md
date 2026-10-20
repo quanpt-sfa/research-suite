@@ -1,3 +1,9 @@
+> **PARTIALLY SUPERSEDED BY INDEPENDENT AUDIT.** The upstream (Deep Agents) descriptions in this document are accurate.
+> Several statements about the *local* implementation are not: the `workflow_runs` table and `WorkflowArtifactRecord`
+> do not exist, `CONTEXT_PREPARED` / `EXCERPT_ONLY` are not produced, skill-tool disclosure is not implemented,
+> and the model-adapter path is not callable. Corrections are marked **[CORRECTED]**. Planned for 9.2:
+> `docs/refactor_9_2/RESEARCH_SUITE_9_2_REFACTOR_PLAN.md`.
+
 # Deep Agents Reference Alignment: Source-to-Source Architectural Specification
 
 **Target Repository:** `quanpt-sfa/research-suite`  
@@ -76,7 +82,7 @@ This document establishes the source-to-source alignment between Deep Agents (`1
 - **Adaptation in Research Suite 9.1.1:**
   - **ADAPTED:** Adapt offloading to scientific research objects:
     - Primary manuscripts remain in Research Harness CAS (`store.artifacts`) indexed by SHA-256.
-    - Context packages preserve distinct statuses: `FULLTEXT_AVAILABLE`, `FULLTEXT_LOADED`, `ABSTRACT_ONLY`, `EXCERPT_ONLY`, `FULLTEXT_MISSING`. An abstract is never relabeled as full text.
+    - Context packages preserve distinct statuses: `FULLTEXT_AVAILABLE`, `FULLTEXT_LOADED`, `ABSTRACT_ONLY`, `FULLTEXT_MISSING` (**[CORRECTED]** `EXCERPT_ONLY` is not implemented). An abstract is never relabeled as full text.
     - Full prompt budgeting covers the complete model-facing payload: instructions, context manifest, excerpts, expanded texts, and response schemas.
     - Summarization is treated as an intentional, budgeted transformation, not a silent lossy replacement of primary evidence.
 - **Classification:** **ADAPTED**
@@ -105,9 +111,9 @@ This document establishes the source-to-source alignment between Deep Agents (`1
 - **Adaptation in Research Suite 9.1.1:**
   - **ADAPTED:** Retain Research Harness 9.0 CAS as the single storage engine.
   - Workflow outputs are serialized, content-hashed, and stored in CAS (`store.artifacts.put(bytes)`).
-  - Workflow execution records (`WorkflowArtifactRecord`) are persisted into a dedicated, append-only SQLite metadata table (`workflow_runs`), preserving task IDs, input object revisions, skill digests, model identifiers, and dependency validity across process restarts.
-- **Classification:** **ADAPTED**
-- **Verification Test:** `tests/test_scientific_regression_9_1_1.py::test_i11_workflow_artifact_persistence_across_restart`
+  - ~~Workflow execution records (`WorkflowArtifactRecord`) are persisted into a dedicated, append-only SQLite metadata table (`workflow_runs`)~~ **[CORRECTED]** Not implemented in 9.1.1: outputs are written to CAS as unindexed blobs that `StateStore.recover()` reports as orphans. The `workflow_runs` registry is planned in Phase 4.1 of the 9.2 plan.
+- **Classification:** ~~ADAPTED~~ **[CORRECTED] PARTIAL** (CAS storage of outputs only; no registry)
+- **Verification Test:** `tests/test_scientific_regression_9_1_1.py::test_i11_workflow_artifact_persistence_across_restart` (**[CORRECTED]** does not query the Research Core and never deletes the cache)
 
 ---
 
@@ -142,7 +148,7 @@ This document establishes the source-to-source alignment between Deep Agents (`1
 | Upstream Component | File in `deepagents` | Status in Research Suite 9.1.1 | Justification & Architectural Decision |
 | :--- | :--- | :--- | :--- |
 | **Progressive Skill Disclosure** | `middleware/skills.py` | **ADAPTED** | Compact registry metadata at discovery; operational `SKILL.md` injected directly into model payload upon workflow selection. |
-| **Skill Tool Disclosure** | `middleware/_skill_tools.py` | **ADAPTED** | Context Builder tools are exposed conditionally based on workflow contract rather than all tools at once. |
+| **Skill Tool Disclosure** | `middleware/_skill_tools.py` | ~~ADAPTED~~ **NOT IMPLEMENTED** | **[CORRECTED]** The SKILL.md `allowed_tools` frontmatter is never parsed or enforced. |
 | **Summarization Compaction** | `middleware/summarization.py` | **DEFERRED** | Multi-turn chat compaction is deferred; solo research tasks operate on structured object DAGs and selective retrieval rather than long chat threads. |
 | **Blob Content-Addressing** | `middleware/_blob_offload.py` | **ADAPTED** | Integrated with Research Harness CAS (`store.artifacts`). Bulky manuscripts and outputs stay in CAS; compact locators pass to model. |
 | **Subagent Task Tool (`task`)** | `middleware/subagents.py` | **ADAPTED** | Workflows remain isolated single-invocation tasks. Structured cross-workflow handoffs implemented via `upstream_artifacts`. |
@@ -154,6 +160,6 @@ This document establishes the source-to-source alignment between Deep Agents (`1
 ## 4. Architectural Invariants Enforced in 9.1.1
 
 1. **Provable Skill Grounding:** Every model request must carry the exact text of the active workflow's `SKILL.md`. Changing `SKILL.md` must invalidate cached outputs.
-2. **Scientific Truthfulness:** An offline executor must return `CONTEXT_PREPARED`, `REQUIRES_REASONING`, or `REQUIRES_VERIFICATION`, never declaring substantive scientific findings without verified computation or primary evidence.
+2. **Scientific Truthfulness:** An offline executor must not declare substantive scientific findings without verified computation or primary evidence. **[CORRECTED]** `CONTEXT_PREPARED` and `REQUIRES_REASONING` are not implemented, and the 9.1.1 executors do not meet this invariant (audit P0-3).
 3. **Exact Provenance:** Full texts, excerpts, and claims must preserve object IDs, revisions, locators, and CAS digests across prompt assembly, execution, and persistence.
 4. **Deterministic Budgeting:** Token budgets apply to the entire model-facing payload, with transparent fallback to continuation retrieval plans on overflow.

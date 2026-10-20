@@ -1,0 +1,7 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "scope_dimension": ["domain", "subfield", "study_design", "data_regime", "unit_of_analysis", "period", "journal", "estimand"],
+    "data_regime_key": ["jurisdiction", "data_source", "label_source", "outcome_measure"]
+  }
+}

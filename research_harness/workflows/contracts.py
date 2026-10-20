@@ -11,6 +11,17 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Sequence
 
+from research_harness.workflows.status import (  # noqa: F401  (re-exported four-axis status model)
+    Applicability,
+    AssessmentStatus,
+    ContextStatus,
+    ExecutionStatus,
+    Status,
+    apply_caps,
+    axes_from_legacy,
+    normalize_status,
+)
+
 
 @dataclass
 class TaskUsage:
@@ -377,6 +388,11 @@ class WorkflowOutput:
     provenance_refs: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def axes(self) -> Status:
+        """Four-axis view of the combined legacy `status` (compatibility adapter, see `axes_from_legacy`)."""
+        return axes_from_legacy(self.status)
 
     def to_dict(self) -> dict[str, Any]:
         return {

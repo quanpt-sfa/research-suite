@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "hierarchies": {
+    "domain": {
+      "accounting": ["archival_financial_reporting", "auditing", "management_accounting", "accounting_information_systems"],
+      "finance": ["asset_pricing", "corporate_finance", "banking"],
+      "education": ["learning_analytics", "design_based_research", "qualitative_education"],
+      "cross_domain": ["conceptual", "provocation"]
+    }
+  }
+}

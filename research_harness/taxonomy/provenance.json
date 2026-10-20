@@ -1,0 +1,8 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "generated_by": ["researcher", "model", "deterministic", "import", "legacy"],
+    "evidence_basis_kind": ["source_passage", "replication_code", "project_run", "journal_policy",
+                            "reporting_standard", "review_feedback", "researcher_judgement"]
+  }
+}

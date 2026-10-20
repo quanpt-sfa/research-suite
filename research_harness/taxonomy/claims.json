@@ -1,0 +1,8 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "claim_change": ["STRENGTHENED", "UNCHANGED", "NARROWED", "QUALIFIED", "WEAKENED", "REVERSED", "NOT_SUPPORTED"],
+    "claim_effect": ["STRENGTHENS", "LIMITS", "CHANGES", "NO_BEARING", "NOT_ASSESSED"],
+    "intro_component_status": ["AUTHOR_ASSERTED", "CORROBORATED", "CONTESTED", "UNSUPPORTED", "NOT_ASSESSED"]
+  }
+}

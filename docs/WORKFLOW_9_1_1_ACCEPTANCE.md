@@ -1,3 +1,10 @@
+> **SUPERSEDED BY INDEPENDENT AUDIT — STATUS: NOT ACCEPTED.**
+> An independent functional audit of this commit (`9728134`) reproduced 45 failing checks, including a model-adapter
+> `TypeError` that makes model-backed execution unusable, keyword-based scientific verdicts, and the absence of the
+> `workflow_runs` table described below. See `docs/refactor_9_2/RESEARCH_SUITE_9_1_1_INDEPENDENT_AUDIT.md`.
+> Statements below that are struck through or marked **[CORRECTED]** were found to be inaccurate; they are kept for the record.
+> The remediation is `docs/refactor_9_2/RESEARCH_SUITE_9_2_REFACTOR_PLAN.md`.
+
 # Research Suite 9.1.1 Acceptance Report
 ## Scientific Workflow Correctness, Deep Agents Reference Alignment, and Measured Context Efficiency
 
@@ -7,7 +14,7 @@
 **Working Feature Branch:** `feature/workflow-9-1-1-scientific-correctness`  
 **Mandatory Reference Repository:** [https://github.com/langchain-ai/deepagents](https://github.com/langchain-ai/deepagents)  
 **Pinned Reference Commit Inspected:** `12f70f27cc2e96ac715f4563e05b205be7adc275`  
-**Final Status:** **ACCEPTED**
+**Final Status:** ~~ACCEPTED~~ **[CORRECTED] NOT ACCEPTED (independent audit)**
 
 ---
 
@@ -56,7 +63,7 @@ A comprehensive source-to-source architectural inspection was performed comparin
 - **Correction:** Strictly separated direct data observations from scholarly interpretations. Rival explanations output `verification_status = "NOT_VERIFIED"` when diagnostics are unperformed.
 
 ### B6. Offline Execution Status
-- Offline workflows return `CONTEXT_PREPARED` or `REQUIRES_VERIFICATION` rather than premature `SUCCESS`.
+- ~~Offline workflows return `CONTEXT_PREPARED` or `REQUIRES_VERIFICATION` rather than premature `SUCCESS`.~~ **[CORRECTED]** `CONTEXT_PREPARED` does not exist in the code. Executors return `SUCCESS`, `REQUIRES_VERIFICATION` or `INCOMPLETE_CONTEXT`; several return `SUCCESS` with no evidence at all.
 
 ---
 
@@ -72,7 +79,7 @@ A comprehensive source-to-source architectural inspection was performed comparin
 ## 5. Context Builder & Full-Text Fidelity
 
 - **Strict Focal Retrieval (D1):** Explicitly unknown research questions raise `KeyError("RESEARCH_QUESTION_NOT_FOUND: ...")`; unknown focus claims raise `KeyError("CLAIM_NOT_FOUND: ...")`. Selection strategy is explicitly reported.
-- **Full-Text Semantics (D3):** Distinguishes `FULLTEXT_AVAILABLE`, `FULLTEXT_LOADED`, `ABSTRACT_ONLY`, `EXCERPT_ONLY`, and `FULLTEXT_MISSING`. Abstracts are never relabeled as full text.
+- **Full-Text Semantics (D3):** Distinguishes `FULLTEXT_AVAILABLE`, `FULLTEXT_LOADED`, `ABSTRACT_ONLY` and `FULLTEXT_MISSING` (**[CORRECTED]** `EXCERPT_ONLY` is not implemented). Abstracts are never relabeled as full text.
 - **Excerpt Schema (D4):** Standardized across `passage_id`, `revision`, `source_id`, `locator`, and `quote`/`excerpt`.
 - **Full-Prompt Budgeting (D5):** Measures tokens across the *entire assembled prompt* (instructions, manifest, objects, excerpts, full texts). Exceeded budgets output `INCOMPLETE_EXCEEDED` with an actionable `continuation_plan`.
 
@@ -104,11 +111,11 @@ The benchmark was executed across 8 comprehensive scientific test cases under sa
 REPORT STATEMENT: Under this synthetic benchmark, selected context was estimated to be 90.29% smaller while retaining 3/4 required evidence items.
 ```
 
-- **Required Evidence Recall:** 75.0% (3/4 target evidence items retained; 1 omitted due to explicit unrequested status)
+- **Required Evidence Recall:** 75.0% (3/4). **[CORRECTED]** the missing item is the competitor Source, which the contribution context builder never expands (audit P0-4); it was not "unrequested".
 - **Contradictory Evidence Recall:** 100.0% (both conflicting results and passages preserved)
-- **Provenance Correctness:** 100.0% (all locators, revisions, and source IDs preserved)
+- **Provenance Correctness:** ~~100.0%~~ **[CORRECTED] NOT MEASURED** — the value is a literal in `tests/benchmark_fixture.py`, not a computed metric.
 - **Full-Text Completeness:** Verified on-demand (abstracts kept distinct from manuscripts)
-- **Context Size Reduction:** 90.29% token reduction / 88.4% byte reduction
+- **Context Size Reduction:** 90.29% token reduction (**[CORRECTED]** compares the candidate's intermediate JSON with a full snapshot export, not prompt to prompt; the prompt-to-prompt reduction measured by the audit was 78.29%). The byte reduction reproduces as 92.4%, not 88.4%.
 - **Language Standard:** Strictly adheres to Gate H non-fabrication standard: reports estimated context size reduction and evidence recall without claiming unverified real-world API cost savings.
 
 ---
@@ -176,6 +183,6 @@ tests\test_trust_boundary_and_hardening.py ...........                   [100%]
 
 ## 11. Final Verdict
 
-**ACCEPTED**
+~~**ACCEPTED**~~ **[CORRECTED] NOT ACCEPTED** (independent audit, see banner).
 
 The Research Suite 9.1.1 workflow engine operates with full scientific integrity, eliminates unverified academic claims, connects progressive skill instructions directly to model-facing execution, enforces strict context budgeting and full-text fidelity, preserves verifiable provenance across process restarts, and provides fair, evidence-grounded performance metrics.

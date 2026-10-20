@@ -22,6 +22,7 @@ include = ["research_harness*"]
 research_harness = [
     "legacy/VENDORED.json",
     "workflows/skills/*/*.md",
+    "taxonomy/*.json",
 ]
 
 [tool.pytest.ini_options]

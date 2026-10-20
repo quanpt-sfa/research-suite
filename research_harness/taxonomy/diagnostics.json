@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "diagnostic_signal": ["NO_CONCERN_INDICATED", "CONCERN_INDICATED", "INCONCLUSIVE", "NOT_COMPUTABLE"]
+  }
+}

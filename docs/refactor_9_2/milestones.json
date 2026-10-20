@@ -1,0 +1,48 @@
+{
+  "description": "Required integration tests per milestone (plan v3 section 7). A milestone is complete only when every listed test PASSES (xfail/skip/missing do not count) and no test in `no_xfail_files` is still xfail. Unit tests or stubs of another module's output never close a milestone.",
+  "milestones": {
+    "M1": {
+      "title": "Trustworthy core",
+      "phases": ["0", "1", "2", "3A.1", "4.1"],
+      "no_xfail_files": ["tests/test_audit_9_1_1_regressions.py"],
+      "required_tests": [
+        "tests/test_phase0_status_taxonomy_provenance.py::test_execution_success_does_not_imply_verified",
+        "tests/test_phase0_status_taxonomy_provenance.py::test_apply_caps_exhaustive_never_verified_without_confirmation",
+        "tests/test_domain_engine.py::test_domain_workflows_differ_in_execution_not_prompt",
+        "tests/test_workflow_runs.py::test_legacy_cache_registered_not_reusable"
+      ]
+    },
+    "M2": {
+      "title": "Knowledge infrastructure",
+      "phases": ["3C.0", "5b.corpus", "3A.2", "4.2", "4.3", "4.4"],
+      "no_xfail_files": [],
+      "required_tests": [
+        "tests/test_eca.py::test_correct_quote_wrong_interpretation_detected_or_unverified",
+        "tests/test_library_closure.py::test_project_reproduces_with_library_unavailable",
+        "tests/test_library_lifecycle.py::test_promotion_requires_three_dimensions_and_resolved_eca",
+        "tests/test_reading_protocols.py::test_extraction_runs_real_protocols_with_quote_verification"
+      ]
+    },
+    "M3": {
+      "title": "Pilot domain end-to-end",
+      "phases": ["3B", "3C", "3D", "3E", "5a", "5b.replication"],
+      "no_xfail_files": [],
+      "required_tests": [
+        "tests/test_introduction_argument.py::test_3b_contribution_comparison_integrates_3c_output",
+        "tests/test_playbooks.py::test_extracted_and_reproduced_playbook_not_valid_by_default",
+        "tests/test_results_dag.py::test_diagnostic_concern_never_blocks_or_passes",
+        "tests/test_pilot_chain.py::test_pilot_chain_end_to_end_on_synthetic_fixture"
+      ]
+    },
+    "M4": {
+      "title": "Evidence of value",
+      "phases": ["6", "7"],
+      "no_xfail_files": [],
+      "required_tests": [
+        "tests/test_benchmark_logic.py::test_synthetic_logic_benchmark",
+        "tests/test_gate_k_l_artifacts.py::test_gate_k_real_pilot_artifacts_present",
+        "tests/test_gate_k_l_artifacts.py::test_gate_l_cold_warm_artifacts_present"
+      ]
+    }
+  }
+}
