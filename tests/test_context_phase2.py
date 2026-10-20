@@ -408,6 +408,20 @@ def test_classify_heading(heading, label, conf):
     assert classify_heading(heading) == (label, conf)
 
 
+def test_unnumbered_title_case_headings_are_found_but_wrapped_sentences_are_not():
+    text = "Robustness Checks\nResults hold.\n\nData are collected from\nthe public registry.\n\nData and Sample Selection\nWe use X.\n"
+    secs = detect_sections(text)
+    assert [(s.label, s.heading) for s in secs] == [("robustness", "Robustness Checks"), ("data_sample", "Data and Sample Selection")]
+    assert "Data are collected from" in text[secs[0].char_start:secs[0].char_end]  # stayed in the previous section's body
+
+
+def test_run_in_headings_need_a_known_heading_word_at_the_start_of_a_line():
+    secs = detect_sections("7. Limitations: because treatment was self-selected our estimates may overstate.\n")
+    assert [(s.label, s.heading) for s in secs] == [("limitations", "7. Limitations")]
+    prose = "The sample is large. Results: the model fits well, but the data are noisy.\nWe find data matter.\n"
+    assert [s.label for s in detect_sections(prose)] == ["other"]
+
+
 def test_unmatched_heading_is_kept_as_other_and_no_text_is_dropped():
     text = "Overview\nSome text.\n\nOur Special Section\nMore text.\n"
     assert "".join(text[s.char_start:s.char_end] for s in detect_sections(text)) == text

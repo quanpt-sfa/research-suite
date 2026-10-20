@@ -569,9 +569,16 @@ def test_i11_workflow_artifact_persistence_across_restart(tmp_path):
             origin={},
             edges=[],
         )
+        tx.add_revision(
+            object_id="SRC_P11",
+            object_type="Source",
+            content={"citation_key": "Persist2024", "abstract": "A source for the run to register."},
+            origin={},
+            edges=[("depends_on", "RQ_P11", 1, {})],
+        )
 
     out1 = run_workflow("literature", store1, research_question_id="RQ_P11")
-    assert out1.status in {"SUCCESS", "CONTEXT_PREPARED"}
+    assert out1.status in {"SUCCESS", "REQUIRES_VERIFICATION"}
 
     # Simulate restart by instantiating fresh StateStore pointing to same directory
     store2 = StateStore(store1.paths)

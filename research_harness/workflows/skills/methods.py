@@ -1,26 +1,35 @@
-"""Workflow 3 — Methods Design and Evaluation Implementation.
+"""Workflow 3 - Methods (deterministic evidence gate).
 
-Designs, formalizes, and evaluates research methods, empirical specifications, construct
-operationalizations, and diagnostic checks, integrating optional discipline profiles.
-Follows Part B3 rules: methods remain conditional candidate designs (CANDIDATE_METHOD)
-rather than justified designs, and checklist items are not marked ADDRESSED_IN_SPECIFICATION
-merely for being displayed.
+States what the project records about its methods and what is missing. It does not choose, justify or fill in a
+design: there is no default design, estimator, set of controls, fixed effects or clustering. Those depend on the
+question, the measurement, the data and the literature; evaluating them against a method's prerequisites is the job of
+a selected methodological playbook (Phase 3D), not of a template.
+
+Reported:
+* the designs the researcher proposed (`candidate_methods`) and those recorded on Analysis objects, each
+  `justified: False` with its prerequisites marked as not yet evaluated;
+* specifications exactly as the researcher recorded them, with their planned/executed status;
+* how constructs are (not) operationalized, from the Construct/Proxy objects;
+* the structure of each dataset when recorded.
 """
 from __future__ import annotations
 
-import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from research_harness.workflows.contracts import (
-    ContextPackage,
-    MethodsEvaluationResult,
-    TaskUsage,
-    WorkflowOutput,
-)
-from research_harness.workflows.instrumentation import estimate_tokens
+from research_harness.workflows.contracts import ContextPackage, MethodsEvaluationResult, WorkflowOutput
 from research_harness.workflows.profiles.registry import get_profile
+from research_harness.workflows.skills._common import (
+    NEEDS_VERIFICATION,
+    assessed_claims,
+    budget_gate,
+    finish,
+    head_objects,
+)
+
+_PREREQUISITES_PENDING = ("Design-specific prerequisites, diagnostics and alternatives are not evaluated until a "
+                          "methodological playbook is selected; no design is recommended or justified here.")
 
 
 def execute_methods_workflow(
@@ -31,201 +40,88 @@ def execute_methods_workflow(
     discipline_profile: Optional[str] = None,
     **kwargs: Any,
 ) -> WorkflowOutput:
-    """Execute Methods workflow deterministically over structured research context."""
+    """Execute the Methods evidence gate over structured research context."""
     start_time = time.time()
     tid = task_id or f"TASK_METH_{uuid.uuid4().hex[:8].upper()}"
 
-    rq_objs = [o for o in context.objects if o["object_type"] == "ResearchQuestion"]
-    rq_text = rq_objs[0]["content"].get("text", "") if rq_objs else "Primary research inquiry"
+    constructs = head_objects(context, "Construct")
+    proxies = head_objects(context, "Proxy")
+    datasets = head_objects(context, "Dataset")
+    analyses = head_objects(context, "Analysis")
+    claims = assessed_claims(context)
 
-    constructs = [o for o in context.objects if o["object_type"] == "Construct"]
-    proxies = [o for o in context.objects if o["object_type"] == "Proxy"]
-    datasets = [o for o in context.objects if o["object_type"] == "Dataset"]
-    claims = [o for o in context.objects if o["object_type"] == "Claim"]
+    # 1. Designs: those the researcher proposed, and those recorded on analyses. Nothing is added by default.
+    designs: list[dict[str, Any]] = []
+    for name in dict.fromkeys(candidate_methods or []):
+        designs.append({"design_name": name, "type": "researcher_proposed", "status": "CANDIDATE_METHOD", "justified": False,
+                        "justification_status": "NOT_ASSESSED", "required_information": [_PREREQUISITES_PENDING],
+                        "source": "candidate_methods"})
+    for a in analyses:
+        c = a["content"]
+        name = c.get("identification_strategy") or c.get("design")
+        if name:
+            executed = c.get("status") == "EXECUTED"
+            designs.append({"design_name": name, "type": "recorded_in_analysis", "analysis_id": a["object_id"],
+                            "status": "RECORDED_IN_PROJECT" if executed else "CANDIDATE_METHOD", "justified": False,
+                            "justification_status": "NOT_ASSESSED", "required_information": [_PREREQUISITES_PENDING],
+                            "source": f"Analysis {a['object_id']}:rev{a['revision']}"})
 
-    # 1. Candidate Research Designs (Part B3: Conditional candidates, not justified methods)
-    candidate_designs: list[dict[str, Any]] = []
-    methods_requested = candidate_methods or []
+    # 2. Assumptions exactly as recorded.
+    assumptions = [f"{a['object_id']}: {x}" for a in analyses for x in (a["content"].get("assumptions") or []) if isinstance(x, str)]
 
-    claim_tiers = {c["content"].get("claim_tier", "descriptive") for c in claims}
-
-    if "causal" in claim_tiers or "causal" in [m.lower() for m in methods_requested]:
-        candidate_designs.append({
-            "design_name": "Quasi-Experimental Difference-in-Differences",
-            "type": "quasi_experimental",
-            "status": "CANDIDATE_METHOD",
-            "justified": False,
-            "required_information": [
-                "Explicit exogenous intervention event with known timing",
-                "Observable unexposed comparison group",
-                "Pre-treatment period data for parallel trends evaluation",
-            ],
-            "target_claim_tier": "causal",
-            "rationale": "Candidate method for mitigating time-invariant confounders if parallel trends hold.",
-        })
-        candidate_designs.append({
-            "design_name": "Instrumental Variables (2SLS)",
-            "type": "instrumental_variable",
-            "status": "CANDIDATE_METHOD",
-            "justified": False,
-            "required_information": [
-                "Exogenous instrument satisfying relevance (F > 10) and exclusion restriction",
-            ],
-            "target_claim_tier": "causal",
-            "rationale": "Candidate method if valid exogenous instrument is identified and defensible.",
-        })
-    elif "predictive" in claim_tiers:
-        candidate_designs.append({
-            "design_name": "Cross-Validated Predictive Model (Train/Validation/Test)",
-            "type": "machine_learning_predictive",
-            "status": "CANDIDATE_METHOD",
-            "justified": False,
-            "required_information": ["Temporal or clustered partition scheme", "Pre-specified performance metrics"],
-            "target_claim_tier": "predictive",
-            "evaluation_metrics": ["RMSE", "AUC-ROC", "Out-of-sample R2"],
-            "rationale": "Evaluates out-of-sample generalization without in-sample overfitting.",
-        })
-    else:
-        candidate_designs.append({
-            "design_name": "Panel Regression with Multi-Way Fixed Effects",
-            "type": "panel_econometric",
-            "status": "CANDIDATE_METHOD",
-            "justified": False,
-            "required_information": ["Panel unit identifier", "Time index", "Attrition diagnostics"],
-            "target_claim_tier": "associational",
-            "rationale": "Candidate design to control for time-invariant unit heterogeneity.",
-        })
-
-    # 2. Key Assumptions
-    assumptions: list[str] = [
-        "Construct-to-proxy mapping preserves construct validity and minimizes measurement error.",
-        "Panel observation units are not subject to differential attrition across sample windows.",
-    ]
-    if "causal" in claim_tiers:
-        assumptions.extend([
-            "Parallel trends assumption: Treated and control units would follow parallel paths in the absence of treatment.",
-            "Stable Unit Treatment Value Assumption (SUTVA): No unmodeled interference or spillovers between units.",
-        ])
-
-    # 3. Identification & Measurement Requirements
-    id_requirements: list[str] = [
-        f"Operationalize {len(constructs)} construct(s) using {len(proxies)} validated empirical proxy metric(s).",
-    ]
+    # 3. Measurement: how each construct is operationalized, from the recorded objects.
+    requirements: list[str] = []
     for c in constructs:
-        c_label = c["content"].get("label", c["object_id"])
-        matching_proxies = [p for p in proxies if p["content"].get("construct_id") == c["object_id"]]
-        if matching_proxies:
-            p_labels = ", ".join(p["content"].get("label", p["object_id"]) for p in matching_proxies)
-            id_requirements.append(f"Construct '{c_label}' operationalized by proxy: {p_labels}")
+        label = c["content"].get("label", c["object_id"])
+        linked = [p for p in proxies if p["content"].get("construct_id") == c["object_id"]
+                  or any(r["source_id"] == p["object_id"] and r["target_id"] == c["object_id"]
+                         and r["relation"] in {"operationalizes", "measures"} for r in context.relations)]
+        if linked:
+            requirements.append(f"Construct '{label}' is operationalized by: "
+                                + ", ".join(p["content"].get("label", p["object_id"]) for p in linked)
+                                + " (validity of the proxy is not assessed here)")
         else:
-            id_requirements.append(f"Construct '{c_label}' lacks explicit linked Proxy object.")
+            requirements.append(f"Construct '{label}' has no linked Proxy.")
+    for d in datasets:
+        structure = d["content"].get("structure")
+        requirements.append(f"Dataset '{d['content'].get('label', d['object_id'])}': structure "
+                            + (str(structure) if structure else "NOT_RECORDED"))
 
-    # 4. Specification Plans
-    specification_plans: list[dict[str, Any]] = [
-        {
-            "specification_name": "Proposed Baseline Model",
-            "dependent_variable": proxies[0]["content"].get("label", "DependentVariable") if proxies else "Y",
-            "primary_regressors": [proxies[1]["content"].get("label", "TreatmentRegressor")] if len(proxies) > 1 else ["X"],
-            "controls": ["Size", "Leverage", "PriorPerformance", "MacroTrend"],
-            "fixed_effects": ["Entity/Firm FE", "Year/Period FE"],
-            "clustering": "Two-way clustered by entity and time period",
-            "datasets_used": [d["content"].get("label", d["object_id"]) for d in datasets] if datasets else ["Primary dataset"],
-            "status": "PROPOSED",
-        }
-    ]
+    # 4. Specifications: only what the researcher recorded.
+    plans = [{"specification_name": a["content"].get("label", a["object_id"]), "analysis_id": a["object_id"],
+              "purpose": a["content"].get("purpose"), "status": a["content"].get("status") or "NOT_RECORDED",
+              "specification": a["content"].get("specification") or {}, "estimator": a["content"].get("estimator"),
+              "datasets_used": [d["object_id"] for d in datasets if any(
+                  r["source_id"] == a["object_id"] and r["target_id"] == d["object_id"] for r in context.relations)]}
+             for a in analyses]
 
-    # 5. Diagnostic and Falsification Tests
-    diagnostics = [
-        {
-            "test_name": "Placebo Timing / Lead-Lag Test",
-            "purpose": "Verify lack of pre-treatment anticipatory trends",
-            "success_criterion": "Coefficients on pre-treatment leads are statistically indistinguishable from zero",
-            "status": "REQUIRES_INFORMATION",
-        },
-        {
-            "test_name": "Alternative Proxy Sensitivity",
-            "purpose": "Check sensitivity to proxy measurement choices",
-            "success_criterion": "Core coefficients maintain direction and significance under secondary proxy definitions",
-            "status": "REQUIRES_INFORMATION",
-        },
-        {
-            "test_name": "Cluster-Robust Variance Check",
-            "purpose": "Rule out artificial significance from correlated residuals",
-            "success_criterion": "Standard errors remain robust under alternative clustering structures",
-            "status": "REQUIRES_INFORMATION",
-        },
-    ]
-
-    # 6. Discipline Profile Integration (Part B3: Never ADDRESSED_IN_SPECIFICATION merely because displayed)
+    # 5. Optional discipline checklist (a static list of items to consider; none is marked addressed).
     prof_id = discipline_profile or kwargs.get("discipline") or (context.manifest.get("profile") or {}).get("profile_id")
     profile_results = None
     if prof_id:
         try:
             prof = get_profile(prof_id)
             profile_results = {
-                "profile": prof.identifier,
-                "traditions": prof.research_traditions,
-                "checklist_evaluations": [
-                    {
-                        "item": item["item"],
-                        "prompt": item["prompt"],
-                        "compliance_status": "REQUIRES_INFORMATION",
-                    }
-                    for item in prof.methodological_checklist
-                ],
-                "recommended_validity_questions": prof.validity_questions,
-            }
+                "profile": prof.identifier, "traditions": prof.research_traditions,
+                "checklist_evaluations": [{"item": it["item"], "prompt": it["prompt"], "compliance_status": "REQUIRES_INFORMATION"}
+                                          for it in prof.methodological_checklist],
+                "recommended_validity_questions": prof.validity_questions}
         except KeyError:
             pass
 
-    # 7. Limitations and Unresolved Choices
-    limitations = [
-        "Candidate econometric methods require verified institutional events; causality cannot be claimed from specification structure alone.",
-        "External validity is constrained by sample composition of underlying datasets.",
-    ]
+    limitations = [_PREREQUISITES_PENDING]
+    if not designs:
+        tiers = sorted({c["content"].get("claim_tier", "unspecified") for c in claims})
+        limitations.append("No candidate design is recorded" + (f" for claim tier(s) {tiers}" if tiers else "")
+                           + "; none is proposed by default. Name one in candidate_methods or record it on an Analysis.")
+    if not (datasets or analyses or constructs):
+        limitations.append("No dataset, analysis or construct is recorded; the empirical design cannot be described.")
 
     result_data = MethodsEvaluationResult(
-        candidate_research_designs=candidate_designs,
-        assumptions=assumptions,
-        identification_or_measurement_requirements=id_requirements,
-        specification_plans=specification_plans,
-        alternative_methods=[{"alternative": "Matched sample using propensity score or entropy balancing", "tradeoff": "Reduces sample size while improving covariate balance."}],
-        diagnostic_tests=diagnostics,
-        limitations_and_unresolved_choices=limitations,
-        profile_checklist_results=profile_results,
-    )
-
-    out_dict = result_data.to_dict()
-
-    elapsed_ms = int((time.time() - start_time) * 1000)
-    usage = TaskUsage(
-        workflow="methods",
-        task_id=tid,
-        model=None,
-        input_tokens=context.estimated_tokens,
-        output_tokens=estimate_tokens(json.dumps(out_dict))[0],
-        cache_read_tokens=None,
-        llm_calls=0,
-        context_objects=len(context.objects),
-        reused_artifacts=0,
-        elapsed_ms=elapsed_ms,
-        usage_source="estimated",
-    )
-
-    if context.budget_status == "INCOMPLETE_EXCEEDED":
-        status_val = "INCOMPLETE_CONTEXT"
-    elif any(d.get("status") == "CANDIDATE_METHOD" for d in candidate_designs):
-        status_val = "REQUIRES_VERIFICATION"
-    else:
-        status_val = "SUCCESS"
-
-    return WorkflowOutput(
-        workflow="methods",
-        task_id=tid,
-        project_id=context.project_id,
-        status=status_val,
-        result=out_dict,
-        usage=usage,
-        provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-        notes=["Candidate research designs evaluated conditionally without premature methodological justification."],
-    )
+        candidate_research_designs=designs, assumptions=assumptions, identification_or_measurement_requirements=requirements,
+        specification_plans=plans, alternative_methods=[], diagnostic_tests=[], limitations_and_unresolved_choices=limitations,
+        profile_checklist_results=profile_results)
+    out = result_data.to_dict()
+    status = budget_gate(context, NEEDS_VERIFICATION)  # the stage reports requirements; it never certifies a design
+    return finish("methods", tid, context, out, status, start_time,
+                  ["Methods reported as recorded; no design, estimator, control, fixed effect or clustering is assumed."])

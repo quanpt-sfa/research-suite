@@ -212,6 +212,8 @@ class ContextPackage:
     # Claims the package is about: the explicit focus claims, else the claims connected to the research question.
     # (`focus_claims` stays the explicit list only.)
     scope_claims: list[str] = field(default_factory=list)
+    # Execution runs that really succeeded, `run_id -> output digest` (from the run registry).
+    verified_runs: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

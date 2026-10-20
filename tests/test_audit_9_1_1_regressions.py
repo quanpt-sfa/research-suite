@@ -146,7 +146,6 @@ def test_p13_zero_llm_calls_never_reported_as_provider_usage(proj, monkeypatch):
 # C1 — Contribution
 # ==================================================================================================
 
-@xfail("P0-3 (C1b)")
 def test_c1b_adjudication_saying_identification_is_not_credible_does_not_verify_it(proj):
     add(proj, rq(), ("CLAIM_C", "Claim", {"text": "Independence causes fewer restatements.", "claim_tier": "causal"}, [dep("RQ_TEST")]),
         ("ADJ_1", "Adjudication", {"subject": {"object_id": "CLAIM_C"}, "verdict": "SUPPORTED",
@@ -155,7 +154,6 @@ def test_c1b_adjudication_saying_identification_is_not_credible_does_not_verify_
     assert res["identification_status"] != "IDENTIFIED_BY_VERIFIED_DESIGN"
 
 
-@xfail("P0-4 (C1c)")
 def test_c1c_full_text_competitor_linked_by_challenges_is_surfaced(proj):
     add(proj, rq(),
         ("SRC_COMP", "Source", {"citation_key": "Prior2019", "abstract": "Shows independence reduces restatements.",
@@ -166,7 +164,6 @@ def test_c1c_full_text_competitor_linked_by_challenges_is_surfaced(proj):
     assert "Prior2019" in blob or "SRC_COMP" in blob
 
 
-@xfail("P0-3 (C1d)")
 def test_c1d_passage_linked_by_challenges_is_not_counted_as_supporting(proj):
     add(proj, rq(),
         ("EP_COMP", "EvidencePassage", {"locator": "Prior2019 p.12",
@@ -177,7 +174,6 @@ def test_c1d_passage_linked_by_challenges_is_not_counted_as_supporting(proj):
     assert "EP_COMP" not in [e.get("passage_id") for e in res["supporting_evidence"]]
 
 
-@xfail("P0-3 (C1f)")
 def test_c1f_all_competing_mechanisms_are_surfaced(proj):
     add(proj, rq(),
         ("MECH_MON", "Mechanism", {"label": "Monitoring"}, []),
@@ -188,7 +184,6 @@ def test_c1f_all_competing_mechanisms_are_surfaced(proj):
     assert "Monitoring" in blob and "Selection of better firms" in blob
 
 
-@xfail("P0-5 (C1g)")
 def test_c1g_researchers_own_sibling_hypothesis_is_not_a_literature_competitor(proj):
     add(proj, rq(),
         ("CLAIM_H1", "Claim", {"text": "H1: independence reduces restatements.", "claim_tier": "associational"}, [dep("RQ_TEST")]),
@@ -216,7 +211,6 @@ def _lit_corpus(proj):
          [("derived_from", "SRC_4", 1, {})]))
 
 
-@xfail("P0-3 (C2b)")
 def test_c2b_negated_consistency_is_not_support(proj):
     _lit_corpus(proj)
     res = run(proj, "literature", fulltext_policy="always").result
@@ -224,14 +218,12 @@ def test_c2b_negated_consistency_is_not_support(proj):
     assert rel["EP_3"] != "supports_prior"
 
 
-@xfail("P1-6 (C2c)")
 def test_c2c_limitation_in_loaded_full_text_is_surfaced(proj):
     _lit_corpus(proj)
     blob = json.dumps(run(proj, "literature", fulltext_policy="always").result)
     assert "self-selected" in blob or "reverses" in blob or "Limitations" in blob
 
 
-@xfail("P1-6 (C2f)")
 def test_c2f_literature_without_any_evidence_is_not_success(proj):
     add(proj, rq())
     assert run(proj, "literature").status != "SUCCESS"
@@ -248,7 +240,6 @@ _METHODS_CASES = {
 }
 
 
-@xfail("P0-7 (C3)")
 @pytest.mark.parametrize("name", sorted(_METHODS_CASES))
 def test_c3_methods_do_not_impose_econometric_defaults(proj, name):
     q, tier = _METHODS_CASES[name]
@@ -258,7 +249,6 @@ def test_c3_methods_do_not_impose_econometric_defaults(proj, name):
         assert forbidden not in blob, forbidden
 
 
-@xfail("P0-7 (C3-competing)")
 def test_c3_researcher_proposed_methods_are_evaluated(proj):
     add(proj, rq(), ("CLAIM_1", "Claim", {"text": "x", "claim_tier": "causal"}, [dep("RQ_TEST")]))
     res = run(proj, "methods", candidate_methods=["regression discontinuity", "synthetic control"]).result
@@ -270,13 +260,11 @@ def test_c3_researcher_proposed_methods_are_evaluated(proj):
 # C4 — Results
 # ==================================================================================================
 
-@xfail("P1-8 (C4b)")
 def test_c4b_author_typed_summary_is_not_listed_as_supported_by_outputs(proj):
     add(proj, rq(), ("RES_U", "Result", {"summary": "Author stated beta = 0.35, t = 2.45 in draft text."}, [dep("RQ_TEST")]))
     assert run(proj, "results").result["findings_supported_by_available_outputs"] == []
 
 
-@xfail("P0-8 (C4c)")
 def test_c4c_caller_flag_alone_cannot_verify_a_computation(proj):
     add(proj, rq(), ("DS_1", "Dataset", {"label": "anything"}, [dep("RQ_TEST")]),
         ("RES_U", "Result", {"summary": "Author stated beta = 0.35."}, [dep("DS_1")]))
@@ -295,32 +283,27 @@ def _discussion(proj, summary):
     return run(proj, "discussion", focus_claims=["CLAIM_1"]).result
 
 
-@xfail("P0-3 (C5-1)")
 def test_c5_negative_coefficient_that_the_theory_predicts_does_not_reopen_contribution(proj):
     res = _discussion(proj, "Independence has a negative and significant coefficient on restatements (beta=-0.12, p<0.01), as H1 predicts.")
     assert res["reopens_contribution_workflow"] is False
 
 
-@xfail("P0-3 (C5-2)")
 def test_c5_nonsignificant_result_is_not_falsification(proj):
     res = _discussion(proj, "The coefficient on independence is not significant (beta=0.01, p=0.41).")
     assert res["reopens_contribution_workflow"] is False
     assert "overturned" not in json.dumps(res["supported_interpretations"])
 
 
-@xfail("P0-3 (C5-3)")
 def test_c5_the_word_regression_is_not_a_contradiction(proj):
     res = _discussion(proj, "An OLS regression with industry controls shows independence is associated with fewer restatements.")
     assert res["reopens_contribution_workflow"] is False
 
 
-@xfail("P0-3 (C5-5)")
 def test_c5_result_without_trigger_words_is_not_declared_corroborated(proj):
     res = _discussion(proj, "Firms adding independent directors increased restatements by 12% relative to controls.")
     assert "Empirically corroborated" not in json.dumps(res["revised_contribution_statements"])
 
 
-@xfail("P2-4 (C5-4)")
 def test_c5_planned_but_unexecuted_robustness_is_never_addressed(proj):
     add(proj, rq(),
         ("RES_1", "Result", {"summary": "Independence associated with fewer restatements."}, [dep("RQ_TEST")]),
@@ -338,7 +321,6 @@ def test_c5_planned_but_unexecuted_robustness_is_never_addressed(proj):
 # D — context and budget
 # ==================================================================================================
 
-@xfail("D2")
 def test_d2_discussion_without_any_result_is_not_success(proj):
     add(proj, rq(), ("CLAIM_1", "Claim", {"text": "H1", "claim_tier": "associational"}, [dep("RQ_TEST")]))
     out = run(proj, "discussion", focus_claims=["CLAIM_1"])

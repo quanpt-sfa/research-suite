@@ -20,7 +20,11 @@ _MARKDOWN = re.compile(r"^\s{0,3}#{1,6}\s+(?P<h>\S.*?)\s*#*\s*$")
 _NUMBERED = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+(?P<h>[A-Z][^.!?;:]{0,78})\s*$")
 _NUM_PREFIX = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+")
 _STRIP = re.compile(r"[^a-z0-9 ]+")
+# "7. Limitations: because ..." : a known heading word followed by running text on the same line (common in text
+# extracted from PDFs). Only known heading words qualify, so ordinary sentences are not mistaken for headings.
+_RUN_IN = re.compile(r"^\s*(?P<h>(?:(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.)\s+)?[A-Za-z][A-Za-z ]{2,40}?)\s*[:.\u2014-]\s+\S")
 _MAX_PLAIN_HEADING = 60
+_TITLE_SMALL_WORDS = frozenset({"and", "of", "the", "for", "in", "on", "to", "a"})
 
 
 @dataclass(frozen=True)
@@ -61,7 +65,14 @@ def _known_plain_heading(line: str) -> bool:
     norm = normalize_heading(line)
     if not norm or len(line.strip()) > _MAX_PLAIN_HEADING or line.strip().endswith((".", ",", ";")):
         return False
-    return any(norm == p for pats in taxonomy.hierarchy("section_headings").values() for p in pats)
+    patterns = [p for pats in taxonomy.hierarchy("section_headings").values() for p in pats]
+    if any(norm == p for p in patterns):
+        return True
+    # "Robustness Checks", "Data and Sample Selection": a known heading word followed by a short Title Case tail.
+    # A wrapped sentence such as "Data are collected from" has lowercase content words and is not a heading.
+    words = _NUM_PREFIX.sub("", line.strip()).split()
+    title_case = all(w[:1].isupper() or w.lower() in _TITLE_SMALL_WORDS for w in words)
+    return len(words) <= 5 and title_case and any(norm.startswith(p + " ") for p in patterns)
 
 
 def _is_heading(line: str) -> Optional[str]:
@@ -80,6 +91,9 @@ def _is_heading(line: str) -> Optional[str]:
             return stripped
         if _known_plain_heading(line):
             return stripped
+    m = _RUN_IN.match(line)
+    if m and _known_plain_heading(m.group("h")):
+        return m.group("h").strip()
     return None
 
 

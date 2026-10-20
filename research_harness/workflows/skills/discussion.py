@@ -1,24 +1,52 @@
-"""Workflow 5 — Discussion & Theoretical Integration Implementation.
+"""Workflow 5 - Discussion & Theoretical Integration (deterministic evidence gate).
 
-Interprets empirical findings relative to theory and literature, distinguishes observation
-from inference, identifies boundary conditions, and re-examines contribution statements.
-Follows Part B5 rules: does not assert unverified robustness tests were performed,
-delineates observed facts from interpretations, and consumes upstream workflow handoffs.
+Reports what the structured evidence shows and keeps the layers of a discussion apart:
+
+* observed findings: the result as recorded, verbatim, with its structured values and provenance;
+* statistical inference: the classification of each result against each hypothesis it bears on
+  (`evidence_fields.classify_against_hypothesis`), from structured fields only;
+* theoretical interpretation: NOT_ASSESSED here (it needs a model step or the researcher);
+* speculation: none is generated;
+* unverified alternatives: the mechanisms recorded in the project, each NOT_VERIFIED unless an *executed* analysis
+  that addresses it is recorded. A planned analysis never counts.
+
+A contribution is reopened only for a stated reason: a result classified as challenging a hypothesis, a result the
+author flagged `contradictory: true`, or a `challenges` relation between a result or passage and a claim. The wording
+of a summary never reopens anything; lexical cues are listed under `review_flags` and change nothing.
 """
 from __future__ import annotations
 
-import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from research_harness.workflows.contracts import (
-    ContextPackage,
-    DiscussionResult,
-    TaskUsage,
-    WorkflowOutput,
+from research_harness.workflows.contracts import ContextPackage, DiscussionResult, WorkflowOutput
+from research_harness.workflows.evidence_fields import (
+    classify_against_hypothesis,
+    parse_hypothesis,
+    parse_result,
+    result_bears_on_claim,
+    review_flag,
 )
-from research_harness.workflows.instrumentation import estimate_tokens
+from research_harness.workflows.skills._common import (
+    INSUFFICIENT,
+    NEEDS_VERIFICATION,
+    assessed_claims,
+    budget_gate,
+    finish,
+    head_objects,
+)
+
+
+def _upstream_result_records(upstream: list[Any]) -> tuple[list[dict[str, Any]], list[str]]:
+    records, consumed = [], []
+    for art in upstream:
+        d = art.to_dict() if hasattr(art, "to_dict") else (art if isinstance(art, dict) else {})
+        if d.get("task_id"):
+            consumed.append(d["task_id"])
+        if d.get("workflow") == "results":
+            records.extend(d.get("result", {}).get("structured_run_records", []))
+    return records, consumed
 
 
 def execute_discussion_workflow(
@@ -29,213 +57,190 @@ def execute_discussion_workflow(
     upstream_artifacts: Optional[list[Any]] = None,
     **kwargs: Any,
 ) -> WorkflowOutput:
-    """Execute Discussion workflow deterministically over structured research context."""
+    """Execute the Discussion evidence gate over structured research context."""
     start_time = time.time()
     tid = task_id or f"TASK_DISC_{uuid.uuid4().hex[:8].upper()}"
 
-    rq_objs = [o for o in context.objects if o["object_type"] == "ResearchQuestion"]
-    rq_text = rq_objs[0]["content"].get("text", "") if rq_objs else "Primary research inquiry"
+    claims = assessed_claims(context)
+    claim_text = {c["object_id"]: c["content"].get("text", "") for c in claims}
+    theories = head_objects(context, "Theory")
+    mechanisms = head_objects(context, "Mechanism")
+    analyses = head_objects(context, "Analysis")
+    relations = context.relations
+    hypotheses = {c["object_id"]: parse_hypothesis(c["object_id"], c["content"]) for c in claims}
 
-    results = [o for o in context.objects if o["object_type"] == "Result"]
-    claims = [o for o in context.objects if o["object_type"] == "Claim"]
-    theories = [o for o in context.objects if o["object_type"] == "Theory"]
-    mechanisms = [o for o in context.objects if o["object_type"] == "Mechanism"]
-    analyses = [o for o in context.objects if o["object_type"] == "Analysis"]
-    excerpts = context.excerpts
+    # Results: those in the context (head revision) plus the structured records of upstream Results runs.
+    results: list[dict[str, Any]] = []
+    for r in head_objects(context, "Result"):
+        results.append({"id": r["object_id"], "revision": r["revision"], "label": r["content"].get("label", r["object_id"]),
+                        "summary": r["content"].get("summary", ""), "content": r["content"], "origin": "context"})
+    upstream_records, consumed = _upstream_result_records(upstream_artifacts or kwargs.get("upstream_artifacts") or [])
+    known = {(r["id"], r["revision"]) for r in results}
+    for rec in upstream_records:
+        if (rec.get("result_id"), rec.get("revision")) not in known:
+            content = dict(rec.get("structured") or {})
+            if rec.get("contradictory"):
+                content["contradictory"] = True
+            results.append({"id": rec["result_id"], "revision": rec["revision"], "label": rec.get("label", rec["result_id"]),
+                            "summary": rec.get("summary", ""), "content": content, "origin": "upstream"})
 
-    # Process upstream artifacts (Part E5 & I-10: Results -> Discussion)
-    upstream = upstream_artifacts or kwargs.get("upstream_artifacts") or []
-    upstream_results: list[dict[str, Any]] = []
-    consumed_artifact_ids: list[str] = []
-    for art in upstream:
-        art_dict = art.to_dict() if hasattr(art, "to_dict") else (art if isinstance(art, dict) else {})
-        art_res = art_dict.get("result", {})
-        if art_dict.get("task_id"):
-            consumed_artifact_ids.append(art_dict["task_id"])
-        if art_dict.get("workflow") == "results":
-            for run_rec in art_res.get("structured_run_records", []):
-                upstream_results.append(run_rec)
-
-    # 1. Supported Interpretations (Distinguish Data from Inference, Part B5)
-    supported_interpretations: list[dict[str, Any]] = []
+    observed: list[dict[str, Any]] = []
+    interpretations: list[dict[str, Any]] = []
     contradictions: list[dict[str, Any]] = []
-    reopens_contribution = False
+    unresolved: list[str] = []
+    review_flags: list[dict[str, Any]] = []
+    classifications: list[dict[str, Any]] = []
+    reopened_claims: dict[str, list[str]] = {}
+    consistent_claims: dict[str, int] = {}
+    bearing: dict[str, int] = {}
 
-    # Combine context results and upstream results
-    all_evaluated_results = []
     for res in results:
-        all_evaluated_results.append({
-            "result_id": res["object_id"],
-            "revision": res["revision"],
-            "summary": res["content"].get("summary", ""),
-            "contradictory": bool(res["content"].get("contradictory")),
-        })
-    for ur in upstream_results:
-        if not any(r["result_id"] == ur["result_id"] and r["revision"] == ur["revision"] for r in all_evaluated_results):
-            all_evaluated_results.append({
-                "result_id": ur["result_id"],
-                "revision": ur["revision"],
-                "summary": ur.get("summary", ""),
-                "contradictory": bool(ur.get("contradictory")),
-            })
+        rid, rev = res["id"], res["revision"]
+        fields = parse_result(rid, rev, res["content"])
+        observed.append({"result_id": rid, "revision": rev, "label": res["label"], "summary": res["summary"],
+                         "structured": fields.structured(), "provenance": fields.provenance or "NOT_RECORDED",
+                         "origin": res["origin"]})
+        flag = review_flag(rid, rev, res["summary"], "summary")
+        if flag:
+            review_flags.append(flag)
 
-    for r_entry in all_evaluated_results:
-        rid = r_entry["result_id"]
-        rev = r_entry["revision"]
-        summary = r_entry["summary"]
+        linked = [(c["object_id"], result_bears_on_claim(fields, c["object_id"], relations)) for c in claims]
+        linked = [(cid, why) for cid, why in linked if why]
+        statistical: list[dict[str, Any]] = []
+        for cid, why in linked:
+            bearing[cid] = bearing.get(cid, 0) + 1
+            cls = classify_against_hypothesis(hypotheses[cid], fields)
+            statistical.append({"claim_id": cid, "linked_by": why, **cls.to_dict()})
+            classifications.append({"result_id": rid, "revision": rev, "claim_id": cid, "linked_by": why, **cls.to_dict()})
+            if cls.label == "CHALLENGES":
+                reopened_claims.setdefault(cid, []).append(rid)
+                contradictions.append({
+                    "result_id": rid, "revision": rev, "claim_id": cid, "observed_finding": res["summary"],
+                    "contradicted_expectation": f"{cid} predicts '{hypotheses[cid].predicted_direction}'",
+                    "reconciliation_status": "CHALLENGES_CLAIM", "basis": {"kind": "classification", **cls.basis}})
+            elif cls.label == "CONSISTENT":
+                consistent_claims[cid] = consistent_claims.get(cid, 0) + 1
+            elif cls.label == "NOT_ASSESSED":
+                unresolved.append(f"{rid}@{rev} cannot be classified against {cid}: missing {', '.join(cls.missing)}")
+            elif cls.label == "INCONCLUSIVE":
+                unresolved.append(f"{rid}@{rev} is inconclusive for {cid}: {cls.note}")
 
-        is_negative = (
-            r_entry.get("contradictory")
-            or any(term in summary.lower() for term in [
-                "contrary", "contradict", "fails", "zero", "not significant", "opposite", "null",
-                "increased latency", "degrade", "negative", "timeout", "latency increase", "regression", "persist"
-            ])
-        )
+        # An explicit author flag, or a `challenges` relation, also reopens (never wording).
+        challenge_targets = [cid for cid, _ in linked if any(
+            {rel["source_id"], rel["target_id"]} == {rid, cid} and rel["relation"] == "challenges" for rel in relations)]
+        flagged_targets = [cid for cid, _ in linked] or [c["object_id"] for c in claims]
+        reasons: list[tuple[str, str, str]] = [(cid, "LINKED_AS_CHALLENGE", "relation:challenges") for cid in challenge_targets]
+        if fields.contradictory_flag:
+            reasons += [(cid, "FLAGGED_BY_AUTHOR_AS_CONTRADICTORY", "author_flag:contradictory")
+                        for cid in flagged_targets if cid not in challenge_targets]
+        for cid, status, basis in reasons:
+            if rid not in reopened_claims.get(cid, []):
+                reopened_claims.setdefault(cid, []).append(rid)
+                contradictions.append({
+                    "result_id": rid, "revision": rev, "claim_id": cid, "observed_finding": res["summary"],
+                    "contradicted_expectation": f"{cid} as stated: '{claim_text.get(cid, '')}'",
+                    "reconciliation_status": status, "basis": {"kind": basis}})
 
-        if is_negative:
-            reopens_contribution = True
-            contradictions.append({
-                "result_id": rid,
-                "revision": rev,
-                "observed_finding": summary,
-                "contradicted_expectation": "Initial hypothesis predicted full elimination or positive relationship.",
-                "reconciliation_status": "CHALLENGES_INITIAL_HYPOTHESIS",
-            })
-            interpretation_text = f"Empirical observation for {rid}: '{summary}' does not conform to directional prediction."
-            inference_text = "Suggests that the hypothesized effect is bounded or overturned by institutional frictions."
+        if statistical:
+            bits = ", ".join(f"{s['claim_id']}: {s['classification']}" for s in statistical)
+            supported = f"Statistical relation to the hypotheses (from structured fields): {bits}."
         else:
-            interpretation_text = f"Empirical observation for {rid}: '{summary}' is consistent with expected direction."
-            inference_text = "Provides empirical support within the analyzed sample domain."
-
-        supported_interpretations.append({
-            "result_id": rid,
-            "revision": rev,
-            "direct_data_observation": summary,
-            "supported_interpretation": interpretation_text,
-            "scholarly_inference": inference_text,
-            "distinction_note": "Direct observation separated from scholarly interpretation and speculation.",
+            supported = "No structured basis relates this result to a hypothesis under assessment; not assessed."
+        interpretations.append({
+            "result_id": rid, "revision": rev,
+            "direct_data_observation": res["summary"],
+            "statistical_inference": statistical,
+            "theoretical_interpretation": "NOT_ASSESSED: requires interpretation by a model step or the researcher",
+            "speculation": [],
+            "supported_interpretation": supported,
+            "scholarly_inference": "NOT_ASSESSED: no scholarly inference is generated by the deterministic gate",
+            "distinction_note": "Observed data, statistical inference, theoretical interpretation and speculation are kept apart.",
         })
 
-    # Also check literature contradictions against excerpts
-    for ex in excerpts:
-        text_str = (ex.get("excerpt") or ex.get("quote") or ex.get("normalized_claim", "")).lower()
-        if "contradict" in text_str or "fails" in text_str or "unsupported" in text_str:
-            reopens_contribution = True
-            contradictions.append({
-                "literature_passage_id": ex.get("passage_id"),
-                "source_id": ex.get("source_id"),
-                "observed_finding": ex.get("excerpt") or ex.get("normalized_claim"),
-                "contradicted_expectation": "Prior consensus literature",
-                "reconciliation_status": "LITERATURE_DISAGREEMENT",
-            })
+    # Passages that challenge a claim by relation or by an explicit structured flag.
+    for ex in context.excerpts:
+        pid, prev = ex.get("passage_id"), ex.get("revision")
+        content = next((o["content"] for o in context.objects if o["object_id"] == pid and o["revision"] == prev), {})
+        flag = review_flag(pid, prev, ex.get("excerpt") or ex.get("quote") or "", "excerpt")
+        if flag:
+            review_flags.append(flag)
+        for cid in claim_text:
+            challenged = any({rel["source_id"], rel["target_id"]} == {pid, cid} and rel["relation"] == "challenges"
+                             for rel in relations)
+            if challenged or content.get("contradictory") is True:
+                reopened_claims.setdefault(cid, []).append(pid)
+                contradictions.append({
+                    "literature_passage_id": pid, "source_id": ex.get("source_id"), "claim_id": cid,
+                    "observed_finding": ex.get("excerpt") or ex.get("normalized_claim"),
+                    "contradicted_expectation": f"{cid} as stated: '{claim_text[cid]}'",
+                    "reconciliation_status": "LITERATURE_CHALLENGES_CLAIM",
+                    "basis": {"kind": "relation:challenges" if challenged else "author_flag:contradictory"}})
 
-    # 2. Theoretical Implications
-    theoretical_implications: list[str] = []
-    if theories:
-        t_label = theories[0]["content"].get("label", theories[0]["object_id"])
-        theoretical_implications.append(
-            f"Suggests potential boundary refinement for {t_label} under observed friction conditions."
-        )
-    if mechanisms:
-        m_label = mechanisms[0]["content"].get("label", mechanisms[0]["object_id"])
-        theoretical_implications.append(
-            f"Provides tentative evidence on mechanism '{m_label}'; requires structural testing before asserting validity."
-        )
-    if not theoretical_implications:
-        theoretical_implications.append(
-            "Synthesizes observed empirical regularities; theoretical implications remain provisional."
-        )
+    # Theoretical implications are open questions, not conclusions.
+    implications = [f"NOT_ASSESSED: whether {kind} '{o['content'].get('label', o['object_id'])}' is supported, bounded or "
+                    f"challenged by the findings requires interpretation"
+                    for kind, objs in (("theory", theories), ("mechanism", mechanisms)) for o in objs]
 
-    # 3. Plausible Alternative Explanations (Part B5: Never assert unperformed tests mitigated endogeneity)
-    # Check if lagged regressors or lead diagnostics actually exist in Analyses
-    has_lagged_regressors = any("lag" in json.dumps(a.get("content", {})).lower() for a in analyses)
-    has_time_fe = any("time fe" in json.dumps(a.get("content", {})).lower() or "year fe" in json.dumps(a.get("content", {})).lower() for a in analyses)
+    # Unverified alternatives: mechanisms, unless an EXECUTED analysis that addresses them is recorded.
+    alternatives = []
+    for m in mechanisms:
+        mid = m["object_id"]
+        addressed = [a["object_id"] for a in analyses if a["content"].get("status") == "EXECUTED"
+                     and a["content"].get("purpose") in {"robustness", "placebo"} and mid in (a["content"].get("addresses") or [])]
+        alternatives.append({
+            "rival_explanation": m["content"].get("label", mid), "mechanism_id": mid, "plausibility": "NOT_ASSESSED",
+            "evaluative_status": ("An executed analysis that addresses it is recorded (its results are not verified here): "
+                                  + ", ".join(addressed)) if addressed else "No executed analysis recorded that addresses this explanation.",
+            "verification_status": "ANALYSIS_RECORDED_NOT_VERIFIED" if addressed else "NOT_VERIFIED"})
 
-    eval_macro = "Controlled via specified time fixed effects." if has_time_fe else "Unverified: Macroeconomic shock controls were not independently verified in executed analyses."
-    eval_rev_caus = "Examined via documented lagged specifications." if has_lagged_regressors else "Unaddressed rival explanation: Lagged regressors or lead diagnostics were not verified in context."
-
-    alternative_explanations: list[dict[str, Any]] = [
-        {
-            "rival_explanation": "Omitted macroeconomic or sector-wide shocks during the sample window",
-            "plausibility": "Moderate",
-            "evaluative_status": eval_macro,
-            "verification_status": "NOT_VERIFIED" if not has_time_fe else "ADDRESSED_BY_SPECIFICATION",
-        },
-        {
-            "rival_explanation": "Reverse causality or contemporaneous strategic response by subjects",
-            "plausibility": "Moderate",
-            "evaluative_status": eval_rev_caus,
-            "verification_status": "NOT_VERIFIED" if not has_lagged_regressors else "ADDRESSED_BY_SPECIFICATION",
-        },
-    ]
-
-    # 4. Scope and Boundary Conditions
-    boundary_conditions: list[str] = [
-        "Inferences are strictly valid for the institutional and temporal parameters of analyzed dataset(s).",
-        "Findings may not extrapolate to settings with substantially different market structures or regulatory mandates.",
-    ]
-
-    # 5. Revised Contribution Statements (Consumes results conflict)
-    revised_contributions: list[str] = []
+    boundary: list[str] = []
     for c in claims:
-        c_text = c["content"].get("text", "")
-        if reopens_contribution:
-            revised_contributions.append(
-                f"Provisional boundary formulation: '{c_text}' is challenged by empirical findings; "
-                f"contribution should be reframed to account for observed frictions ({contradictions[0]['observed_finding']})."
-            )
+        for key in ("scope", "boundary_conditions"):
+            val = c["content"].get(key)
+            boundary.extend(val if isinstance(val, list) else [val] if isinstance(val, str) and val else [])
+    boundary = boundary or ["NOT_ASSESSED: no scope or boundary conditions are recorded for the claims under assessment"]
+
+    revised: list[str] = []
+    for c in claims:
+        cid, rev = c["object_id"], c["revision"]
+        if cid in reopened_claims:
+            items = sorted(set(reopened_claims[cid]))
+            revised.append(f"REOPEN {cid}@{rev}: {len(items)} item(s) challenge it ({', '.join(items)}); the contribution "
+                           f"statement needs revision or qualification: '{claim_text[cid]}'")
+        elif consistent_claims.get(cid):
+            revised.append(f"No revision indicated for {cid}@{rev} by the classified results ({consistent_claims[cid]} consistent); "
+                           f"interpretation and robustness are not assessed.")
+        elif bearing.get(cid):
+            revised.append(f"NOT_ASSESSED: the results bearing on {cid}@{rev} are inconclusive or cannot be classified; "
+                           f"no revision can be indicated.")
         else:
-            revised_contributions.append(f"Empirically corroborated formulation: '{c_text}' within analyzed conditions.")
+            revised.append(f"NOT_ASSESSED: no result bears on {cid}@{rev}.")
 
+    if not analyses:
+        unresolved.append("No executed robustness analysis is recorded; alternative explanations remain unverified.")
+    unresolved.extend(limitations or [])
+
+    reopens = bool(reopened_claims)
     result_data = DiscussionResult(
-        supported_interpretations=supported_interpretations,
-        theoretical_implications=theoretical_implications,
-        alternative_explanations=alternative_explanations,
+        supported_interpretations=interpretations,
+        theoretical_implications=implications,
+        alternative_explanations=alternatives,
         contradictions_with_earlier_literature=contradictions,
-        scope_and_boundary_conditions=boundary_conditions,
-        revised_contribution_statements=revised_contributions,
-        unresolved_questions=[c["observed_finding"] for c in contradictions] if contradictions else ["Empirical replication across broader temporal windows"],
-        reopens_contribution_workflow=reopens_contribution,
+        scope_and_boundary_conditions=boundary,
+        revised_contribution_statements=revised,
+        unresolved_questions=unresolved,
+        reopens_contribution_workflow=reopens,
     )
+    out = result_data.to_dict()
+    out.update({
+        "observed_findings": observed, "statistical_classifications": classifications, "review_flags": review_flags,
+        "contradictions": contradictions, "contradictions_identified": contradictions, "revised_contributions": revised,
+        "reopens_contribution_assessment": reopens, "plausible_alternative_explanations": alternatives,
+        "reopened_claims": {k: sorted(set(v)) for k, v in reopened_claims.items()},
+        "upstream_artifacts_consumed": consumed,
+    })
 
-    out_dict = result_data.to_dict()
-    # Provide aliases for test assertions
-    out_dict["contradictions"] = contradictions
-    out_dict["contradictions_identified"] = contradictions
-    out_dict["revised_contributions"] = revised_contributions
-    out_dict["reopens_contribution_assessment"] = reopens_contribution
-    out_dict["plausible_alternative_explanations"] = alternative_explanations
-    out_dict["upstream_artifacts_consumed"] = consumed_artifact_ids
-
-    elapsed_ms = int((time.time() - start_time) * 1000)
-    usage = TaskUsage(
-        workflow="discussion",
-        task_id=tid,
-        model=None,
-        input_tokens=context.estimated_tokens,
-        output_tokens=estimate_tokens(json.dumps(out_dict))[0],
-        cache_read_tokens=None,
-        llm_calls=0,
-        context_objects=len(context.objects),
-        reused_artifacts=0,
-        elapsed_ms=elapsed_ms,
-        usage_source="estimated",
-    )
-
-    if context.budget_status == "INCOMPLETE_EXCEEDED":
-        status_val = "INCOMPLETE_CONTEXT"
-    elif reopens_contribution or contradictions:
-        status_val = "REQUIRES_VERIFICATION"
-    else:
-        status_val = "SUCCESS"
-
-    return WorkflowOutput(
-        workflow="discussion",
-        task_id=tid,
-        project_id=context.project_id,
-        status=status_val,
-        result=out_dict,
-        usage=usage,
-        provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-        notes=["Empirical findings interpreted with strict separation of observation from speculative claims."],
-    )
+    status = budget_gate(context, INSUFFICIENT if not results else NEEDS_VERIFICATION)
+    notes = ["Evidence gate: results are classified against hypotheses from structured fields only; interpretation, "
+             "speculation and verification of alternatives are not generated here."]
+    return finish("discussion", tid, context, out, status, start_time, notes)

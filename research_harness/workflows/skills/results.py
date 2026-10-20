@@ -1,24 +1,49 @@
-"""Workflow 4 — Results Interpretation & Reproducibility Implementation.
+"""Workflow 4 - Results Interpretation & Reproducibility (deterministic evidence gate).
 
-Organizes reproducible empirical analyses, interprets computational outputs, and detects
-changed results affecting dependent scientific claims via graph traversal.
-Follows Part B4 rules: unknown random seeds, scripts, and estimators remain None;
-unexecuted results are flagged COMPUTATIONAL_REPRODUCTION_NOT_VERIFIED.
+Organizes the recorded results, separates what is verified from what is merely reported, and shows what changed
+between revisions and which claims that touches.
+
+* A result is `VERIFIED_RUN` only if its `run_id` names an execution run that really succeeded in the run registry
+  and its `artifact_sha256` equals that run's recorded output digest. Writing `provenance: VERIFIED_RUN` on the
+  result, or passing `run_metadata={"verified_computation": True}`, verifies nothing.
+* Everything else is reported as it is: `AUTHOR_REPORTED`, `IMPORTED_FROM_PAPER`, or unrecorded. Unknown seeds,
+  scripts and estimators stay `None`.
+* Revision comparison is field-level over the structured values, and re-classifies the result against each
+  dependent hypothesis, so it shows which claims' status actually changed.
 """
 from __future__ import annotations
 
-import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from research_harness.workflows.contracts import (
-    ContextPackage,
-    ResultsInterpretationResult,
-    TaskUsage,
-    WorkflowOutput,
+from research_harness.workflows.contracts import ContextPackage, ResultsInterpretationResult, WorkflowOutput
+from research_harness.workflows.evidence_fields import (
+    classify_against_hypothesis,
+    parse_hypothesis,
+    parse_result,
+    result_bears_on_claim,
+    review_flag,
 )
-from research_harness.workflows.instrumentation import estimate_tokens
+from research_harness.workflows.runs import diff_json
+from research_harness.workflows.skills._common import (
+    INSUFFICIENT,
+    NEEDS_VERIFICATION,
+    SUCCESS,
+    budget_gate,
+    finish,
+    head_objects,
+)
+
+
+def _verification(fields: Any, verified_runs: dict[str, str]) -> str:
+    """VERIFIED_RUN only against a real execution record; a self-declared one is called out."""
+    recorded = verified_runs.get(fields.run_id) if fields.run_id else None
+    if recorded is not None and fields.artifact_sha256 is not None and recorded == fields.artifact_sha256:
+        return "VERIFIED_RUN"
+    if fields.provenance == "VERIFIED_RUN":
+        return "CLAIMED_VERIFIED_RUN_NOT_FOUND"
+    return fields.provenance or "UNVERIFIED"
 
 
 def execute_results_workflow(
@@ -28,172 +53,122 @@ def execute_results_workflow(
     run_metadata: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> WorkflowOutput:
-    """Execute Results workflow deterministically over structured research context."""
+    """Execute the Results evidence gate over structured research context."""
     start_time = time.time()
     tid = task_id or f"TASK_RES_{uuid.uuid4().hex[:8].upper()}"
 
-    results = [o for o in context.objects if o["object_type"] == "Result"]
-    datasets = [o for o in context.objects if o["object_type"] == "Dataset"]
-    analyses = [o for o in context.objects if o["object_type"] == "Analysis"]
-    claims = [o for o in context.objects if o["object_type"] == "Claim"]
+    results = head_objects(context, "Result")
+    datasets = head_objects(context, "Dataset")
+    analyses = head_objects(context, "Analysis")
+    claims = head_objects(context, "Claim")
+    relations = context.relations
+    hypotheses = {c["object_id"]: parse_hypothesis(c["object_id"], c["content"]) for c in claims}
 
-    # 1. Structured Run Records
     run_records: list[dict[str, Any]] = []
-    input_params: list[dict[str, Any]] = []
     artifact_refs: list[dict[str, Any]] = []
-    supported_findings: list[str] = []
+    verified, reported = [], []
+    review_flags: list[dict[str, Any]] = []
+    fields_by_id: dict[str, Any] = {}
 
     for res in results:
-        rid = res["object_id"]
-        rev = res["revision"]
-        c = res["content"]
+        rid, rev, c = res["object_id"], res["revision"], res["content"]
+        fields = parse_result(rid, rev, c)
+        fields_by_id[rid] = fields
         summary = c.get("summary", "")
-        metrics = c.get("metrics") or c.get("statistics") or {"summary": summary}
-
+        verification = _verification(fields, context.verified_runs)
         run_records.append({
-            "result_id": rid,
-            "revision": rev,
-            "label": c.get("label", rid),
-            "summary": summary,
-            "metrics": metrics,
-            "analysis_id": c.get("analysis_id"),
-            "contradictory": bool(c.get("contradictory")),
+            "result_id": rid, "revision": rev, "label": c.get("label", rid), "summary": summary,
+            "metrics": c.get("metrics") or c.get("statistics") or {"summary": summary},
+            "analysis_id": c.get("analysis_id"), "contradictory": fields.contradictory_flag,
+            "structured": fields.structured(), "verification": verification,
+            "missing_structured_fields": list(fields.missing), "invalid_structured_fields": list(fields.invalid),
         })
-
         if c.get("artifact_sha256"):
-            artifact_refs.append({
-                "result_id": rid,
-                "revision": rev,
-                "artifact_sha256": c.get("artifact_sha256"),
-                "artifact_type": c.get("artifact_type", "table"),
-            })
-
+            artifact_refs.append({"result_id": rid, "revision": rev, "artifact_sha256": c["artifact_sha256"],
+                                  "artifact_type": c.get("artifact_type", "table")})
         if summary:
-            supported_findings.append(f"[{rid}:rev{rev}] {summary}")
+            (verified if verification == "VERIFIED_RUN" else reported).append(
+                {"result_id": rid, "revision": rev, "summary": summary, "verification": verification})
+        flag = review_flag(rid, rev, summary, "summary")
+        if flag:
+            review_flags.append(flag)
 
-    # 2. Extract Input and Parameter References from Analyses and Datasets (Part B4: No fabricated paths/estimators)
-    for a in analyses:
-        c_a = a.get("content", {})
-        input_params.append({
-            "analysis_id": a["object_id"],
-            "script_path": c_a.get("script_path"),  # None if unspecified
-            "estimator": c_a.get("estimator"),      # None if unspecified
-            "parameters": c_a.get("parameters", {}),
-        })
+    input_params = [{"analysis_id": a["object_id"], "script_path": a["content"].get("script_path"),
+                     "estimator": a["content"].get("estimator"), "parameters": a["content"].get("parameters", {}),
+                     "status": a["content"].get("status"), "purpose": a["content"].get("purpose")} for a in analyses]
 
-    # 3. Detect Changed Results and Affected Claims
+    # Revision comparison: field-level, and which dependent claims' classification moved.
     by_oid: dict[str, list[dict[str, Any]]] = {}
-    for r in results:
-        by_oid.setdefault(r["object_id"], []).append(r)
+    for r in context.objects:
+        if r["object_type"] == "Result":
+            by_oid.setdefault(r["object_id"], []).append(r)
+    comparisons: list[dict[str, Any]] = []
+    changed: list[dict[str, Any]] = []
+    for oid in sorted(by_oid):
+        revs = sorted(by_oid[oid], key=lambda x: x["revision"])
+        if len(revs) < 2:
+            continue
+        prev, curr = revs[-2], revs[-1]
+        f_prev, f_curr = parse_result(oid, prev["revision"], prev["content"]), parse_result(oid, curr["revision"], curr["content"])
+        comparisons.append({
+            "result_id": oid, "prior_revision": prev["revision"], "head_revision": curr["revision"],
+            "prior_summary": prev["content"].get("summary"), "head_summary": curr["content"].get("summary"),
+            "difference": f"Revision {prev['revision']} -> {curr['revision']}",
+            "structured_changes": diff_json(f_prev.structured(), f_curr.structured(), "$.structured")})
+        affected, status_moves = [], []
+        for cl in claims:
+            cid = cl["object_id"]
+            bears = result_bears_on_claim(f_curr, cid, relations) or result_bears_on_claim(f_prev, cid, relations) \
+                or (oid in (cl["content"].get("depends_on") or []))
+            if not bears:
+                continue
+            affected.append(cid)
+            before = classify_against_hypothesis(hypotheses[cid], f_prev).label
+            after = classify_against_hypothesis(hypotheses[cid], f_curr).label
+            status_moves.append({"claim_id": cid, "classification_before": before, "classification_after": after,
+                                 "classification_changed": before != after})
+        changed.append({
+            "changed_result_id": oid, "prior_revision": prev["revision"], "head_revision": curr["revision"],
+            "affected_claims": affected, "claim_status_changes": status_moves,
+            "status": "REQUIRES_REASSESSMENT" if affected else "RESOLVED_ISOLATED",
+            "recommended_action": (f"Re-evaluate claims {affected} against revised result {oid}:rev{curr['revision']}"
+                                   if affected else "No claims depend on this result.")})
 
-    changed_results_affected: list[dict[str, Any]] = []
-    result_comparisons: list[dict[str, Any]] = []
+    robustness = [{"analysis_id": a["object_id"], "purpose": a["content"].get("purpose"), "status": a["content"].get("status"),
+                   "results": [r["object_id"] for r in results if r["content"].get("analysis_id") == a["object_id"]]}
+                  for a in analyses if a["content"].get("purpose") in {"robustness", "placebo", "heterogeneity"}]
 
-    for oid, revs in by_oid.items():
-        sorted_revs = sorted(revs, key=lambda x: x["revision"])
-        if len(sorted_revs) > 1:
-            prev = sorted_revs[-2]
-            curr = sorted_revs[-1]
-            diff_note = f"Revision {prev['revision']} -> {curr['revision']}: '{prev['content'].get('summary', '')}' changed to '{curr['content'].get('summary', '')}'"
-            result_comparisons.append({
-                "result_id": oid,
-                "prior_revision": prev["revision"],
-                "head_revision": curr["revision"],
-                "prior_summary": prev["content"].get("summary"),
-                "head_summary": curr["content"].get("summary"),
-                "difference": diff_note,
-            })
-
-            # Find claims that depend on this result
-            dependent_claim_ids = []
-            for c in claims:
-                c_deps = c["content"].get("depends_on", [])
-                if oid in c_deps:
-                    dependent_claim_ids.append(c["object_id"])
-
-            changed_results_affected.append({
-                "changed_result_id": oid,
-                "prior_revision": prev["revision"],
-                "head_revision": curr["revision"],
-                "affected_claims": dependent_claim_ids,
-                "status": "REQUIRES_REASSESSMENT" if dependent_claim_ids else "RESOLVED_ISOLATED",
-                "recommended_action": f"Re-evaluate claims {dependent_claim_ids} against revised result {oid}:rev{curr['revision']}" if dependent_claim_ids else "No claims dependent on this result.",
-            })
-
-    # 4. Robustness Summaries
-    robustness_summaries = [
-        {
-            "category": "Baseline Specification",
-            "observation_count": len(results),
-            "findings_summary": "; ".join(supported_findings[:3]) if supported_findings else "No empirical findings recorded.",
-        }
-    ]
-
-    # 5. Reproducibility Metadata (Part B4: No fabricated seeds or assumed verification)
     meta = run_metadata or {}
-    has_verified_computation = bool(meta.get("verified_computation") or meta.get("execution_verified"))
-    has_dataset_hashes = any(d.get("content_digest") for d in datasets)
-
-    if not has_verified_computation:
-        rep_status = "COMPUTATIONAL_REPRODUCTION_NOT_VERIFIED"
-    elif not has_dataset_hashes:
-        rep_status = "INPUT_PROVENANCE_INCOMPLETE"
-    else:
-        rep_status = "VERIFIED_COMPUTATIONAL_RUN"
-
+    all_verified = bool(results) and len(verified) == len(results)
     reproducibility = {
-        "runtime_environment": meta.get("environment"),
-        "random_seed": meta.get("random_seed"),  # None if not provided
-        "script_path": meta.get("script_path"),
-        "estimator": meta.get("estimator"),
-        "dataset_hashes": [{d["object_id"]: d.get("content_digest")} for d in datasets],
-        "deterministic_verification": False if not has_verified_computation else True,
-        "reproducibility_status": rep_status,
+        # Author-supplied, shown as such. None stays None.
+        "runtime_environment": meta.get("environment"), "random_seed": meta.get("random_seed"),
+        "script_path": meta.get("script_path"), "estimator": meta.get("estimator"),
+        "metadata_source": "author_reported_run_metadata" if meta else "not_provided",
+        "dataset_hashes": [{"dataset_id": d["object_id"],
+                            "data_sha256": d["content"].get("data_sha256") or d["content"].get("artifact_sha256"),
+                            "object_content_digest": d.get("content_digest")} for d in datasets],
+        "verified_results": [v["result_id"] for v in verified],
+        "unverified_results": [r["object_id"] for r in results if r["object_id"] not in {v["result_id"] for v in verified}],
+        "deterministic_verification": all_verified,
+        "reproducibility_status": "VERIFIED_COMPUTATIONAL_RUN" if all_verified else "COMPUTATIONAL_REPRODUCTION_NOT_VERIFIED",
     }
+    ignored = [f"run_metadata.{k}: asserted by the caller but not accepted without an execution record"
+               for k in ("verified_computation", "execution_verified") if meta.get(k)]
 
     result_data = ResultsInterpretationResult(
-        structured_run_records=run_records,
-        input_and_parameter_references=input_params,
-        output_artifact_references=artifact_refs,
-        reproducibility_metadata=reproducibility,
-        result_comparisons=result_comparisons,
-        robustness_summaries=robustness_summaries,
-        findings_supported_by_available_outputs=supported_findings,
-        changed_results_and_affected_claims=changed_results_affected,
-    )
+        structured_run_records=run_records, input_and_parameter_references=input_params,
+        output_artifact_references=artifact_refs, reproducibility_metadata=reproducibility,
+        result_comparisons=comparisons, robustness_summaries=robustness,
+        findings_supported_by_available_outputs=[f"[{v['result_id']}:rev{v['revision']}] {v['summary']}" for v in verified],
+        changed_results_and_affected_claims=changed)
+    out = result_data.to_dict()
+    out.update({
+        "changed_results_affecting_claims": changed, "author_reported_findings": reported, "review_flags": review_flags,
+        "ignored_assertions": ignored,
+    })
 
-    out_dict = result_data.to_dict()
-    out_dict["changed_results_affecting_claims"] = changed_results_affected
-
-    elapsed_ms = int((time.time() - start_time) * 1000)
-    usage = TaskUsage(
-        workflow="results",
-        task_id=tid,
-        model=None,
-        input_tokens=context.estimated_tokens,
-        output_tokens=estimate_tokens(json.dumps(out_dict))[0],
-        cache_read_tokens=None,
-        llm_calls=0,
-        context_objects=len(context.objects),
-        reused_artifacts=0,
-        elapsed_ms=elapsed_ms,
-        usage_source="estimated",
-    )
-
-    if context.budget_status == "INCOMPLETE_EXCEEDED":
-        status_val = "INCOMPLETE_CONTEXT"
-    elif rep_status != "VERIFIED_COMPUTATIONAL_RUN":
-        status_val = "REQUIRES_VERIFICATION"
-    else:
-        status_val = "SUCCESS"
-
-    return WorkflowOutput(
-        workflow="results",
-        task_id=tid,
-        project_id=context.project_id,
-        status=status_val,
-        result=out_dict,
-        usage=usage,
-        provenance_refs=[{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects],
-        notes=["Results organized with exact parameter references, without fabricated execution metadata."],
-    )
+    status = budget_gate(context, INSUFFICIENT if not results else (SUCCESS if all_verified else NEEDS_VERIFICATION))
+    return finish("results", tid, context, out, status, start_time,
+                  ["Results organized with their verification state; only results backed by an execution record are "
+                   "listed as supported by available outputs."])

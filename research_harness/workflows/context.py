@@ -56,8 +56,8 @@ class AmbiguousResearchQuestionError(ValueError):
 # `out`: targets of the seed's outgoing edges; `in`: sources of its incoming edges.
 _EXPANSION: dict[str, dict[str, frozenset]] = {
     "contribution": {
-        "out": frozenset({"Claim", "Theory", "Mechanism", "EvidencePassage", "Result", "ResearchQuestion", "Source"}),
-        "in": frozenset({"Result", "Adjudication", "Claim", "EvidencePassage", "Theory", "Mechanism", "Source"}),
+        "out": frozenset({"Claim", "Theory", "Mechanism", "EvidencePassage", "Result", "ResearchQuestion", "Source", "Analysis"}),
+        "in": frozenset({"Result", "Adjudication", "Claim", "EvidencePassage", "Theory", "Mechanism", "Source", "Analysis"}),
     },
     "literature": {
         "out": frozenset({"Source", "EvidencePassage", "Construct", "Theory", "Claim", "ResearchQuestion"}),
@@ -374,6 +374,7 @@ def build_context(
     package.manifest = _manifest(package, entries, omitted, deferred, contradictory_ids, max_input_tokens, request_tokens,
                                  reserved, profile_data, system_prompt)
     package.scope_claims = list(claim_ids_in_scope)
+    package.verified_runs = _verified_execution_runs(store)
     package.estimated_tokens = request_tokens
     package.context_bytes = len((system_prompt + "\n" + package.formatted_user_prompt).encode("utf-8"))
     package.manifest["context_bytes"] = package.context_bytes
@@ -384,6 +385,18 @@ def build_context(
 # ---------------------------------------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------------------------------------
+
+def _verified_execution_runs(store: StateStore) -> dict[str, str]:
+    """`run_id -> output digest` of execution runs that succeeded. A Result is `VERIFIED_RUN` only if its `run_id`
+    is in here and its `artifact_sha256` equals the recorded digest; stating it on the Result is not enough."""
+    from research_harness.state import workflow_runs
+    with store.read() as conn:
+        if not workflow_runs.has_registry(conn):
+            return {}
+        return {r[0]: r[1] for r in conn.execute(
+            "SELECT run_id, artifact_sha256 FROM workflow_runs WHERE workflow='execution' AND legacy=0 "
+            "AND execution_status='SUCCEEDED' AND artifact_sha256 IS NOT NULL")}
+
 
 def _structured_contradiction_flag(content: dict[str, Any]) -> bool:
     """Explicit, structured author flags only. Wording of any text field is never inspected."""
