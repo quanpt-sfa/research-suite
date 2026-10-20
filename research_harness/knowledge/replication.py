@@ -161,9 +161,8 @@ def add_replication_package(store: StateStore, token: Optional[str], *, package_
         edges = []
         if source_id:
             edges.append(("derived_from", source_id, tx.head(source_id)["head_revision"], {"origin": "replication_add"}))
-        for o in outputs:
-            if o.get("reported_in"):
-                edges.append(("depends_on", o["reported_in"], tx.head(o["reported_in"])["head_revision"], {"origin": "replication_add"}))
+        for rid in sorted({o["reported_in"] for o in outputs if o.get("reported_in")}):
+            edges.append(("depends_on", rid, tx.head(rid)["head_revision"], {"origin": "replication_add"}))
         res = tx.add_revision(object_id=pid, object_type="KnowledgeItem", content=content, edges=edges,
                               origin=engine_origin("replication_add", tx.actor_id))
         tx.audit("replication_add", "RECORDED", {"object_id": pid, "files": len(stored), "bytes": total})
