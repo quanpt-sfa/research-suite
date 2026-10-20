@@ -203,3 +203,30 @@ def record_reproduction(store: StateStore, token: Optional[str], package_id: str
                                 edges=[(x[0], x[1], x[2], _json.loads(x[3])) for x in prows], origin=engine_origin("replication_reproduce", tx.actor_id))
                 touched.append(r[0])
     return {**result, "recorded_in": touched, "entitlement": entitlement_of(store.get_object(package_id)["content"])}
+
+
+def set_entitlement(store: StateStore, token: Optional[str], package_id: str, *, status: str, license: Optional[str] = None,
+                    basis: Optional[str] = None, findings: Optional[list[str]] = None) -> dict[str, Any]:
+    """Record or change the entitlement of a package (author or owner). `confirmed` needs a stated basis: it is the researcher's
+    statement that they may use the data and code, and the record says whose statement it is."""
+    import json as _json
+    from research_harness.knowledge.common import engine_origin
+    if status not in ENTITLEMENT_STATUS:
+        raise KnowledgeError("ENTITLEMENT_STATUS_INVALID", f"status must be one of {ENTITLEMENT_STATUS}")
+    if status == "confirmed" and not (basis or "").strip():
+        raise KnowledgeError("ENTITLEMENT_BASIS_REQUIRED", "confirming an entitlement needs a stated basis (a license, an agreement, the authors' permission, or the researcher's statement)")
+    with store.write_tx(token=token, require_roles=("author", "owner")) as tx:
+        cur = tx.get(package_id)
+        if not cur or cur["content"].get("kind") != "replication_package":
+            raise KnowledgeError("NOT_A_REPLICATION_PACKAGE", f"{package_id} is not a replication_package item")
+        body = dict(cur["content"].get("body") or {})
+        old = body.get("entitlement") or {}
+        body["entitlement"] = {**old, "status": status, "license": license if license is not None else old.get("license"), "basis": basis,
+                               "findings": findings if findings is not None else old.get("findings", []), "checked_at": tx.at,
+                               "history": (old.get("history") or []) + [{"status": old.get("status", "unspecified"), "until": tx.at, "by": tx.actor_id}]}
+        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
+                               (package_id, cur["revision"])).fetchall()
+        res = tx.add_revision(object_id=package_id, object_type="KnowledgeItem", content={**cur["content"], "body": body},
+                              edges=[(r[0], r[1], r[2], _json.loads(r[3])) for r in rows], origin=engine_origin("entitlement", tx.actor_id))
+        tx.audit("entitlement", "RECORDED", {"package": package_id, "status": status})
+    return {"package_id": package_id, "revision": res["revision"], "entitlement": entitlement_of({"body": body})}

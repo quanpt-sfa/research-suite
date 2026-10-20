@@ -142,3 +142,21 @@ def test_pilot_model_rerun_matches_the_shipped_results_split_by_split():
             assert float(a[col]) == float(rerun[split][col]), (split, col)               # identical, not merely close
     env = (REPRODUCED.parent / "environment.txt").read_text(encoding="utf-8")
     assert "Python 3.8" in env and "scikit-learn==1.0.2" in env and "numpy==1.24.4" in env
+
+
+def test_an_entitlement_is_confirmed_by_a_stated_basis_and_the_history_is_kept(tmp_path, pkgdir):
+    from research_harness.knowledge.replication import set_entitlement
+    store, token = StateStore.create(tmp_path / "home", "PRJ_SETENT", owner_id="researcher")
+    add_replication_package(store, token, package_id="PKG_E", label="p", directory=pkgdir, files=["data/panel.csv"])
+    assert entitlement_of(store.get_object("PKG_E")["content"])["established"] is False
+    with pytest.raises(KnowledgeError, match="ENTITLEMENT_BASIS_REQUIRED"):
+        set_entitlement(store, token, "PKG_E", status="confirmed")
+    out = set_entitlement(store, token, "PKG_E", status="confirmed", license="stated by the researcher", basis="the researcher confirms they may use the data and code")
+    assert out["entitlement"]["established"] is True and store.get_object("PKG_E")["revision"] == 2
+    hist = store.get_object("PKG_E")["content"]["body"]["entitlement"]["history"]
+    assert hist[0]["status"] == "unspecified" and hist[0]["by"] == "researcher"
+    assert store.get_object("PKG_E", 1)["content"]["body"]["entitlement"]["status"] == "unspecified"      # the earlier revision is kept
+    with pytest.raises(KnowledgeError, match="ENTITLEMENT_STATUS_INVALID"):
+        set_entitlement(store, token, "PKG_E", status="maybe")
+    with pytest.raises(KnowledgeError, match="NOT_A_REPLICATION_PACKAGE"):
+        set_entitlement(store, token, "NOPE_X", status="declared")
