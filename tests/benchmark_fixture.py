@@ -354,8 +354,16 @@ def run_full_benchmark_suite(store: StateStore, token: str) -> Dict[str, Any]:
     }
 
 
+# The cases `run_scientific_benchmark_evaluation` injects (the count reported is len(), not a literal).
+_SCIENTIFIC_CASES = (
+    "descriptive_claim_with_exact_passages", "novelty_claim_contradicted_by_fulltext_competitor",
+    "novelty_claim_with_missing_fulltext_competitor", "causal_claim_without_identification",
+    "result_contradicting_initial_prediction", "twin_sources_with_different_limitations", "subtle_counterexample_passage",
+)
+
+
 def run_scientific_benchmark_evaluation(store: StateStore, token: str) -> Dict[str, Any]:
-    """Execute rigorous 8-case scientific benchmark evaluating evidence recall, contradiction preservation,
+    """Execute the scientific benchmark (see _SCIENTIFIC_CASES) evaluating evidence recall, contradiction preservation,
     and context efficiency under strict same-task evaluation (Part H).
     """
     populate_benchmark_project(store, token)
@@ -485,7 +493,7 @@ def run_scientific_benchmark_evaluation(store: StateStore, token: str) -> Dict[s
     contra_recall = round(retained_contra / len(contradictory_ids), 2)
 
     cand_bytes = len(pkg.formatted_prompt.encode("utf-8"))
-    cand_tokens = pkg.estimated_tokens
+    cand_tokens = pkg.manifest["request_tokens"]  # the whole request (system prompt + evidence), not an intermediate JSON
     byte_savings_pct = round((1.0 - (cand_bytes / max(1, baseline["context_bytes"]))) * 100, 2)
     token_savings_pct = round((1.0 - (cand_tokens / max(1, baseline["estimated_tokens"]))) * 100, 2)
 
@@ -494,12 +502,25 @@ def run_scientific_benchmark_evaluation(store: StateStore, token: str) -> Dict[s
         f"while retaining {retained_required}/{len(required_ids)} required evidence items."
     )
 
+    # Provenance, computed from what the package actually carries: a passage is correct when its source and locator
+    # are resolved and the source object is itself in the package.
+    retained_sources = {o["object_id"] for o in pkg.objects if o["object_type"] == "Source"}
+    resolved = [e for e in pkg.excerpts
+                if e["source_id"] != "UNKNOWN" and e["locator"] != "UNSPECIFIED" and e["source_id"] in retained_sources]
+    provenance_pct = round(100.0 * len(resolved) / max(1, len(pkg.excerpts)), 2)
+    ft_counts: Dict[str, int] = {}
+    for ft in pkg.full_texts:
+        ft_counts[ft["fulltext_status"]] = ft_counts.get(ft["fulltext_status"], 0) + 1
+    loaded, total_sources = ft_counts.get("FULLTEXT_LOADED", 0), len(pkg.full_texts)
+
     return {
-        "cases_evaluated": 8,
+        "cases_evaluated": len(_SCIENTIFIC_CASES),
         "required_evidence_recall": required_recall,
         "contradictory_evidence_recall": contra_recall,
-        "provenance_correctness_pct": 100.0,
-        "fulltext_inspection_status": "VERIFIED_ON_DEMAND",
+        "provenance_correctness_pct": provenance_pct,
+        "provenance_checked": f"{len(resolved)}/{len(pkg.excerpts)} excerpts with resolved source and locator",
+        "fulltext_inspection_status": f"{loaded} of {total_sources} source(s) loaded in full; counts {ft_counts}",
+        "token_reduction_basis": "request tokens vs the JSON of a full snapshot export: not like-for-like (redesigned in Phase 6)",
         "omission_of_irrelevant_material_pct": round((1.0 - len(pkg.objects) / max(1, baseline["context_objects"])) * 100, 2),
         "context_bytes_reduction_pct": byte_savings_pct,
         "estimated_tokens_reduction_pct": token_savings_pct,

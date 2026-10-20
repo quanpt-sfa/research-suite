@@ -58,3 +58,24 @@ ran (diagnostic signals use the `diagnostic_signal` vocabulary). Execution plans
 
 `tests/fixtures/dw_edu_qualitative_fixture.json` is a test-only qualitative-education contrast (no separate results stage, a
 saturation loop-back to data collection). It exists to prove structural difference and is not an education workflow.
+
+## Static discipline profiles
+
+`workflows/profiles/{accounting,finance,education}.py` are checklists written for one tradition and the data sources it lists;
+they never defined a field. They keep working as before (the Methods stage still shows their checklist, with every item
+`REQUIRES_INFORMATION`), and can be migrated into scoped knowledge:
+
+```
+python scripts/migrate_profiles.py accounting --out operations.json    # nothing is written to any project
+```
+
+Each checklist item and validity question becomes a `KnowledgeItem` of kind `checklist` whose **scope is exactly what the profile
+states** (its domain and its own list of preferred data sources; no jurisdiction or period is inferred), with an explicit
+exclusion ("not established outside the data sources this profile lists"), `generated_by: import`, no evidence basis, and
+`source_fidelity: NOT_CHECKED`. They cannot be promoted into a shared library until they are given evidence. Wrap the operations in
+a proposal with `build_proposal(project_id, snapshot, proposal_id, operations)` and import them through the normal gateway.
+
+The six 9.2 object types (`DomainWorkflow`, `MethodPlaybook`, `JournalPolicy`, `KnowledgeItem`, `ContributionArgument`,
+`AnalysisPlan`) are registered after the existing ones, are proposable, and have content schemas; the existing types and their
+order are unchanged. Content keys are screened by the gateway: `role`, `actor`, `verified`, `revision`, `timestamp`, `token`
+and similar are server-assigned and rejected anywhere in a proposal (hence `Dataset.data_role`).

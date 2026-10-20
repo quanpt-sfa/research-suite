@@ -12,6 +12,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from research_harness import PROTOCOL_VERSION, SCHEMA_VERSION
+from research_harness import taxonomy
 from research_harness.core.model import (CLAIM_TIERS, FORMATION_BASES, ID_PATTERN, OBJECT_TYPES,
                                          PROJECT_ID_PATTERN, SERVER_ONLY_TYPES, SHA256_PATTERN)
 from research_harness.graph.relations import RELATIONS
@@ -79,6 +80,19 @@ _TYPE_PROPS: dict[str, tuple[dict, list]] = {
                       "source_registry": {"type": ["string", "null"]},
                       "legacy_record_id": {"type": ["string", "null"]}},
                      ["subject", "assessment_kind", "verdict", "rationale"]),
+    # 9.2 knowledge types. Validation dimensions are recorded separately and contextually (plan v3 section 4.1).
+    "DomainWorkflow": ({"spec": {"type": "object"}, "spec_digest": SHA, "validation": {"type": "object"}}, ["label"]),
+    "MethodPlaybook": ({"playbook": {"type": "object"}, "validation": {"type": "object"}}, ["label"]),
+    "JournalPolicy": ({"journal": _str(300), "policy_type": {"enum": list(taxonomy.vocabulary("journal_policy_type"))},
+                       "effective_from": _str(40), "retrieved_at": _str(40), "source_url": _str(2000), "source_sha256": SHA,
+                       "excerpt": _str(5000), "applies_to": {"type": "object"}}, ["label", "policy_type"]),
+    "KnowledgeItem": ({"kind": {"enum": list(taxonomy.vocabulary("knowledge_kind"))}, "group": _str(100),
+                       "scope": {"type": "object"}, "exclusions": {"type": "array", "items": _str(2000)},
+                       "validation": {"type": "object"}, "generated_by": _str(120),
+                       "evidence_basis": {"type": "array", "items": {"type": "object"}}}, ["label", "kind"]),
+    "ContributionArgument": ({"components": {"type": "object"}, "subject": SUBJECT}, ["label"]),
+    "AnalysisPlan": ({"playbook_pins": {"type": "array", "items": _str(300)}, "steps": {"type": "array", "items": {"type": "object"}}},
+                     ["label"]),
     # Approval content is written only by the engine (review.py); schema documents the stored shape.
     "Approval": ({"subject": SUBJECT, "kind": {"enum": ["author_approval", "independent_review"]},
                   "decision": {"enum": ["approve", "reject"]}, "rationale": _str(20000, 0),

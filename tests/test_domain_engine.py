@@ -131,13 +131,13 @@ def test_a_step_that_is_not_applicable_must_say_why():
 # ==================================================================================================
 
 def test_object_predicates():
-    f = facts([("Dataset", {"role": "label_source", "tags": ["fraud", "sec"]}), ("Dataset", {"role": "sample"}), ("Claim", {})])
-    assert ok({"exists": {"type": "Dataset", "where": {"role": "label_source"}}}, f)
+    f = facts([("Dataset", {"data_role": "label_source", "tags": ["fraud", "sec"]}), ("Dataset", {"data_role": "sample"}), ("Claim", {})])
+    assert ok({"exists": {"type": "Dataset", "where": {"data_role": "label_source"}}}, f)
     assert ok({"exists": {"type": "Dataset", "where": {"tags": "sec"}}}, f)  # a list field matches by membership
-    assert not ok({"exists": {"type": "Dataset", "where": {"role": "nope"}}}, f)
+    assert not ok({"exists": {"type": "Dataset", "where": {"data_role": "nope"}}}, f)
     assert ok({"count_ge": {"type": "Dataset", "n": 2}}, f) and not ok({"count_ge": {"type": "Dataset", "n": 3}}, f)
-    assert ok({"field_in": {"type": "Dataset", "field": "role", "values": ["sample", "x"]}}, f)
-    assert "no Dataset with {'role': 'nope'}" in evaluate_predicate({"exists": {"type": "Dataset", "where": {"role": "nope"}}}, f).reason
+    assert ok({"field_in": {"type": "Dataset", "field": "data_role", "values": ["sample", "x"]}}, f)
+    assert "no Dataset with {'data_role': 'nope'}" in evaluate_predicate({"exists": {"type": "Dataset", "where": {"data_role": "nope"}}}, f).reason
 
 
 def test_study_design_and_scope_predicates():
@@ -189,7 +189,7 @@ def test_domain_workflows_differ_in_execution_not_prompt(proj):
     assert [fraud.stage_instructions(s) for s in STAGES] == [edu.stage_instructions(s) for s in STAGES] == [SHARED[s] for s in STAGES]
 
     add(proj, RQ,
-        ("DS_L", "Dataset", {"role": "label_source", "label": "SEC enforcement releases"}, [("depends_on", "RQ_A", 1, {})]),
+        ("DS_L", "Dataset", {"data_role": "label_source", "label": "SEC enforcement releases"}, [("depends_on", "RQ_A", 1, {})]),
         ("EP_L", "EvidencePassage", {"topic": "label_definition", "locator": "p.3", "quote": "Fraud is defined as..."}, [("depends_on", "RQ_A", 1, {})]),
         ("EP_S", "EvidencePassage", {"topic": "sampling_rationale", "locator": "p.5", "quote": "We sampled..."}, [("depends_on", "RQ_A", 1, {})]))
     store, _ = proj
@@ -464,7 +464,7 @@ def test_record_step_run_validation_and_history(proj):
 
 def test_cli_domain_list_and_next(proj, capsys):
     store, _ = proj
-    add(proj, RQ, ("DS_L", "Dataset", {"role": "label_source"}, [("depends_on", "RQ_A", 1, {})]),
+    add(proj, RQ, ("DS_L", "Dataset", {"data_role": "label_source"}, [("depends_on", "RQ_A", 1, {})]),
         ("EP_L", "EvidencePassage", {"topic": "label_definition", "locator": "p.1", "quote": "q"}, [("depends_on", "RQ_A", 1, {})]))
     assert cli_main(["domain", "list", "--json"]) == 0
     assert {w["id"] for w in json.loads(capsys.readouterr().out)["domain_workflows"]} == {"LIB_DW_GENERIC", "LIB_DW_ACC_FRAUD_DETECTION"}

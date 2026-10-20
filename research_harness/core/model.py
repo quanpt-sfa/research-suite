@@ -63,6 +63,8 @@ OBJECT_TYPES = (
     "ResearchQuestion", "Theory", "Construct", "Mechanism", "Proxy", "Dataset", "Source",
     "EvidencePassage", "Analysis", "Result", "Claim", "ManuscriptArtifact", "Adjudication",
     "Approval",
+    # 9.2 knowledge types (appended: existing types and their order are unchanged)
+    "DomainWorkflow", "MethodPlaybook", "JournalPolicy", "KnowledgeItem", "ContributionArgument", "AnalysisPlan",
 )
 SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication"})  # can never be created through a proposal
 

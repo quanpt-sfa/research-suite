@@ -14,10 +14,14 @@ must be numbers: `"p<0.01"` is not a p-value and is reported as invalid.
 | `Claim` | `predicted_direction` (`positive` \| `negative` \| `no_effect` \| `nondirectional`), `focal_variable`, `outcome_variable`, `hypothesis_label`, `scope` / `boundary_conditions` |
 | `Result` | `hypothesis_ids[]`, `estimate`, `std_error`, `p_value`, `ci` `[lo, hi]` + `ci_level`, `alpha`, `n`, `estimator`, `run_id`, `artifact_sha256`, `provenance` (`VERIFIED_RUN` \| `AUTHOR_REPORTED` \| `IMPORTED_FROM_PAPER`), `contradictory` (author flag) |
 | `Analysis` | `status` (`PLANNED` \| `EXECUTED`), `purpose` (`main` \| `robustness` \| `placebo` \| `heterogeneity`), `identification_strategy`, `assumptions[]`, `specification` `{controls, fixed_effects, clustering}`, `addresses[]` (mechanism ids), `hypothesis_ids[]` |
-| `Dataset` | `structure` (`panel` \| `cross_sectional` \| `time_series` \| `experimental` \| `qualitative` \| `mixed`), `unit`, `time_index`, `data_sha256` |
+| `Dataset` | `structure` (`panel` \| `cross_sectional` \| `time_series` \| `experimental` \| `qualitative` \| `mixed`), `unit`, `time_index`, `data_sha256`, `data_role` (what the dataset is for in the design, e.g. `label_source`, `sample`) |
 | `EvidencePassage` | `evidence_type`, `assessment.relation` (`supports` \| `challenges`), `contradictory` (author flag) |
 | `Source` | `study_design`, `sample_context`, `time_period`, `unit` |
 | `Adjudication` | `subject.object_id`, `scope` (`claim_support` \| `identification` \| `measurement` \| `novelty`), `verdict` |
+
+**Field names to avoid.** The proposal gateway rejects any key named `role`, `roles`, `actor`, `actor_id`, `verified`, `revision`,
+`timestamp`, `token`, ... anywhere in a proposal, because the server assigns identity, time, approval and verification. A dataset's
+function in a design is therefore `data_role`, never `role`.
 
 ## Relations
 

@@ -485,7 +485,6 @@ def test_g3_benchmark_required_competitor_source_is_retained(tmp_path):
     assert "SRC_COMPETITOR_FULL" in {o["object_id"] for o in pkg.objects}
 
 
-@xfail("P1-5 (hard-coded metrics)")
 def test_g_benchmark_metrics_are_computed_not_literals():
     import inspect
     from tests import benchmark_fixture
