@@ -25,7 +25,7 @@ from research_harness.knowledge.common import (
     KnowledgeError, engine_origin, head_or_raise, id_fragment, next_numbered_id, scope_id)
 from research_harness.knowledge.corpus import verify_passage
 from research_harness.knowledge.library import make_pin, parse_pin, pins_in
-from research_harness.knowledge.replication import reproduce_package
+from research_harness.knowledge.replication import entitlement_of, reproduce_package
 from research_harness.state.store import StateStore
 from research_harness.workflows import eca
 
@@ -313,6 +313,8 @@ def promotion_blockers(store: StateStore, item_id: str, *, scope: dict[str, Any]
     if not exclusions and not none_known:
         blockers.append("exclusions are empty: list them, or record explicitly that none are known")
     elements = obj["content"].get("elements") or []
+    if obj["content"].get("kind") == "replication_package" and not entitlement_of(obj["content"])["established"]:
+        blockers.append("entitlement to use the package's data and code is not confirmed (license or permission with a stated basis)")
     unbased = [e.get("id") for e in elements if isinstance(e, dict) and (e.get("basis_missing") or not e.get("evidence_basis"))]
     if unbased:
         blockers.append("elements without an evidence basis: " + ", ".join(map(str, unbased)))

@@ -531,3 +531,138 @@ def queue(store: StateStore) -> list[dict[str, Any]]:
                     items.append({"statement": {"object_id": obj["object_id"], "revision": obj["revision"]}, "element": e.get("id"),
                                   "state": "NOT_ADJUDICATED"})
     return items
+
+
+# ---------------------------------------------------------------------------------------------------
+# coverage policy (decision D15): every HIGH statement, a stratified 20% of STANDARD ones, more after errors
+# ---------------------------------------------------------------------------------------------------
+
+STANDARD_SAMPLE_RATE = 0.20
+
+
+def mark_high(tx: Any, object_id: str, element: Optional[str] = None) -> bool:
+    """Make a statement HIGH risk (a new revision of its object; the statement's words are untouched, so its adjudications
+    stay valid). Anything a material conclusion rests on must be HIGH. Returns False if it already was."""
+    import json as _json
+    cur = tx.get(object_id)
+    c = dict(cur["content"])
+    if element:
+        els = [dict(e) for e in c.get("elements") or []]
+        for e in els:
+            if e.get("id") == element and e.get("risk_tier") != "HIGH":
+                e["risk_tier"] = "HIGH"
+                c["elements"] = els
+                break
+        else:
+            return False
+    else:
+        attrs = dict(c.get("attributes") or {})
+        if attrs.get("risk_tier") == "HIGH":
+            return False
+        attrs["risk_tier"] = "HIGH"
+        c["attributes"] = attrs
+    rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
+                           (object_id, cur["revision"])).fetchall()
+    tx.add_revision(object_id=object_id, object_type=cur["object_type"], content=c, edges=[(r[0], r[1], r[2], _json.loads(r[3])) for r in rows],
+                    origin=engine_origin("risk_tier_high", tx.actor_id))
+    return True
+
+
+def use_in_conclusion(store: StateStore, token: Optional[str], statements: list[tuple[str, Optional[str]]]) -> dict[str, Any]:
+    """Declare that a material conclusion rests on these statements `(object_id, element)`: they become HIGH."""
+    changed = []
+    with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
+        for oid, element in statements:
+            head_or_raise(tx, oid)
+            if mark_high(tx, oid, element):
+                changed.append({"object_id": oid, "element": element})
+    return {"made_high": changed, "already_high": len(statements) - len(changed)}
+
+
+def iter_statements(store: StateStore) -> list[dict[str, Any]]:
+    """Every statement ECA can be asked about: Claims, and the elements of knowledge items, playbooks and arguments."""
+    out = []
+    with store.read() as conn:
+        rows = conn.execute("SELECT object_id, object_type FROM object_heads WHERE object_type IN "
+                            "('Claim','KnowledgeItem','MethodPlaybook','ContributionArgument') ORDER BY object_id").fetchall()
+        objs = [store.get_object(r[0], conn=conn) for r in rows]
+    for o in objs:
+        c = o["content"]
+        if o["object_type"] == "Claim":
+            tier = "HIGH" if (c.get("attributes") or {}).get("risk_tier") == "HIGH" else "STANDARD"
+            out.append({"object_id": o["object_id"], "element": None, "stratum": "Claim", "risk_tier": tier,
+                        "text_sha256": canonical_json_hash(c["text"])})
+            continue
+        for e in c.get("elements") or []:
+            if isinstance(e, dict) and (e.get("text") or e.get("statement")):
+                kind = e.get("category") or e.get("component") or "element"
+                out.append({"object_id": o["object_id"], "element": e["id"], "stratum": f"{o['object_type']}:{kind}",
+                            "risk_tier": "HIGH" if e.get("risk_tier") == "HIGH" else "STANDARD",
+                            "text_sha256": canonical_json_hash(e.get("text") or e.get("statement"))})
+    return out
+
+
+def _adjudicated(store: StateStore) -> set[tuple]:
+    done = set()
+    with store.read() as conn:
+        for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type='Adjudication' ORDER BY object_id"):
+            c = store.get_object(r[0], conn=conn)["content"]
+            if c.get("kind") == "evidence_claim":
+                done.add((c["subject"]["object_id"], (c.get("statement") or {}).get("element"), (c.get("statement") or {}).get("text_sha256")))
+    return done
+
+
+def error_counts(store: StateStore) -> dict[str, int]:
+    """Adjudication problems per stratum: a guard that fired, or a verdict other than supported-as-stated. Sampling is raised
+    where these occur."""
+    strata = {(s["object_id"], s["element"]): s["stratum"] for s in iter_statements(store)}
+    counts: dict[str, int] = {}
+    with store.read() as conn:
+        for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type='Adjudication' ORDER BY object_id"):
+            c = store.get_object(r[0], conn=conn)["content"]
+            if c.get("kind") != "evidence_claim" or c.get("confirms"):
+                continue
+            stratum = strata.get((c["subject"]["object_id"], (c.get("statement") or {}).get("element")))
+            if stratum and (c.get("guard") or c["eca_verdict"] != "SUPPORTED_AS_STATED"):
+                counts[stratum] = counts.get(stratum, 0) + 1
+    return counts
+
+
+def escalated_rate(base: float, errors: int) -> float:
+    """The sampling rate after `errors` problems in a stratum: doubled for each, up to everything."""
+    return min(1.0, base * (2 ** errors))
+
+
+def sampling_plan(store: StateStore, *, rate: float = STANDARD_SAMPLE_RATE, seed: str = "eca-sample-v1") -> dict[str, Any]:
+    """Which statements to adjudicate: all HIGH, and a deterministic stratified sample of STANDARD ones (at least one per
+    stratum), at a rate that doubles for each problem found in the stratum."""
+    import hashlib
+    import math
+    stmts = iter_statements(store)
+    errors = error_counts(store)
+    high = [s for s in stmts if s["risk_tier"] == "HIGH"]
+    by: dict[str, list[dict[str, Any]]] = {}
+    for s in stmts:
+        if s["risk_tier"] == "STANDARD":
+            by.setdefault(s["stratum"], []).append(s)
+    sampled, strata = [], {}
+    for stratum, items in sorted(by.items()):
+        r = escalated_rate(rate, errors.get(stratum, 0))
+        k = min(len(items), max(1, math.ceil(r * len(items))))
+        ranked = sorted(items, key=lambda s: hashlib.sha256(f"{seed}|{s['object_id']}|{s['element']}".encode()).hexdigest())
+        sampled += ranked[:k]
+        strata[stratum] = {"statements": len(items), "rate": r, "sampled": k, "errors_found": errors.get(stratum, 0)}
+    return {"policy": {"high": "every statement", "standard_rate": rate, "escalation": "the rate doubles for each problem found in a stratum", "seed": seed},
+            "high": high, "standard_sampled": sampled, "by_stratum": strata}
+
+
+def coverage_report(store: StateStore, *, rate: float = STANDARD_SAMPLE_RATE) -> dict[str, Any]:
+    """Where the policy stands: HIGH statements not yet adjudicated, and sampled STANDARD statements not yet adjudicated."""
+    plan = sampling_plan(store, rate=rate)
+    done = _adjudicated(store)
+    key = lambda s: (s["object_id"], s["element"], s["text_sha256"])  # noqa: E731
+    high_missing = [s for s in plan["high"] if key(s) not in done]
+    sample_missing = [s for s in plan["standard_sampled"] if key(s) not in done]
+    return {"high_total": len(plan["high"]), "high_adjudicated": len(plan["high"]) - len(high_missing), "high_not_adjudicated": high_missing,
+            "standard_sampled": len(plan["standard_sampled"]), "sample_not_adjudicated": sample_missing, "by_stratum": plan["by_stratum"],
+            "complete": not high_missing and not sample_missing}

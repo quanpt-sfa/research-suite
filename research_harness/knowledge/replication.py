@@ -97,3 +97,110 @@ def reproduce_package(store: StateStore, item_id: str, revision: Optional[int] =
     else:
         status = "REPRODUCED_WITHIN_TOLERANCE"
     return {"item": item_id, "revision": obj["revision"], "computational_reproducibility": status, "outputs": outputs}
+
+
+# ---------------------------------------------------------------------------------------------------
+# intake, entitlement and recording (phase 5b)
+# ---------------------------------------------------------------------------------------------------
+
+ENTITLEMENT_STATUS = ("unspecified", "declared", "confirmed")
+MAX_PACKAGE_BYTES = 512 * 1024 * 1024
+
+
+def entitlement_of(content: dict[str, Any]) -> dict[str, Any]:
+    """Whether the researcher is entitled to use a package's data and code, as recorded. `confirmed` needs a stated basis
+    (a license, a data-use agreement, the authors' permission). A repository with no license is `unspecified`: all rights
+    stay with its authors, and the package is kept for local use only."""
+    e = ((content.get("body") or {}).get("entitlement")) or {}
+    status = e.get("status", "unspecified")
+    if status == "confirmed" and not e.get("basis"):
+        status = "unspecified"
+    return {"status": status, "license": e.get("license"), "basis": e.get("basis"), "checked_at": e.get("checked_at"),
+            "findings": list(e.get("findings") or []), "established": status == "confirmed"}
+
+
+def add_replication_package(store: StateStore, token: Optional[str], *, package_id: str, label: str, directory: Any,
+                            files: list[str], expected_outputs: Optional[list[dict[str, Any]]] = None, source_id: Optional[str] = None,
+                            entitlement: Optional[dict[str, Any]] = None, notes: Optional[str] = None,
+                            max_total_bytes: int = MAX_PACKAGE_BYTES) -> dict[str, Any]:
+    """Store files of a replication package in the content-addressed store and record them as a `replication_package` item.
+
+    `files` are paths relative to `directory`. Each `expected_outputs` entry is `{id, file, stat, column?, where?, expected,
+    tolerance, reported_in?}`; `reported_in` names the passage where the source reports that number, and must exist.
+    `entitlement` records the license and the basis on which the researcher uses the data (default: unspecified).
+    """
+    from pathlib import Path
+    from research_harness.knowledge.common import WRITE_ROLES, engine_origin, scope_id
+    root = Path(directory).resolve()
+    stored, total = [], 0
+    for rel in files:
+        p = (root / rel).resolve()
+        if root not in p.parents or not p.is_file():
+            raise KnowledgeError("PACKAGE_FILE_INVALID", f"{rel} is not a file inside the package directory")
+        total += p.stat().st_size
+        if total > max_total_bytes:
+            raise KnowledgeError("PACKAGE_TOO_LARGE", f"the files exceed {max_total_bytes} bytes")
+        stored.append({"name": Path(rel).as_posix(), "sha256": store.artifacts.put_bytes(p.read_bytes()), "bytes": p.stat().st_size})
+    names = {f["name"] for f in stored}
+    outputs = []
+    for o in expected_outputs or []:
+        if o.get("file") not in names:
+            raise KnowledgeError("EXPECTED_OUTPUT_INVALID", f"output {o.get('id')}: file {o.get('file')!r} is not one of the stored files")
+        if o.get("stat") not in STATS or "expected" not in o or o.get("id") is None:
+            raise KnowledgeError("EXPECTED_OUTPUT_INVALID", f"an expected output needs id, expected and a stat in {STATS}")
+        if o.get("reported_in") and not store.get_object(o["reported_in"]):
+            raise KnowledgeError("EXPECTED_OUTPUT_INVALID", f"output {o['id']}: the passage {o['reported_in']} does not exist")
+        outputs.append(dict(o))
+    ent = {"status": "unspecified", "license": None, "basis": None, "findings": [], **(entitlement or {})}
+    if ent["status"] not in ENTITLEMENT_STATUS:
+        raise KnowledgeError("ENTITLEMENT_STATUS_INVALID", f"status must be one of {ENTITLEMENT_STATUS}")
+    pid = scope_id(store, package_id)
+    content = {"label": label, "kind": "replication_package", "generated_by": "import", "lifecycle": "ACTIVE",
+               "body": {"files": stored, "expected_outputs": outputs, "entitlement": {**ent, "checked_at": store.clock()}, "notes": notes or ""}}
+    with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
+        edges = []
+        if source_id:
+            edges.append(("derived_from", source_id, tx.head(source_id)["head_revision"], {"origin": "replication_add"}))
+        for o in outputs:
+            if o.get("reported_in"):
+                edges.append(("depends_on", o["reported_in"], tx.head(o["reported_in"])["head_revision"], {"origin": "replication_add"}))
+        res = tx.add_revision(object_id=pid, object_type="KnowledgeItem", content=content, edges=edges,
+                              origin=engine_origin("replication_add", tx.actor_id))
+        tx.audit("replication_add", "RECORDED", {"object_id": pid, "files": len(stored), "bytes": total})
+    return {"package_id": pid, "revision": res["revision"], "files": len(stored), "bytes": total, "entitlement": entitlement_of(content)}
+
+
+def record_reproduction(store: StateStore, token: Optional[str], package_id: str) -> dict[str, Any]:
+    """Recompute a package's outputs and write the result into the package and into the playbook elements linked to it, as
+    their `computational_reproducibility`. That is the only effect: it never touches methodological validity."""
+    import json as _json
+    from research_harness.knowledge.common import WRITE_ROLES, engine_origin
+    result = reproduce_package(store, package_id)
+    stamp = {"status": result["computational_reproducibility"], "package": package_id, "outputs": result["outputs"], "checked_at": store.clock()}
+    touched = []
+    with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
+        cur = tx.get(package_id)
+        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
+                               (package_id, cur["revision"])).fetchall()
+        tx.add_revision(object_id=package_id, object_type="KnowledgeItem", content={**cur["content"], "reproduction": stamp},
+                        edges=[(r[0], r[1], r[2], _json.loads(r[3])) for r in rows], origin=engine_origin("replication_reproduce", tx.actor_id))
+        for r in tx.conn.execute("SELECT object_id FROM object_heads WHERE object_type='MethodPlaybook' ORDER BY object_id").fetchall():
+            pb = tx.get(r[0])
+            els = [dict(e) for e in pb["content"].get("elements") or []]
+            hit = False
+            ids = {o["id"] for o in result["outputs"]}
+            for e in els:
+                linked = [o for o in e.get("replication_outputs") or [] if o in ids]
+                if linked:
+                    sts = [o["status"] for o in result["outputs"] if o["id"] in linked]
+                    e["computational_reproducibility"] = {"status": "FAILED_TO_REPRODUCE" if "FAILED" in sts else "REPRODUCED_WITHIN_TOLERANCE"
+                                                          if all(s == "REPRODUCED" for s in sts) else "RAN", "package": package_id,
+                                                          "outputs": linked, "checked_at": stamp["checked_at"]}
+                    hit = True
+            if hit:
+                prows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
+                                        (r[0], pb["revision"])).fetchall()
+                tx.add_revision(object_id=r[0], object_type="MethodPlaybook", content={**pb["content"], "elements": els},
+                                edges=[(x[0], x[1], x[2], _json.loads(x[3])) for x in prows], origin=engine_origin("replication_reproduce", tx.actor_id))
+                touched.append(r[0])
+    return {**result, "recorded_in": touched, "entitlement": entitlement_of(store.get_object(package_id)["content"])}
