@@ -1,12 +1,44 @@
 {
   "version": "1",
   "vocabularies": {
-    "knowledge_kind": ["verification_rule", "evidence_comparison_pattern", "analysis_script", "review_lesson", "checklist",
-                       "reading_protocol", "replication_package", "failure_record", "validity_assessment",
-                       "library_import_manifest"],
-    "source_fidelity": ["NOT_CHECKED", "QUOTE_VERIFIED", "MEANING_VERIFIED", "DISPUTED"],
-    "computational_reproducibility": ["NOT_ATTEMPTED", "NO_ASSETS", "RAN", "REPRODUCED_WITHIN_TOLERANCE", "FAILED_TO_REPRODUCE"],
-    "methodological_validity": ["NOT_ASSESSED", "CONTESTED", "PROVISIONAL", "SUPPORTED_WITHIN_SCOPE"],
-    "knowledge_lifecycle": ["ACTIVE", "RESTRICTED", "SUPERSEDED", "WITHDRAWN"]
+    "knowledge_kind": [
+      "verification_rule",
+      "evidence_comparison_pattern",
+      "analysis_script",
+      "review_lesson",
+      "checklist",
+      "reading_protocol",
+      "replication_package",
+      "failure_record",
+      "validity_assessment",
+      "library_import_manifest",
+      "reference_annotation",
+      "evaluation_record"
+    ],
+    "source_fidelity": [
+      "NOT_CHECKED",
+      "QUOTE_VERIFIED",
+      "MEANING_VERIFIED",
+      "DISPUTED"
+    ],
+    "computational_reproducibility": [
+      "NOT_ATTEMPTED",
+      "NO_ASSETS",
+      "RAN",
+      "REPRODUCED_WITHIN_TOLERANCE",
+      "FAILED_TO_REPRODUCE"
+    ],
+    "methodological_validity": [
+      "NOT_ASSESSED",
+      "CONTESTED",
+      "PROVISIONAL",
+      "SUPPORTED_WITHIN_SCOPE"
+    ],
+    "knowledge_lifecycle": [
+      "ACTIVE",
+      "RESTRICTED",
+      "SUPERSEDED",
+      "WITHDRAWN"
+    ]
   }
 }
