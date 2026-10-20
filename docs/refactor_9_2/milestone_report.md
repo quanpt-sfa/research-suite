@@ -6,6 +6,7 @@ _Generated from pytest results; no status is written by hand._
 |---|---|---|
 | M1 | Trustworthy core | PASS |
 | M2 | Knowledge infrastructure | PASS |
+| M3 | Pilot domain end-to-end | PASS |
 
 ## M1 — Trustworthy core (phases 0, 1, 2, 3A.1, 4.1)
 
@@ -24,3 +25,12 @@ _Generated from pytest results; no status is written by hand._
 | `tests/test_library_closure.py::test_project_reproduces_with_library_unavailable` | PASSED |
 | `tests/test_library_lifecycle.py::test_promotion_requires_three_dimensions_and_resolved_eca` | PASSED |
 | `tests/test_reading_protocols.py::test_extraction_runs_real_protocols_with_quote_verification` | PASSED |
+
+## M3 — Pilot domain end-to-end (phases 3B, 3C, 3D, 3E, 5a, 5b.replication)
+
+| Required integration test | Outcome |
+|---|---|
+| `tests/test_introduction_argument.py::test_3b_contribution_comparison_integrates_3c_output` | PASSED |
+| `tests/test_playbooks.py::test_extracted_and_reproduced_playbook_not_valid_by_default` | PASSED |
+| `tests/test_results_dag.py::test_diagnostic_concern_never_blocks_or_passes` | PASSED |
+| `tests/test_pilot_chain.py::test_pilot_chain_end_to_end_on_synthetic_fixture` | PASSED |

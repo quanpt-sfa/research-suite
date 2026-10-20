@@ -492,3 +492,239 @@ def register(sub: Any) -> None:
     q.add_argument("--type")
     _common(q, project=False, library=False, token=False)
     q.set_defaults(func=cmd_journal_policy_lookup)
+
+    register_m3(sub)
+
+
+# --------------------------------------------------------------------------------------------------
+# M3: literature, introduction argument, playbooks, plans, execution, replication, claim change
+# --------------------------------------------------------------------------------------------------
+
+def _ids(value: str) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def cmd_literature_run(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import literature
+    cli = _helpers()
+
+    def go():
+        return literature.run_literature(_store(args), cli._resolve_token(args), args.purpose, _ids(args.sources), _adapter(args), mode=args.mode,
+                                         search_protocol=_json_arg(args.search_protocol, "--search-protocol"),
+                                         screening_log=_json_arg(args.screening_log, "--screening-log"), max_input_tokens=args.budget, reuse=not args.no_cache)
+    return _run(args, go, lambda o: print(f"{o['purpose']} review of {len(o['sources'])} source(s) [{o['mode']}]: {o['extraction']['model_calls']} model call(s), "
+                                          f"{o['extraction']['reused']} reused  (run {o['run_id']})"))
+
+
+def cmd_intro_analyze(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import argument
+    return _run(args, lambda: argument.analyze_introduction(_store(args), _helpers()._resolve_token(args), args.source, _adapter(args),
+                                                            max_input_tokens=args.budget),
+                lambda o: print(f"{o['argument_id']}: {o['status']}" + (f"; missing: {', '.join(o['missing_components'])}" if o["missing_components"] else "")))
+
+
+def cmd_playbook_draft(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import literature, playbooks
+    cli = _helpers()
+
+    def go():
+        store, tok = _store(args), cli._resolve_token(args)
+        review = literature.run_literature(store, tok, "method", _ids(args.sources), _adapter(args), max_input_tokens=args.budget)
+        return playbooks.draft_playbook_from_methods(store, tok, review, playbook_id=args.id, label=args.label, scope=_json_arg(args.scope, "--scope"),
+                                                     exclusions=_json_arg(args.exclusions, "--exclusions"), replication_package=args.replication,
+                                                     replication_links=_json_arg(args.links, "--links"))
+    return _run(args, go, lambda o: print(f"{o['object_id']}: {o['elements']} element(s), {o['critical']} critical  {o['pin']}"))
+
+
+def cmd_playbook_select(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import playbooks
+
+    def text(rows):
+        for r in rows:
+            d = r["dimensions"]
+            print(f"  [{r['status']}] {r['item_id']}  fidelity={d['source_fidelity']} reproducibility={d['computational_reproducibility']} "
+                  f"validity here={d['methodological_validity_for_this_context']}")
+            for b in r["because"]:
+                print(f"      - {b}")
+            for q in r.get("questions", []):
+                print(f"      ? {q}")
+    return _run(args, lambda: playbooks.select_playbooks(_store(args), _json_arg(args.context, "--context") or {}), text)
+
+
+def cmd_plan_draft(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import playbooks
+    cli = _helpers()
+
+    def go():
+        store = _store(args)
+        plan = playbooks.draft_analysis_plan(store, args.playbook, plan_id=args.id, label=args.label, context=_json_arg(args.context, "--context") or {},
+                                             steps=_json_arg(args.steps, "--steps"), declared=_json_arg(args.declared, "--declared"))
+        if args.do_import:   # accepting the proposal is the researcher's act
+            return {"imported": playbooks.submit_operations(store, cli._resolve_token(args), plan["operations"], proposal_id=f"PROP_{args.id}"), **plan}
+        return plan
+    return _run(args, go)
+
+
+def cmd_plan_run(args: argparse.Namespace) -> int:
+    from research_harness.execution import dag
+    cli = _helpers()
+
+    def text(o):
+        for sid in o["order"]:
+            s = o["steps"].get(sid)
+            if s:
+                print(f"  {sid:<20} {s['execution']}" + (f"  blocked by {', '.join(s['blocked_by'])}" if s.get("blocked_by") else "")
+                      + (f"  signals {s['signals']}" if s.get("signals") else ""))
+    return _run(args, lambda: dag.run_plan(_store(args), cli._resolve_token(args), args.plan, args.workdir, only=args.only, from_step=args.from_step,
+                                           timeout=args.timeout), text)
+
+
+def cmd_plan_fidelity(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import playbooks
+    return _run(args, lambda: playbooks.fidelity_report(_store(args), args.plan))
+
+
+def cmd_replication_add(args: argparse.Namespace) -> int:
+    from research_harness.knowledge.replication import add_replication_package
+    return _run(args, lambda: add_replication_package(
+        _store(args), _helpers()._resolve_token(args), package_id=args.id, label=args.label, directory=args.directory, files=_ids(args.files),
+        expected_outputs=_json_arg(args.expected, "--expected"), source_id=args.source, entitlement=_json_arg(args.entitlement, "--entitlement")),
+        lambda o: print(f"{o['package_id']}: {o['files']} file(s), {o['bytes']} bytes; entitlement {o['entitlement']['status']}"))
+
+
+def cmd_replication_reproduce(args: argparse.Namespace) -> int:
+    from research_harness.knowledge.replication import record_reproduction
+    return _run(args, lambda: record_reproduction(_store(args), _helpers()._resolve_token(args), args.package),
+                lambda o: print(f"{o['item']}: {o['computational_reproducibility']} (recorded in: {', '.join(o['recorded_in']) or 'the package only'})"))
+
+
+def cmd_claim_assess(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import loop
+    return _run(args, lambda: loop.assess_claim_change(_store(args), _helpers()._resolve_token(args), args.claim, change_id=args.id,
+                                                       interpretation_ids=_ids(args.interpretations) if args.interpretations else None),
+                lambda o: print(f"{o['claim_id']}: {o['change'] or 'no change derived'} ({o['assessment']}) - {' '.join(o['because'])}"))
+
+
+def cmd_claim_confirm(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import loop
+    return _run(args, lambda: loop.confirm_claim_change(_store(args), _helpers()._resolve_token(args), args.change, rationale=args.rationale))
+
+
+def cmd_adjudicate_coverage(args: argparse.Namespace) -> int:
+    from research_harness.workflows import eca
+
+    def text(o):
+        print(f"HIGH: {o['high_adjudicated']}/{o['high_total']} adjudicated; STANDARD sample: {o['standard_sampled'] - len(o['sample_not_adjudicated'])}/{o['standard_sampled']}; "
+              f"{'complete' if o['complete'] else 'incomplete'}")
+        for s in o["high_not_adjudicated"] + o["sample_not_adjudicated"]:
+            print(f"  open: {s['object_id']}{'#' + s['element'] if s['element'] else ''} [{s['risk_tier']}]")
+    return _run(args, lambda: eca.coverage_report(_store(args), rate=args.rate), text)
+
+
+def register_m3(sub: Any) -> None:
+    p = sub.add_parser("literature", help="Literature engine: theory, method or contribution review of stored sources (calls a model)")
+    s = p.add_subparsers(dest="literature_cmd", required=True)
+    q = s.add_parser("run")
+    q.add_argument("--purpose", required=True, choices=["theory", "method", "contribution"])
+    q.add_argument("--sources", required=True, help="Comma-separated Source ids")
+    q.add_argument("--mode", default="narrative", choices=["narrative", "systematic"])
+    q.add_argument("--search-protocol", help="JSON or file (systematic mode)")
+    q.add_argument("--screening-log", help="JSON list or file (systematic mode)")
+    q.add_argument("--model")
+    q.add_argument("--budget", type=int, default=12000)
+    q.add_argument("--no-cache", action="store_true")
+    _common(q)
+    q.set_defaults(func=cmd_literature_run)
+
+    p = sub.add_parser("intro", help="Introduction argument analysis")
+    s = p.add_subparsers(dest="intro_cmd", required=True)
+    q = s.add_parser("analyze")
+    q.add_argument("--source", required=True)
+    q.add_argument("--model")
+    q.add_argument("--budget", type=int, default=12000)
+    _common(q)
+    q.set_defaults(func=cmd_intro_analyze)
+
+    p = sub.add_parser("playbook", help="Method playbooks")
+    s = p.add_subparsers(dest="playbook_cmd", required=True)
+    q = s.add_parser("draft", help="Method review of the sources, then a draft playbook (EXTRACTED: nothing validated)")
+    q.add_argument("--sources", required=True)
+    q.add_argument("--id", required=True)
+    q.add_argument("--label", required=True)
+    q.add_argument("--scope", help="JSON or file")
+    q.add_argument("--exclusions", help="JSON list or file")
+    q.add_argument("--replication", help="Replication package item id")
+    q.add_argument("--links", help="JSON {category: [output ids]}")
+    q.add_argument("--model")
+    q.add_argument("--budget", type=int, default=12000)
+    _common(q)
+    q.set_defaults(func=cmd_playbook_draft)
+    q = s.add_parser("select", help="Playbooks for a project context, ranked and justified")
+    q.add_argument("--context", help="JSON or file: scope, estimand, measurement, assumptions, conditions, facts")
+    _common(q, token=False)
+    q.set_defaults(func=cmd_playbook_select)
+
+    p = sub.add_parser("plan", help="Analysis plans: draft as a proposal, run the execution DAG, report fidelity")
+    s = p.add_subparsers(dest="plan_cmd", required=True)
+    q = s.add_parser("draft")
+    q.add_argument("--playbook", required=True)
+    q.add_argument("--id", required=True)
+    q.add_argument("--label", required=True)
+    q.add_argument("--context", required=True, help="JSON or file")
+    q.add_argument("--steps", required=True, help="JSON list or file")
+    q.add_argument("--declared", help="JSON or file: sesoi, alpha, basis")
+    q.add_argument("--import", dest="do_import", action="store_true", help="Import the proposal (the researcher accepting it)")
+    _common(q)
+    q.set_defaults(func=cmd_plan_draft)
+    q = s.add_parser("run", help="Run the plan's commands in a working directory (owner token)")
+    q.add_argument("plan")
+    q.add_argument("--workdir", required=True)
+    q.add_argument("--only")
+    q.add_argument("--from-step")
+    q.add_argument("--timeout", type=int, default=600)
+    _common(q)
+    q.set_defaults(func=cmd_plan_run)
+    q = s.add_parser("fidelity", help="What the plan rests on, what was inherited/adapted/added/omitted, and how the runs went")
+    q.add_argument("plan")
+    _common(q, token=False)
+    q.set_defaults(func=cmd_plan_fidelity)
+
+    p = sub.add_parser("replication", help="Replication packages")
+    s = p.add_subparsers(dest="replication_cmd", required=True)
+    q = s.add_parser("add")
+    q.add_argument("--id", required=True)
+    q.add_argument("--label", required=True)
+    q.add_argument("--directory", required=True)
+    q.add_argument("--files", required=True, help="Comma-separated paths relative to the directory")
+    q.add_argument("--expected", help="JSON list or file of expected outputs")
+    q.add_argument("--source")
+    q.add_argument("--entitlement", help="JSON: status (unspecified|declared|confirmed), license, basis")
+    _common(q)
+    q.set_defaults(func=cmd_replication_add)
+    q = s.add_parser("reproduce")
+    q.add_argument("package")
+    _common(q)
+    q.set_defaults(func=cmd_replication_reproduce)
+
+    p = sub.add_parser("claim-change", help="Claim change from the interpretation layer (HIGH risk; provisional until confirmed)")
+    s = p.add_subparsers(dest="claim_cmd", required=True)
+    q = s.add_parser("assess")
+    q.add_argument("--claim", required=True)
+    q.add_argument("--id", required=True)
+    q.add_argument("--interpretations", help="Comma-separated interpretation ids (default: all)")
+    _common(q)
+    q.set_defaults(func=cmd_claim_assess)
+    q = s.add_parser("confirm")
+    q.add_argument("change")
+    q.add_argument("--rationale", required=True)
+    _common(q)
+    q.set_defaults(func=cmd_claim_confirm)
+
+    # attached to the existing `adjudicate` group
+    for name, action in sub.choices.items():
+        if name == "adjudicate":
+            for sp in action._subparsers._group_actions:
+                q = sp.add_parser("coverage", help="Where the 100%% HIGH / stratified 20%% STANDARD policy stands")
+                q.add_argument("--rate", type=float, default=0.2)
+                _common(q, token=False)
+                q.set_defaults(func=cmd_adjudicate_coverage)
