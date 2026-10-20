@@ -115,6 +115,64 @@ class TokenBudget:
         return asdict(self)
 
 
+# --------------------------------------------------------------------------------------------------
+# Prompt rendering primitives. The budgeter (context.py) costs exactly these strings, so what is counted is
+# what the model receives.
+# --------------------------------------------------------------------------------------------------
+
+def render_object_line(obj: dict[str, Any]) -> str:
+    content_str = json.dumps(obj.get("content", {}), sort_keys=True, ensure_ascii=False)
+    return f"- [{obj.get('object_type')}] {obj.get('object_id')} (rev {obj.get('revision')}): {content_str}"
+
+
+def render_excerpt_block(exc: dict[str, Any]) -> str:
+    pid = exc.get("passage_id") or exc.get("object_id") or "UNKNOWN_PASSAGE"
+    rev = exc.get("revision", 1)
+    sid = exc.get("source_id", "UNKNOWN_SOURCE")
+    loc = exc.get("locator") or "MISSING_LOCATOR"
+    quote = exc.get("excerpt") or exc.get("quote") or exc.get("normalized_claim") or ""
+    text = f"- [{pid}:rev{rev}] (Source: {sid}, Locator: {loc}):\n  \"{quote}\""
+    claim = exc.get("normalized_claim")
+    if claim and claim != quote:
+        text += f"\n  Normalized claim: {claim}"
+    other = exc.get("other_fields")
+    if other:
+        text += f"\n  Other fields: {json.dumps(other, sort_keys=True, ensure_ascii=False)}"
+    return text
+
+
+def render_fulltext_block(ft: dict[str, Any]) -> str:
+    oid = ft.get("object_id") or ft.get("source_id") or "UNKNOWN_DOC"
+    status = ft.get("fulltext_status", "FULLTEXT_LOADED")
+    text = ft.get("full_text")
+    if text:
+        return f"### {oid} (Status: {status})\n{text}"
+    if status == "FULLTEXT_DEFERRED":
+        return (f"### {oid} (Status: {status})\n[Full text not loaded into context: {ft.get('chars')} characters "
+                f"(sha256 {str(ft.get('sha256'))[:16]}); read it in pages with get_fulltext_page('{oid}', offset=..., limit=...)]")
+    return f"### {oid} (Status: {status})\n[Full text not loaded into context: {status}]"
+
+
+def render_comparison_block(entries: Sequence[dict[str, Any]]) -> str:
+    """Side-by-side block for a prompt: one sub-block per source, each span with its locator."""
+    if not entries:
+        return ""
+    lines = [f"\n## Comparison: {entries[0]['dimension']}"]
+    for e in entries:
+        lines.append(f"### {e['source_id']}@{e['revision']} ({e['citation_key']}) - {e['status']}")
+        if e["status"] == "NO_FULLTEXT":
+            lines.append(f"[No stored full text: {e.get('reason')}]")
+        elif e["status"] == "NO_MATCHING_SECTION":
+            labels = ", ".join(sorted({a['label'] for a in e["available_sections"]})) or "none"
+            lines.append(f"[No section matches this dimension. Sections found: {labels}]")
+        for b in e["blocks"]:
+            tail = f" [TRUNCATED; resume at char {b['next_offset']}]" if b["truncated"] else ""
+            lines.append(f"[{b['locator']}] {b['heading'] or b['label']}{tail}\n{b['text']}")
+        for u in e["unread_sections"]:
+            lines.append(f"[Not read: {u['label']} '{u['heading']}' chars {u['char_start']}:{u['char_end']}]")
+    return "\n".join(lines)
+
+
 @dataclass
 class ContextPackage:
     """Structured context package produced by the shared Context Builder."""
@@ -136,6 +194,18 @@ class ContextPackage:
     skill_instructions: str = ""
     skill_digest: str = ""
     selection_strategy: Optional[str] = None
+    # Edges between the objects in this package ({source_id, source_revision, relation, target_id, target_revision}).
+    # Executors read relations from here instead of inferring them from wording.
+    relations: list[dict[str, Any]] = field(default_factory=list)
+    # FULL | PARTIAL_T2 (background omitted) | PARTIAL_T1 (relevant evidence omitted) | INSUFFICIENT (must-have omitted).
+    coverage: str = "FULL"
+    # COMPLETE | PARTIAL | INSUFFICIENT (values of ContextStatus).
+    context_status: str = "COMPLETE"
+    # Section-aligned reads of several sources for one comparison dimension (comparison.compare_sources).
+    comparisons: list[dict[str, Any]] = field(default_factory=list)
+    # Claims the package is about: the explicit focus claims, else the claims connected to the research question.
+    # (`focus_claims` stays the explicit list only.)
+    scope_claims: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -187,31 +257,23 @@ class ContextPackage:
         if self.skill_instructions:
             skill.append(f"\n## Operational Skill Instructions:\n{self.skill_instructions.strip()}")
 
+        excerpt_keys = {(e.get("passage_id"), e.get("revision")) for e in self.excerpts}
         parts = ["\n## Selected Objects:"]
         for obj in self.objects:
-            content_str = json.dumps(obj.get("content", {}), sort_keys=True, ensure_ascii=False)
-            parts.append(f"- [{obj.get('object_type')}] {obj.get('object_id')} (rev {obj.get('revision')}): {content_str}")
+            if obj.get("object_type") == "EvidencePassage" and (obj.get("object_id"), obj.get("revision")) in excerpt_keys:
+                continue  # rendered once, in the evidence excerpts below
+            parts.append(render_object_line(obj))
 
         if self.excerpts:
             parts.append("\n## Evidence Excerpts:")
-            for exc in self.excerpts:
-                pid = exc.get("passage_id") or exc.get("object_id") or "UNKNOWN_PASSAGE"
-                rev = exc.get("revision", 1)
-                sid = exc.get("source_id", "UNKNOWN_SOURCE")
-                loc = exc.get("locator") or "MISSING_LOCATOR"
-                quote = exc.get("excerpt") or exc.get("quote") or exc.get("normalized_claim") or ""
-                parts.append(f"- [{pid}:rev{rev}] (Source: {sid}, Locator: {loc}):\n  \"{quote}\"")
+            parts.extend(render_excerpt_block(exc) for exc in self.excerpts)
 
         if self.full_texts:
             parts.append("\n## Expanded Full Texts:")
-            for ft in self.full_texts:
-                oid = ft.get("object_id") or ft.get("source_id") or "UNKNOWN_DOC"
-                status = ft.get("fulltext_status", "FULLTEXT_LOADED")
-                text = ft.get("full_text")
-                if text:
-                    parts.append(f"### {oid} (Status: {status})\n{text}")
-                else:
-                    parts.append(f"### {oid} (Status: {status})\n[Full text not loaded into context: {status}]")
+            parts.extend(render_fulltext_block(ft) for ft in self.full_texts)
+
+        if self.comparisons:
+            parts.append(render_comparison_block(self.comparisons))
         return header, skill, parts
 
     @property

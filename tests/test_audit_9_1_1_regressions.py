@@ -350,7 +350,6 @@ def _passages(proj, n=6):
                        {"locator": f"p.{i}", "quote": f"Passage {i} " + "evidence " * 60}, [dep("RQ_TEST")]) for i in range(1, n + 1)])
 
 
-@xfail("P1-2 (D3)")
 @pytest.mark.parametrize("budget", [900, 1300])
 def test_d3_assembled_prompt_fits_the_budget(proj, budget):
     _passages(proj)
@@ -358,7 +357,6 @@ def test_d3_assembled_prompt_fits_the_budget(proj, budget):
     assert estimate_tokens(ctx.formatted_prompt)[0] <= budget
 
 
-@xfail("P1-2 (D3b)")
 def test_d3b_large_full_text_never_drops_the_whole_source(proj):
     add(proj, rq(),
         ("SRC_BIG", "Source", {"citation_key": "Big2020", "abstract": "Important competitor.", "full_text": "Lorem ipsum. " * 20000},
@@ -368,14 +366,12 @@ def test_d3b_large_full_text_never_drops_the_whole_source(proj):
     assert "SRC_BIG" in [o["object_id"] for o in ctx.objects]
 
 
-@xfail("P1-2 (A4-dup)")
 def test_a4_evidence_text_appears_once_in_the_prompt(proj):
     _passages(proj, 2)
     ctx = build_context(proj[0], "contribution", research_question_id="RQ_TEST", max_input_tokens=100000)
     assert ctx.formatted_prompt.count("Passage 1 evidence") == 1
 
 
-@xfail("P0-4 (D4b)")
 def test_d4b_contribution_sees_rq_linked_sources(proj):
     add(proj, rq(),
         ("SRC_F", "Source", {"citation_key": "Full2021", "abstract": "abs", "full_text": "FULLBODY " * 50}, [dep("RQ_TEST")]))
@@ -383,7 +379,6 @@ def test_d4b_contribution_sees_rq_linked_sources(proj):
     assert [o for o in ctx.objects if o["object_type"] == "Source"]
 
 
-@xfail("P0-5 (D5b)")
 def test_d5b_explicit_research_question_scopes_claims(proj):
     add(proj, rq("RQ_A", "Board independence and restatements"), rq("RQ_B", "Teacher feedback and student motivation"),
         ("CLAIM_B", "Claim", {"text": "Feedback raises motivation.", "claim_tier": "associational"}, [dep("RQ_B")]),
@@ -424,7 +419,6 @@ def test_e4_budget_value_alone_does_not_invalidate_when_selection_is_identical(p
     assert run(proj, "literature", reuse_cached=True, max_input_tokens=12001).status == "REUSED"
 
 
-@xfail("P1-4 (E-unrelated)")
 def test_e_unrelated_claim_under_another_question_does_not_invalidate_any_workflow(proj):
     seed_all(proj)
     for wf in WORKFLOWS:
@@ -434,7 +428,6 @@ def test_e_unrelated_claim_under_another_question_does_not_invalidate_any_workfl
     assert all(run(proj, wf, reuse_cached=True).status == "REUSED" for wf in WORKFLOWS)
 
 
-@xfail("P0-4 (E6)")
 def test_e6_new_contradictory_passage_on_an_rq_linked_source_invalidates_contribution(proj):
     seed_all(proj)
     run(proj, "contribution", reuse_cached=True)
@@ -500,7 +493,6 @@ def test_f3_identical_request_is_reused_after_cache_files_are_deleted(proj):
 # G — benchmark honesty
 # ==================================================================================================
 
-@xfail("P1-5 (G3-missing)")
 def test_g3_benchmark_required_competitor_source_is_retained(tmp_path):
     from tests.benchmark_fixture import populate_benchmark_project
     store, token = StateStore.create(tmp_path / "bench", "PRJ_BENCH")

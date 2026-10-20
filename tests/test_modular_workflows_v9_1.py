@@ -530,7 +530,12 @@ def test_benchmark_performance_evaluation(tmp_path):
     # Assertions on Benchmark Metrics
     assert baseline["context_objects"] >= 40
     assert candidate["context_objects"] < baseline["context_objects"]
-    assert comp["object_reduction_percent"] > 50.0
+    # Selection follows relevance to the research question, not a compression target (audit P0-4): every paper
+    # linked to the question is evidence for a novelty assessment, so the contribution context keeps all 40
+    # sources and their passages. The object count is therefore close to the full project; the saving that
+    # remains is in tokens and bytes (below), not in dropping competitors.
+    assert comp["object_reduction_percent"] >= 0.0
+    assert candidate["evidence_passages_count"] == 40
 
     # Byte and Token reductions
     assert comp["byte_savings_percent"] > 50.0

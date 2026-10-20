@@ -219,7 +219,7 @@ def _execute_model_step(
     request_tokens, token_basis = adapter_token_count(adapter, system_prompt, user_prompt)
     provenance = [{"object_id": o["object_id"], "revision": o["revision"]} for o in context.objects]
     omitted = tuple(f"{o.get('object_id')}@{o.get('revision')}" for o in context.omitted_items)
-    ctx_status = ContextStatus.COMPLETE if context.budget_status == "OK" else ContextStatus.PARTIAL
+    ctx_status = ContextStatus(context.context_status)
 
     def elapsed() -> int:
         return int((time.time() - start_time) * 1000)
@@ -236,16 +236,23 @@ def _execute_model_step(
             metadata={"model_backed": True, "model_id": model_id, "model": identity,
                       "request_tokens": request_tokens, "token_count_basis": token_basis, **meta})
 
-    # Never send a request that does not fit, whatever allow_incomplete says (I4).
+    # Never send a request that does not fit, nor one missing must-have evidence, whatever allow_incomplete says
+    # (I4). Relevant-but-omitted evidence (PARTIAL_T1) needs allow_incomplete; omitted background (PARTIAL_T2) does not.
     overflow = request_tokens > max_input_tokens
-    if overflow or (context.budget_status != "OK" and not allow_incomplete):
-        reason = (f"assembled request is {request_tokens} tokens ({token_basis}) against max_input_tokens="
-                  f"{max_input_tokens}" if overflow else
-                  "selected context is incomplete (evidence omitted for budget) and allow_incomplete is False")
+    insufficient = ctx_status is ContextStatus.INSUFFICIENT
+    needs_consent = context.coverage == "PARTIAL_T1" and not allow_incomplete
+    if overflow or insufficient or needs_consent:
+        if overflow:
+            reason = (f"assembled request is {request_tokens} tokens ({token_basis}) against max_input_tokens="
+                      f"{max_input_tokens}")
+        elif insufficient:
+            reason = "must-have evidence (the question, the claims under assessment or the evidence linked to them) does not fit the budget"
+        else:
+            reason = "relevant evidence was omitted for budget and allow_incomplete is False"
         result = {"refused": True, "reason": reason, "request_tokens": request_tokens,
                   "max_input_tokens": max_input_tokens, "token_count_basis": token_basis,
                   "omitted_items": context.omitted_items, "continuation_plan": context.continuation_plan}
-        axes = Status(ExecutionStatus.NOT_RUN, ContextStatus.INSUFFICIENT if overflow else ctx_status,
+        axes = Status(ExecutionStatus.NOT_RUN, ContextStatus.INSUFFICIENT if (overflow or insufficient) else ctx_status,
                       AssessmentStatus.NOT_ASSESSED, Applicability.APPLICABLE, reason="budget_refused", omissions=omitted)
         return build("INCOMPLETE_CONTEXT", result, no_call_usage(), axes,
                      ["Model call refused: the request would exceed the input budget or rest on omitted evidence."])

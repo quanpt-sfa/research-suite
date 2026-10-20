@@ -66,10 +66,10 @@ def execute_contribution_workflow(
                 if "fail" in s.lower() or "not significant" in s.lower() or "persist" in s.lower():
                     discussion_tensions.append(s)
 
-    # Differentiate focus claims from baseline literature claims
-    focus_claims = [c for c in claims if c["object_id"] in context.focus_claims]
-    if not focus_claims and claims:
-        focus_claims = [claims[0]]  # Default to primary claim if no focus set
+    # Claims under assessment: the explicit focus claims, else every claim the context builder scoped to the
+    # research question. No claim is silently chosen as "primary".
+    assessed_ids = set(context.focus_claims or context.scope_claims)
+    focus_claims = [c for c in claims if c["object_id"] in assessed_ids]
 
     competing_literature = [c for c in claims if c["object_id"] not in {fc["object_id"] for fc in focus_claims}]
 

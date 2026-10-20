@@ -1,0 +1,37 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "section_label": ["preamble", "abstract", "introduction", "theory_hypotheses", "data_sample", "measurement", "method",
+                      "results", "robustness", "limitations", "discussion_conclusion", "references", "other"],
+    "comparison_dimension": ["introduction_argument", "theory", "sample_construction", "measurement", "design",
+                             "results", "robustness", "limitations", "conclusion"]
+  },
+  "hierarchies": {
+    "section_headings": {
+      "abstract": ["abstract"],
+      "introduction": ["introduction", "background and motivation", "motivation"],
+      "robustness": ["robustness", "additional analyses", "additional analysis", "additional tests", "sensitivity", "falsification", "placebo"],
+      "limitations": ["limitations", "threats to validity", "caveats"],
+      "theory_hypotheses": ["theory", "theoretical background", "theoretical framework", "literature review", "related literature",
+                            "prior literature", "hypothesis development", "hypotheses", "conceptual framework", "background"],
+      "measurement": ["variable definitions", "variable measurement", "variables", "measurement", "measures", "operationalization"],
+      "data_sample": ["data and sample", "sample and data", "data", "sample selection", "sample construction", "sample", "participants"],
+      "results": ["empirical results", "main results", "results", "findings"],
+      "method": ["research design", "empirical design", "empirical strategy", "empirical approach", "methodology", "methods", "method",
+                 "identification strategy", "identification", "model specification", "specification", "estimation", "procedure"],
+      "discussion_conclusion": ["discussion", "conclusions", "conclusion", "concluding remarks", "implications", "summary"],
+      "references": ["references", "bibliography"]
+    },
+    "comparison_dimensions": {
+      "introduction_argument": ["abstract", "introduction"],
+      "theory": ["theory_hypotheses", "introduction"],
+      "sample_construction": ["data_sample"],
+      "measurement": ["measurement", "data_sample"],
+      "design": ["method"],
+      "results": ["results"],
+      "robustness": ["robustness"],
+      "limitations": ["limitations", "discussion_conclusion"],
+      "conclusion": ["discussion_conclusion"]
+    }
+  }
+}
