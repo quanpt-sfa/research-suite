@@ -31,6 +31,13 @@ from research_harness.workflows.adapters import (
     adapter_token_count,
 )
 from research_harness.workflows.context import build_context
+from research_harness.workflows.domain_engine import (
+    DomainWorkflowSpec,
+    StageEvaluation,
+    facts_from_store,
+    resolve_spec,
+    stage_status,
+)
 from research_harness.workflows.contracts import ContextPackage, TaskUsage, WorkflowOutput
 from research_harness.workflows.instrumentation import UsageTracker
 from research_harness.workflows.model_io import (
@@ -227,7 +234,8 @@ def _execute_model_step(
     identity = adapter_identity(adapter)
     model_id = identity.get("model_id") or getattr(adapter, "model_id", None)
     schema = output_schema(workflow)
-    system_prompt = build_system_prompt(workflow, context.skill_instructions, schema)
+    system_prompt = build_system_prompt(workflow, context.skill_instructions, schema,
+                                        domain_instructions=context.domain_instructions)
     user_prompt = context.formatted_user_prompt
     request_tokens, token_basis = adapter_token_count(adapter, system_prompt, user_prompt)
     # The exact request that is (or would have been) sent, for audit and replay.
@@ -359,7 +367,8 @@ def _axes_columns(axes: Status) -> dict[str, Any]:
 
 def _register_run(store: StateStore, output: WorkflowOutput, context: ContextPackage, fingerprint: str, *,
                   executor: str, model_descriptor: Optional[dict], upstream_run_ids: list[str],
-                  reused_from_run_id: Optional[str] = None, artifact_sha256: Optional[str] = None) -> str:
+                  reused_from_run_id: Optional[str] = None, artifact_sha256: Optional[str] = None,
+                  domain_pin: Optional[str] = None, domain_step_id: Optional[str] = None) -> str:
     """Append the run to the registry (and store its context manifest). Failure is an error."""
     try:
         manifest_sha = store.artifacts.put(json.dumps(
@@ -380,6 +389,7 @@ def _register_run(store: StateStore, output: WorkflowOutput, context: ContextPac
             "artifact_sha256": artifact_sha256 or output.metadata.get("artifact_sha256"),
             "legacy_status": output.status, "usage": output.usage.to_dict(),
             "reused_from_run_id": reused_from_run_id, "parent_run_id": parent, "upstream_run_ids": upstream_run_ids,
+            "domain_workflow_pin": domain_pin, "domain_step_id": domain_step_id,
             **_axes_columns(output.axes),
         }
         run_id = workflow_runs.append_run(store, row)
@@ -392,7 +402,8 @@ def _register_run(store: StateStore, output: WorkflowOutput, context: ContextPac
 
 def _try_reuse(store: StateStore, row: dict[str, Any], *, workflow: str, task_id: Optional[str], context: ContextPackage,
                fingerprint: str, tracker: UsageTracker, executor: str, model_descriptor: Optional[dict],
-               upstream_run_ids: list[str]) -> Optional[WorkflowOutput]:
+               upstream_run_ids: list[str], domain_pin: Optional[str] = None,
+               domain_step_id: Optional[str] = None) -> Optional[WorkflowOutput]:
     """Serve a stored run if its output still verifies; otherwise None (the caller recomputes)."""
     sha = row.get("artifact_sha256")
     if not sha or not store.artifacts.has(sha) or not store.artifacts.verify(sha):
@@ -415,8 +426,50 @@ def _try_reuse(store: StateStore, row: dict[str, Any], *, workflow: str, task_id
                   "reused_from_run_id": row["run_id"]},
         status_axes=stored.axes)  # all four axes exactly as stored (reuse is not a status)
     _register_run(store, out, context, fingerprint, executor=executor, model_descriptor=model_descriptor,
-                  upstream_run_ids=upstream_run_ids, reused_from_run_id=row["run_id"], artifact_sha256=sha)
+                  upstream_run_ids=upstream_run_ids, reused_from_run_id=row["run_id"], artifact_sha256=sha,
+                  domain_pin=domain_pin, domain_step_id=domain_step_id)
     return out
+
+
+def _research_question_content(store: StateStore, research_question_id: Optional[str]) -> dict[str, Any]:
+    """Content of the named research question, or of the project's only one; {} otherwise (never raises)."""
+    with store.read() as conn:
+        if research_question_id:
+            obj = store.get_object(research_question_id, conn=conn)
+            return (obj or {}).get("content") or {} if (obj or {}).get("object_type") == "ResearchQuestion" else {}
+        rows = conn.execute("SELECT object_id FROM object_heads WHERE object_type='ResearchQuestion'").fetchall()
+        return (store.get_object(rows[0][0], conn=conn) or {}).get("content") or {} if len(rows) == 1 else {}
+
+
+def _stage_gate(spec: DomainWorkflowSpec, store: StateStore, workflow: str, research_question_id: Optional[str]) -> StageEvaluation:
+    """Is this stage applicable to the study, and are its entry conditions met? Facts are read only when the spec has
+    a rule that needs them (the generic spec has none)."""
+    st = spec.stages[workflow]
+    if not spec.study_designs and not st.entry_conditions and st.applicable is True:
+        return StageEvaluation(workflow, Applicability.APPLICABLE, None, True, [])
+    return stage_status(spec, facts_from_store(store, research_question_id=research_question_id), workflow)
+
+
+def _gate_output(spec: DomainWorkflowSpec, workflow: str, task_id: Optional[str], state_store: StateStore,
+                 gate: StageEvaluation, context: ContextPackage, start_time: float) -> WorkflowOutput:
+    """A stage that does not apply, or whose entry conditions are unmet, is not run and is not an error."""
+    tid = task_id or f"TASK_{workflow.upper()}_{'NA' if gate.applicability is Applicability.NOT_APPLICABLE else 'BLOCKED'}"
+    usage = TaskUsage(workflow=workflow, task_id=tid, llm_calls=0, context_objects=0, usage_source="not_available",
+                      elapsed_ms=int((time.time() - start_time) * 1000))
+    if gate.applicability is Applicability.NOT_APPLICABLE:
+        result = {"stage": workflow, "applicability": "NOT_APPLICABLE", "justification": gate.justification,
+                  "domain_workflow": spec.pin}
+        axes = Status(ExecutionStatus.NOT_RUN, ContextStatus.COMPLETE, AssessmentStatus.NOT_ASSESSED,
+                      Applicability.NOT_APPLICABLE, reason="not_applicable")
+        return WorkflowOutput(workflow=workflow, task_id=tid, project_id=state_store.project_id, status="NOT_APPLICABLE",
+                              result=result, usage=usage, status_axes=axes,
+                              notes=[f"Stage '{workflow}' does not apply under {spec.id}: {gate.justification}"])
+    result = {"stage": workflow, "unmet_entry_conditions": gate.unmet_entry, "domain_workflow": spec.pin}
+    axes = Status(ExecutionStatus.BLOCKED, ContextStatus.INSUFFICIENT, AssessmentStatus.NOT_ASSESSED,
+                  Applicability.APPLICABLE, reason="entry_conditions_unmet")
+    return WorkflowOutput(workflow=workflow, task_id=tid, project_id=state_store.project_id, status="BLOCKED",
+                          result=result, usage=usage, status_axes=axes,
+                          notes=[f"Stage '{workflow}' is blocked under {spec.id}: " + "; ".join(gate.unmet_entry)])
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -443,6 +496,7 @@ def run_workflow(
     upstream_artifacts: Optional[list[Any]] = None,
     model_adapter: Optional[Any] = None,
     allow_incomplete: bool = False,
+    domain_workflow: Any = None,
     **kwargs: Any,
 ) -> WorkflowOutput:
     """Run an individual research workflow with selective context, optional artifact reuse, and model adapter support.
@@ -450,6 +504,11 @@ def run_workflow(
     With `model_adapter`, the workflow is executed by the model (see module docstring); `allow_incomplete` lets a
     request go out when low-priority evidence was omitted for budget, but never when the request itself exceeds
     `max_input_tokens`.
+
+    `domain_workflow` (a spec, a spec dict or a built-in id; default: the research question's `domain_workflow` field,
+    else the generic workflow) decides whether the stage applies to the study and whether its entry conditions are
+    met. A stage that does not apply is `NOT_APPLICABLE` (not run, not an error); one whose conditions are unmet is
+    `BLOCKED`. The spec's instruction fragment for the stage joins the model's system prompt.
     """
     start_time = time.time()
     if isinstance(arg1, StateStore):
@@ -492,6 +551,9 @@ def run_workflow(
     with state_store.read() as conn:
         workflow_runs.require_registry(conn)
 
+    spec = resolve_spec(domain_workflow, research_question_content=_research_question_content(state_store, research_question_id))
+    gate = _stage_gate(spec, state_store, canonical_wf, research_question_id)
+
     # Build selective context package
     context = build_context(
         state_store,
@@ -503,9 +565,12 @@ def run_workflow(
         fulltext_sources=fulltext_sources,
         history_policy=history_policy,  # type: ignore
         discipline_profile=profile,
+        domain_instructions=spec.stage_instructions(canonical_wf),
+        domain_workflow_pin=spec.pin,
     )
 
     fingerprint_config = dict(combined_extra)
+    fingerprint_config["domain_workflow"] = {"id": spec.id, "version": spec.version, "stage_digest": spec.stage_digest(canonical_wf)}
     if adapter is not None:
         fingerprint_config["model_adapter"] = adapter
         fingerprint_config["allow_incomplete"] = allow_incomplete
@@ -515,6 +580,19 @@ def run_workflow(
     model_descriptor = None if adapter is None else adapter_identity(adapter)
     upstream_ids = _upstream_run_ids(upstream_artifacts or [])
 
+    assess_steps = [st.id for st in spec.steps if st.stage == canonical_wf and st.kind == "assess"]
+    step_id = assess_steps[0] if len(assess_steps) == 1 else None  # a stage run completes its only assessment step
+
+    # 0. Stage gate: not applicable / entry conditions unmet. Evaluated before any reuse, never cached.
+    if gate.applicability is Applicability.NOT_APPLICABLE or gate.blocked:
+        output = _gate_output(spec, canonical_wf, task_id, state_store, gate, context, start_time)
+        output.input_fingerprint = fingerprint
+        _persist_output(state_store, output)
+        _register_run(state_store, output, context, fingerprint, executor=f"domain_gate@{spec.id}", model_descriptor=None,
+                      upstream_run_ids=upstream_ids, domain_pin=spec.pin)
+        tracker.record_task(output.usage)
+        return output
+
     # 1. Reuse a stored run (the registry decides what is reusable: complete, verified, non-legacy outputs only)
     if reuse_cached:
         with state_store.read() as conn:
@@ -522,7 +600,8 @@ def run_workflow(
         if row is not None:
             reused = _try_reuse(state_store, row, workflow=canonical_wf, task_id=task_id, context=context,
                                 fingerprint=fingerprint, tracker=tracker, executor=executor_label,
-                                model_descriptor=model_descriptor, upstream_run_ids=upstream_ids)
+                                model_descriptor=model_descriptor, upstream_run_ids=upstream_ids,
+                                domain_pin=spec.pin, domain_step_id=step_id)
             if reused is not None:
                 return reused
 
@@ -539,7 +618,8 @@ def run_workflow(
     # 3. Persist (CAS), register the run, record instrumentation
     _persist_output(state_store, output)
     _register_run(state_store, output, context, fingerprint, executor=executor_label,
-                  model_descriptor=model_descriptor, upstream_run_ids=upstream_ids)
+                  model_descriptor=model_descriptor, upstream_run_ids=upstream_ids, domain_pin=spec.pin,
+                  domain_step_id=step_id if output.axes.execution is ExecutionStatus.SUCCEEDED else None)
     tracker.record_task(output.usage)
     return output
 

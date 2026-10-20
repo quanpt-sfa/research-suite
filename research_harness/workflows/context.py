@@ -160,6 +160,8 @@ def build_context(
     discipline_profile: Optional[str] = None,
     comparison_dimension: Optional[str] = None,
     comparison_sources: Optional[Sequence[str]] = None,
+    domain_instructions: Optional[str] = None,
+    domain_workflow_pin: Optional[str] = None,
 ) -> ContextPackage:
     """Build a selective, token-budgeted, deduplicated context package for a specific workflow."""
     canonical_wf = workflow.strip().lower()
@@ -314,7 +316,7 @@ def build_context(
             pass
 
     # ---- 6. budget -------------------------------------------------------------------------------------
-    system_prompt = build_system_prompt(canonical_wf, skill_instructions)
+    system_prompt = build_system_prompt(canonical_wf, skill_instructions, domain_instructions=domain_instructions)
     skeleton = _package(store, canonical_wf, rq=research_question_resolved, focus=sorted(focus_claim_set),
                         strategy=strategy, skill_instructions=skill_instructions, skill_digest=skill_digest,
                         profile=profile_data, budget=max_input_tokens)
@@ -373,6 +375,7 @@ def build_context(
     package.contradictory_evidence_count = len([e for e in entries if e.included and e.oid in contradictory_ids])
     package.manifest = _manifest(package, entries, omitted, deferred, contradictory_ids, max_input_tokens, request_tokens,
                                  reserved, profile_data, system_prompt)
+    package.domain_instructions, package.domain_workflow_pin = domain_instructions, domain_workflow_pin
     package.scope_claims = list(claim_ids_in_scope)
     package.verified_runs = _verified_execution_runs(store)
     package.estimated_tokens = request_tokens

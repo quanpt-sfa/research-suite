@@ -642,6 +642,53 @@ def _runs_store(args: argparse.Namespace) -> StateStore:
     return _resolve_store(_resolve_project_id(args), getattr(args, "home", None))
 
 
+def _load_domain_spec(ref: Optional[str]) -> Any:
+    from research_harness.workflows.domain_engine import DomainWorkflowSpec, GENERIC_SPEC_ID, load_builtin_spec
+    if ref and Path(ref).is_file():
+        return DomainWorkflowSpec.from_dict(json.loads(Path(ref).read_text(encoding="utf-8")))
+    return load_builtin_spec(ref or GENERIC_SPEC_ID)
+
+
+def cmd_domain_list(args: argparse.Namespace) -> int:
+    from research_harness.workflows.domain_engine import list_builtin_specs, load_builtin_spec
+    specs = [load_builtin_spec(i) for i in list_builtin_specs()]
+    if args.json:
+        _json_out({"domain_workflows": [{"id": s.id, "version": s.version, "domain": s.domain, "subfield": s.subfield,
+                                         "study_designs": list(s.study_designs), "validation_status": s.validation_status,
+                                         "steps": len(s.steps)} for s in specs]})
+    else:
+        for s in specs:
+            print(f"  {s.id} v{s.version}  [{s.domain}/{s.subfield or '-'}]  designs={list(s.study_designs) or 'any'}  "
+                  f"steps={len(s.steps)}  status={s.validation_status}")
+    return 0
+
+
+def cmd_domain_next(args: argparse.Namespace) -> int:
+    from research_harness.workflows.domain_engine import evaluate, facts_from_store, next_steps
+    try:
+        spec = _load_domain_spec(args.spec)
+        facts = facts_from_store(_resolve_store(_resolve_project_id(args), getattr(args, "home", None)),
+                                 research_question_id=getattr(args, "question", None),
+                                 study_design=getattr(args, "study_design", None))
+        evals, nxt = evaluate(spec, facts), next_steps(spec, facts)
+    except Exception as e:
+        sys.stderr.write(f"Domain workflow error: {e}\n")
+        return 1
+    if args.json:
+        _json_out({"workflow": spec.pin, "study_design": facts.study_design, "next_steps": nxt,
+                   "steps": [e.to_dict() for e in evals]})
+        return 0
+    print(f"{spec.id} v{spec.version}  study design: {facts.study_design or 'not recorded'}")
+    print(f"Next: {', '.join(nxt) if nxt else '(nothing can run yet)'}\n")
+    for e in evals:
+        mark = "n/a " if e.applicability.value == "NOT_APPLICABLE" else "done" if e.done else "RUN " if e.runnable else "wait"
+        extra = f"  REOPENED by {e.reopened_by['by']}: {e.reopened_by['reason']}" if e.reopened_by else ""
+        print(f"  [{mark}] {e.stage:<12} {e.step_id}{extra}")
+        for reason in e.blocked_by:
+            print(f"           - {reason}")
+    return 0
+
+
 def cmd_workflow_runs(args: argparse.Namespace) -> int:
     from research_harness.workflows.runs import list_workflow_runs
     try:
@@ -1044,6 +1091,20 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--project", "--project-id", dest="project", required=True, help="Project identifier")
         p.add_argument("--home", help="Base directory for research projects")
         p.add_argument("--json", action="store_true", help="Output JSON")
+
+    p_dom = sub.add_parser("domain", help="Domain workflows: execution contracts (steps, conditions, loop-backs)")
+    s_dom = p_dom.add_subparsers(dest="domain_cmd", required=True)
+    p_domlist = s_dom.add_parser("list", help="List the built-in domain workflows")
+    p_domlist.add_argument("--json", action="store_true")
+    p_domlist.set_defaults(func=cmd_domain_list)
+    p_domnext = s_dom.add_parser("next", help="What can run now under a domain workflow, and what blocks the rest")
+    p_domnext.add_argument("--project", "--project-id", dest="project", required=True)
+    p_domnext.add_argument("--spec", help="Built-in id or path to a spec JSON (default: the generic workflow)")
+    p_domnext.add_argument("--question", "--question-id", dest="question")
+    p_domnext.add_argument("--study-design", dest="study_design")
+    p_domnext.add_argument("--home")
+    p_domnext.add_argument("--json", action="store_true")
+    p_domnext.set_defaults(func=cmd_domain_next)
 
     p_wfruns = s_wf.add_parser("runs", help="List recorded workflow runs (newest first)")
     _run_args(p_wfruns)

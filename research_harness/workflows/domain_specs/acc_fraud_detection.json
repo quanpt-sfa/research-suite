@@ -1,0 +1,58 @@
+{
+  "id": "LIB_DW_ACC_FRAUD_DETECTION",
+  "version": "0.1.0",
+  "domain": "accounting",
+  "subfield": "archival_financial_reporting",
+  "study_designs": ["archival", "predictive_modeling", "quasi_experimental"],
+  "description": "Pilot skeleton for archival financial-reporting fraud detection. It fixes the order of work, what must be recorded before each step, and where results send the work back. It carries no method content: the content of each step is added through the knowledge lifecycle, from the study's own method literature and replication assets. Status EXTRACTED: nothing here is verified.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": true},
+    "results": {
+      "applicable": true,
+      "entry_conditions": [{"step_assessment": {"step": "model_comparison_protocol", "at_least": "PROVISIONAL"}}]
+    },
+    "discussion": {
+      "applicable": true,
+      "entry_conditions": [{"step_execution": {"step": "sensitivity_analysis", "is": "SUCCEEDED"}}]
+    }
+  },
+  "steps": [
+    {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "label_provenance", "stage": "methods", "kind": "decide", "title": "Provenance, definition and timing of the fraud label",
+     "entry_conditions": [{"exists": {"type": "Dataset", "where": {"role": "label_source"}}}],
+     "evidence_requirements": [{"type": "EvidencePassage", "where": {"topic": "label_definition"}, "min": 1,
+                                "about": "how the fraud label is defined, dated and sourced"}]},
+    {"id": "sample_construction", "stage": "methods", "kind": "plan", "title": "Sample construction",
+     "entry_conditions": [{"step_assessment": {"step": "label_provenance", "at_least": "PROVISIONAL"}}],
+     "evidence_requirements": [{"type": "Dataset", "where": {"role": "sample"}, "min": 1, "about": "the sample frame"}]},
+    {"id": "feature_construction", "stage": "methods", "kind": "plan", "title": "Feature construction with an information-timing rule",
+     "entry_conditions": [{"step_execution": {"step": "sample_construction", "is": "SUCCEEDED"}}]},
+    {"id": "temporal_validation_design", "stage": "methods", "kind": "plan", "title": "Temporal validation design",
+     "entry_conditions": [{"step_assessment": {"step": "feature_construction", "at_least": "PROVISIONAL"}}]},
+    {"id": "imbalance_aware_evaluation", "stage": "methods", "kind": "plan", "title": "Evaluation under class imbalance",
+     "entry_conditions": [{"step_assessment": {"step": "temporal_validation_design", "at_least": "PROVISIONAL"}}]},
+    {"id": "model_comparison_protocol", "stage": "methods", "kind": "plan", "title": "Model comparison protocol",
+     "entry_conditions": [{"step_assessment": {"step": "imbalance_aware_evaluation", "at_least": "PROVISIONAL"}}]},
+    {"id": "leakage_check", "stage": "results", "kind": "execute", "title": "Leakage check",
+     "entry_conditions": [{"step_assessment": {"step": "model_comparison_protocol", "at_least": "PROVISIONAL"}}],
+     "on_condition": [
+       {"when": {"diagnostic_signal": {"step": "leakage_check", "diagnostic": "feature_timing", "is": "CONCERN_INDICATED"}},
+        "goto": "feature_construction", "reason": "information from after the prediction date may be in the features"},
+       {"when": {"diagnostic_signal": {"step": "leakage_check", "diagnostic": "label_timing", "is": "CONCERN_INDICATED"}},
+        "goto": "label_provenance", "reason": "the label may be known only after the period it is used to predict"}]},
+    {"id": "sensitivity_analysis", "stage": "results", "kind": "execute", "title": "Sensitivity to assumptions",
+     "entry_conditions": [{"step_execution": {"step": "leakage_check", "is": "SUCCEEDED"}}]},
+    {"id": "results_assessment", "stage": "results", "kind": "assess", "title": "Results assessment",
+     "entry_conditions": [{"step_execution": {"step": "sensitivity_analysis", "is": "SUCCEEDED"}}]},
+    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"},
+    {"id": "interpretation_limits", "stage": "discussion", "kind": "review", "title": "Limits of interpretation"},
+    {"id": "transferability_assessment", "stage": "discussion", "kind": "review", "title": "Transferability to other legal regimes, label sources and outcomes",
+     "entry_conditions": [{"step_assessment": {"step": "interpretation_limits", "at_least": "PROVISIONAL"}}]}
+  ],
+  "scope": {"domain": "accounting", "subfield": "archival_financial_reporting"},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}

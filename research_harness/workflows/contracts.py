@@ -214,6 +214,9 @@ class ContextPackage:
     scope_claims: list[str] = field(default_factory=list)
     # Execution runs that really succeeded, `run_id -> output digest` (from the run registry).
     verified_runs: dict[str, str] = field(default_factory=dict)
+    # The domain workflow's instruction fragment for this stage, sent in the system prompt, and the pin of the spec.
+    domain_instructions: Optional[str] = None
+    domain_workflow_pin: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -467,7 +470,7 @@ class WorkflowOutput:
     task_id: str
     project_id: str
     status: Literal["SUCCESS", "REUSED", "REQUIRES_VERIFICATION", "INCOMPLETE_CONTEXT", "INSUFFICIENT_EVIDENCE",
-                    "INVALID_OUTPUT", "BLOCKED", "FAILED"]
+                    "INVALID_OUTPUT", "BLOCKED", "NOT_APPLICABLE", "FAILED"]
     result: dict[str, Any]
     usage: TaskUsage
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

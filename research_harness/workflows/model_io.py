@@ -127,8 +127,10 @@ def schema_digest(workflow: str) -> str:
 # prompts
 # ---------------------------------------------------------------------------------------------------
 
-def build_system_prompt(workflow: str, skill_instructions: str, schema: Optional[dict[str, Any]] = None) -> str:
+def build_system_prompt(workflow: str, skill_instructions: str, schema: Optional[dict[str, Any]] = None,
+                        domain_instructions: Optional[str] = None) -> str:
     schema = schema if schema is not None else output_schema(workflow)
+    domain = (f"## Domain stage instructions\n{domain_instructions.strip()}\n\n" if domain_instructions else "")
     contract = (
         "## Output contract\n"
         "Respond with exactly one JSON object and nothing else (no prose, no code fence). It must validate "
@@ -145,7 +147,7 @@ def build_system_prompt(workflow: str, skill_instructions: str, schema: Optional
     )
     return (
         f"You are executing the {workflow.upper()} workflow of a research assistant that supports a single "
-        f"academic researcher.\n\n## Operational Skill Instructions\n{skill_instructions.strip()}\n\n{contract}"
+        f"academic researcher.\n\n## Operational Skill Instructions\n{skill_instructions.strip()}\n\n{domain}{contract}"
     )
 
 

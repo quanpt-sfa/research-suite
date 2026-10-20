@@ -1,0 +1,37 @@
+{
+  "id": "LIB_DW_EDU_QUALITATIVE_FIXTURE",
+  "version": "0.0.1",
+  "domain": "education",
+  "subfield": "qualitative_education",
+  "study_designs": ["qualitative_interview"],
+  "description": "TEST FIXTURE ONLY: proves that a qualitative-education workflow differs from the fraud-detection one in its steps, conditions and loop-backs, not in its prompts. Its content is not verified and it is not an education workflow.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": true},
+    "results": {"applicable": false, "justification": "interview studies have no separate statistical results stage; the analysis steps are in methods"},
+    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "trustworthiness_checks", "is": "SUCCEEDED"}}]}
+  },
+  "steps": [
+    {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "sampling_rationale", "stage": "methods", "kind": "decide", "title": "Sampling rationale",
+     "evidence_requirements": [{"type": "EvidencePassage", "where": {"topic": "sampling_rationale"}, "min": 1, "about": "why these participants"}]},
+    {"id": "data_collection_protocol", "stage": "methods", "kind": "plan", "title": "Data collection protocol",
+     "entry_conditions": [{"step_assessment": {"step": "sampling_rationale", "at_least": "PROVISIONAL"}}]},
+    {"id": "coding_scheme_development", "stage": "methods", "kind": "plan", "title": "Coding scheme development",
+     "entry_conditions": [{"step_execution": {"step": "data_collection_protocol", "is": "SUCCEEDED"}}]},
+    {"id": "thematic_analysis", "stage": "methods", "kind": "execute", "title": "Thematic analysis",
+     "entry_conditions": [{"step_execution": {"step": "coding_scheme_development", "is": "SUCCEEDED"}}],
+     "on_condition": [{"when": {"diagnostic_signal": {"step": "thematic_analysis", "diagnostic": "saturation", "is": "CONCERN_INDICATED"}},
+                       "goto": "data_collection_protocol", "reason": "themes were still emerging: collect more data"}]},
+    {"id": "trustworthiness_checks", "stage": "methods", "kind": "review", "title": "Trustworthiness checks",
+     "entry_conditions": [{"step_execution": {"step": "thematic_analysis", "is": "SUCCEEDED"}}]},
+    {"id": "statistical_inference_steps", "stage": "methods", "kind": "plan", "title": "Statistical steps (not part of this design)",
+     "applicability": {"when": {"study_design_in": ["archival", "predictive_modeling"]}, "justification": "qualitative interview studies make no statistical inference"}},
+    {"id": "interpretation", "stage": "discussion", "kind": "review", "title": "Interpretation"}
+  ],
+  "scope": {"domain": "education", "subfield": "qualitative_education"},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "LIB_DW_GENERIC",
+  "version": "1.0.0",
+  "domain": "cross_domain",
+  "subfield": null,
+  "study_designs": [],
+  "description": "Default workflow: the five stages in any order, each a single assessment step with no preconditions. It adds no domain behaviour; a domain workflow replaces it.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": true},
+    "results": {"applicable": true},
+    "discussion": {"applicable": true}
+  },
+  "steps": [
+    {"id": "contribution", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "literature", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "methods", "stage": "methods", "kind": "assess", "title": "Methods assessment"},
+    {"id": "results", "stage": "results", "kind": "assess", "title": "Results assessment"},
+    {"id": "discussion", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+  ],
+  "scope": {},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}
