@@ -29,6 +29,7 @@ from research_harness.knowledge.replication import reproduce_package
 from research_harness.state.store import StateStore
 from research_harness.workflows import eca
 
+KNOWLEDGE_TYPES = ("KnowledgeItem", "MethodPlaybook")   # both carry elements, three dimensions and a lifecycle
 FIDELITY_ORDER = {"NOT_CHECKED": 0, "QUOTE_VERIFIED": 1, "MEANING_VERIFIED": 2}
 VALIDITY_ORDER = {"NOT_ASSESSED": 0, "PROVISIONAL": 1, "SUPPORTED_WITHIN_SCOPE": 2}
 ACQUIRE_FROM = ("source", "run", "policy", "review", "retrospective")
@@ -54,8 +55,8 @@ def blank_validation() -> dict[str, Any]:
 
 def _item(store: StateStore, item_id: str, revision: Optional[int] = None) -> dict[str, Any]:
     obj = store.get_object(item_id, revision)
-    if not obj or obj["object_type"] != "KnowledgeItem":
-        raise KnowledgeError("ITEM_NOT_FOUND", f"{item_id} is not a KnowledgeItem in this store")
+    if not obj or obj["object_type"] not in KNOWLEDGE_TYPES:
+        raise KnowledgeError("ITEM_NOT_FOUND", f"{item_id} is not a KnowledgeItem or MethodPlaybook in this store")
     return obj
 
 
@@ -70,7 +71,7 @@ def _write_item(store: StateStore, token: Optional[str], item_id: str, content: 
                                              "source_revision=?", (item_id, head["head_revision"])).fetchall()
                 import json as _json
                 edges = [(r[0], r[1], r[2], _json.loads(r[3])) for r in with_edges]
-        res = tx.add_revision(object_id=item_id, object_type="KnowledgeItem", content=content, edges=edges,
+        res = tx.add_revision(object_id=item_id, object_type=head["object_type"] if head else "KnowledgeItem", content=content, edges=edges,
                               origin=engine_origin(operation, tx.actor_id))
         tx.audit(operation, "RECORDED", {"object_id": item_id, "revision": res["revision"], **(detail or {})})
     return {**res, "pin": make_pin(item_id, res["revision"], res["content_digest"])}
@@ -190,7 +191,7 @@ def computational_reproducibility(store: StateStore, item_id: str) -> dict[str, 
     for p in pins_in(obj["content"]):
         pid = parse_pin(p)[0]
         other = store.get_object(pid)
-        if other and other["object_type"] == "KnowledgeItem" and other["content"].get("kind") == "replication_package" and pid not in packages:
+        if other and other["object_type"] in KNOWLEDGE_TYPES and other["content"].get("kind") == "replication_package" and pid not in packages:
             packages.append(pid)
     results = [reproduce_package(store, pid) for pid in packages]
     states = [r["computational_reproducibility"] for r in results]
@@ -211,7 +212,7 @@ def context_key(context: dict[str, Any]) -> str:
     return canonical_json_hash({k: context.get(k) for k in CONTEXT_KEYS if context.get(k) is not None})
 
 
-def assess_validity(store: StateStore, *, context: dict[str, Any], evidence_basis: list[dict[str, Any]],
+def assess_validity(store: StateStore, *, context: dict[str, Any], evidence_basis: list[dict[str, Any]], elements: Optional[list[str]] = None,
                     known_criticisms: Optional[list[dict[str, Any]]] = None, diagnostics_runs: Optional[list[str]] = None,
                     diagnostics_applicable: bool = False, contested: bool = False, generated_by: str = "researcher",
                     confirmed_by_researcher: bool = False, assessed_at: Optional[str] = None) -> dict[str, Any]:
@@ -246,7 +247,9 @@ def assess_validity(store: StateStore, *, context: dict[str, Any], evidence_basi
             blockers.append("no researcher confirmation")
         if not blockers:
             verdict = "SUPPORTED_WITHIN_SCOPE"
-    return {"context": {k: v for k, v in context.items() if v is not None}, "context_key": context_key(context), "verdict": verdict,
+    return {"context": {k: v for k, v in context.items() if v is not None},
+            "context_key": canonical_json_hash([context_key(context), sorted(elements) if elements else None]), "elements": elements,
+            "verdict": verdict,
             "evidence_basis": evidence_basis, "known_criticisms": criticisms, "diagnostics_runs": diagnostics_runs or [],
             "diagnostics_applicable": diagnostics_applicable, "generated_by": generated_by,
             "confirmed_by_researcher": confirmed_by_researcher, "blockers": blockers, "assessed_at": assessed_at}
@@ -310,6 +313,9 @@ def promotion_blockers(store: StateStore, item_id: str, *, scope: dict[str, Any]
     if not exclusions and not none_known:
         blockers.append("exclusions are empty: list them, or record explicitly that none are known")
     elements = obj["content"].get("elements") or []
+    unbased = [e.get("id") for e in elements if isinstance(e, dict) and (e.get("basis_missing") or not e.get("evidence_basis"))]
+    if unbased:
+        blockers.append("elements without an evidence basis: " + ", ".join(map(str, unbased)))
     fid = source_fidelity(store, item_id)
     if elements and fid["source_fidelity"] != "MEANING_VERIFIED":
         blockers.append(f"source_fidelity is {fid['source_fidelity']}, not MEANING_VERIFIED for every critical element")
@@ -338,7 +344,7 @@ def promote(store: StateStore, token: Optional[str], item_id: str, *, scope: dic
     fid = source_fidelity(store, item_id)["source_fidelity"]
     comp = computational_reproducibility(store, item_id)["computational_reproducibility"]
     with store.write_tx(token=token, require_roles=("owner",)) as tx:
-        head = head_or_raise(tx, item_id, "KnowledgeItem")
+        head = head_or_raise(tx, item_id)
         if head["head_revision"] != fresh["revision"]:
             raise KnowledgeError("REVISION_NOT_HEAD", f"{item_id} changed while being checked")
         content = {**fresh["content"], "validation": {**validation, "source_fidelity": fid, "computational_reproducibility": comp},
@@ -351,7 +357,7 @@ def promote(store: StateStore, token: Optional[str], item_id: str, *, scope: dic
         rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
                                (item_id, fresh["revision"])).fetchall()
         import json as _json
-        res = tx.add_revision(object_id=item_id, object_type="KnowledgeItem", content=content,
+        res = tx.add_revision(object_id=item_id, object_type=head["object_type"], content=content,
                               edges=[(r[0], r[1], r[2], _json.loads(r[3])) for r in rows],
                               origin=engine_origin("library_promote", tx.actor_id))
         tx.audit("library_promote", "PROMOTED", {"object_id": item_id, "revision": res["revision"], "scope": scope})
@@ -396,7 +402,7 @@ def _scope_mismatch(item: dict[str, Any], context: dict[str, Any]) -> list[str]:
     return bad
 
 
-def match(store: StateStore, context: dict[str, Any]) -> list[dict[str, Any]]:
+def match(store: StateStore, context: dict[str, Any], types: Optional[tuple] = None) -> list[dict[str, Any]]:
     """Apply the recommendation rule (plan v3 4.1) to every non-manifest item for a project context.
 
     Statuses: `applicable` (SUPPORTED_WITHIN_SCOPE for a matching context, source fidelity established, no exclusion hit),
@@ -404,19 +410,24 @@ def match(store: StateStore, context: dict[str, Any]) -> list[dict[str, Any]]:
     """
     out: list[dict[str, Any]] = []
     with store.read() as conn:
-        ids = [r[0] for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type='KnowledgeItem' ORDER BY object_id")]
+        ids = [r[0] for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type IN ('KnowledgeItem','MethodPlaybook') "
+                                          "ORDER BY object_id")]
     for iid in ids:
         item = _item(store, iid)
         c = item["content"]
         if c.get("kind") in {"library_import_manifest", "failure_record"}:
             continue
+        if types is not None and item["object_type"] not in types:
+            continue
         lifecycle = "WITHDRAWN" if item.get("lifecycle_status") == "WITHDRAWN" else (c.get("lifecycle") or "ACTIVE")
         fid = source_fidelity(store, iid)
         comp = computational_reproducibility(store, iid)
         assessments = (c.get("validation") or {}).get("validity_assessments", [])
-        here = [a for a in assessments if scope_matches(a["context"], {k: v for k, v in context.items() if k in CONTEXT_KEYS and v is not None})]
+        stated = {k: v for k, v in context.items() if k in CONTEXT_KEYS and v is not None}
+        # a context that states nothing matches no assessment (an empty scope would otherwise match every one vacuously)
+        here = [a for a in assessments if scope_matches(a["context"], stated)] if stated else []
         validity_here = max((a["verdict"] for a in here), key=lambda v: (v == "CONTESTED", VALIDITY_ORDER.get(v, 0)), default="NOT_ASSESSED")
-        row = {"item_id": iid, "label": c.get("label"), "kind": c.get("kind"), "pin": make_pin(iid, item["revision"], item["content_digest"]),
+        row = {"item_id": iid, "label": c.get("label"), "kind": c.get("kind"), "object_type": item["object_type"], "pin": make_pin(iid, item["revision"], item["content_digest"]),
                "promoted": bool((c.get("promotion") or {}).get("promoted")), "lifecycle": lifecycle,
                "dimensions": {"source_fidelity": fid["source_fidelity"], "computational_reproducibility": comp["computational_reproducibility"],
                               "methodological_validity_for_this_context": validity_here,
@@ -444,6 +455,8 @@ def match(store: StateStore, context: dict[str, Any]) -> list[dict[str, Any]]:
             else:
                 questions = ["For which estimand, measurement, assumptions and data regime would this procedure be valid here?"]
                 missing = [k for k in ("estimand", "measurement", "assumptions") if not context.get(k)]
+                if not stated:
+                    questions.append("The project context states no scope, estimand or measurement; state them before any validity can be matched.")
                 if missing:
                     questions.append("State " + ", ".join(missing) + " for this project.")
                 for k in row["known_criticisms"]:

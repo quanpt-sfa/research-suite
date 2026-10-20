@@ -21,7 +21,7 @@ from research_harness.knowledge.common import (
     LIB_PREFIX, LIBRARY_ID, WRITE_ROLES, KnowledgeError, digest16, engine_origin)
 from research_harness.state.store import ProjectPaths, StateStore, default_home
 
-PIN_RE = re.compile(r"LIB:(?P<id>LIB_[A-Z0-9_]{1,60})@(?P<rev>[0-9]+)#(?P<digest>[0-9a-f]{16})")
+PIN_RE = re.compile(r"LIB:(?P<id>[A-Z][A-Z0-9_]{1,63})@(?P<rev>[0-9]+)#(?P<digest>[0-9a-f]{16})")
 _PIN_FULL = re.compile(r"^" + PIN_RE.pattern + r"$")
 
 
@@ -59,7 +59,7 @@ def make_pin(object_id: str, revision: int, content_digest: str) -> str:
 def parse_pin(pin: str) -> tuple[str, int, str]:
     m = _PIN_FULL.match(pin or "")
     if not m:
-        raise KnowledgeError("PIN_MALFORMED", f"{pin!r} is not LIB:<LIB_id>@<revision>#<16 hex>")
+        raise KnowledgeError("PIN_MALFORMED", f"{pin!r} is not LIB:<id>@<revision>#<16 hex>")
     return m.group("id"), int(m.group("rev")), m.group("digest")
 
 

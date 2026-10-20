@@ -22,7 +22,7 @@ BINDING_TYPES = frozenset({"official_requirement"})
 
 def add_policy(lib: StateStore, token: Optional[str], *, journal: str, policy_type: str, excerpt: str, effective_from: str,
                retrieved_at: str, snapshot: bytes | str, source_url: Optional[str] = None, applies_to: Optional[dict] = None,
-               policy_id: Optional[str] = None, label: Optional[str] = None) -> dict[str, Any]:
+               policy_id: Optional[str] = None, label: Optional[str] = None, reporting_items: Optional[list[str]] = None) -> dict[str, Any]:
     """Record a policy with its snapshot. Refused if the excerpt is not in the snapshot, or an official requirement has
     no source reference."""
     taxonomy.validate_term("journal_policy_type", policy_type)
@@ -41,6 +41,8 @@ def add_policy(lib: StateStore, token: Optional[str], *, journal: str, policy_ty
                "applies_to": applies_to or {}}
     if source_url:
         content["source_url"] = source_url
+    if reporting_items:
+        content["reporting_items"] = list(reporting_items)
     res = add_object(lib, token, pid, "JournalPolicy", content, operation="journal_policy_add")
     return {"policy_id": pid, **res}
 
@@ -81,3 +83,55 @@ def lookup(lib: StateStore, journal: str, *, as_of: Optional[str] = None, policy
                     "binding": in_force and c["policy_type"] in BINDING_TYPES, "excerpt": c["excerpt"], "source_url": c.get("source_url"),
                     "applies_to": c.get("applies_to") or {}})
     return out
+
+
+def _days_between(earlier: str, later: str) -> int:
+    from datetime import date
+    return (date.fromisoformat(later[:10]) - date.fromisoformat(earlier[:10])).days
+
+
+def alignment(store: StateStore, *, journal: str, article_type: Optional[str] = None, study_design: Optional[str] = None,
+              planned_submission: Optional[str] = None, today: Optional[str] = None, stale_days: int = 365,
+              policy_ids: Optional[list[str]] = None) -> dict[str, Any]:
+    """What a journal's registered policies mean for one planned submission (plan v3, 3D; works in a project or the library).
+
+    A policy binds only if it is an `official_requirement` that applies to the article type and study design and was in
+    force on the planned submission date (I12). A reporting standard yields required reporting items. Precedents and
+    editorial feedback are context and are never requirements. A policy retrieved more than `stale_days` before `today`
+    is marked `RE-VERIFY`: it is shown, and never silently treated as current.
+    """
+    from datetime import date
+    today = today or date.today().isoformat()
+    planned = planned_submission or today
+    binding, reporting, context, all_entries = [], [], [], []
+    with store.read() as conn:
+        ids = [r[0] for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type='JournalPolicy' ORDER BY object_id")]
+    for pid in ids:
+        if policy_ids is not None and pid not in policy_ids:
+            continue
+        obj = store.get_object(pid)
+        c = obj["content"]
+        if c["journal"].lower() != journal.lower():
+            continue
+        ap = c.get("applies_to") or {}
+        types = ap.get("article_types") or []
+        designs = ap.get("study_designs") or []
+        applies = (not types or article_type in types) and (not designs or study_design in designs)
+        in_force = c["effective_from"] <= planned and ("effective_to" not in c or planned <= c["effective_to"])
+        stale = _days_between(c["retrieved_at"], today) > stale_days
+        entry = {"policy_id": pid, "pin": make_pin(pid, obj["revision"], obj["content_digest"]), "policy_type": c["policy_type"],
+                 "applies": applies, "in_force": in_force, "status": "RE-VERIFY" if stale else "CURRENT", "retrieved_at": c["retrieved_at"],
+                 "excerpt": c["excerpt"], "source_url": c.get("source_url")}
+        all_entries.append(entry)
+        if not (applies and in_force):
+            continue
+        if c["policy_type"] in BINDING_TYPES:
+            binding.append(entry)
+        elif c["policy_type"] == "reporting_standard":
+            reporting.append({**entry, "items": c.get("reporting_items") or []})
+        else:
+            context.append(entry)
+    return {"journal": journal, "planned_submission": planned, "binding_requirements": binding,
+            "required_reporting_items": [{"item": i, "policy_id": r["policy_id"], "status": r["status"]} for r in reporting for i in r["items"]],
+            "context_not_requirements": context, "all": all_entries,
+            "needs_reverification": [e["policy_id"] for e in all_entries if e["status"] == "RE-VERIFY" and e["applies"] and e["in_force"]]}
