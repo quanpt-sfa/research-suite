@@ -23,3 +23,4 @@ Reusable_Research_Harness_Suite_*.zip
 # Local test/verification scratch
 .tmp/
 .verify_venv/
+/sample/

@@ -1,0 +1,55 @@
+Excerpted lines from: E. Zavitsanos, K. Bougiatiotis, A. Sideras, G. Paliouras. Positive-Unlabeled Learning for Financial Misstatement Detection under Realistic Constraints. ICAIF 2025. https://doi.org/10.1145/3768292.3770366 (CC BY 4.0). Text as extracted from the PDF; it is kept only to test section detection on real PDF noise.
+
+Abstract
+Detecting financial misstatements is critical for market integrity but
+remains challenging due to class imbalance, delayed discovery, and
+limited labeled data.
+1 Introduction
+Financial misstatements, whether arising from fraud or error, pose
+significant risks to investors, auditors, regulators, and the broader
+financial system.
+This work is licensed under a Creative Commons Attribution 4.0 International License.
+ICAIF ’25, Singapore, Singapore
+© 2025 Copyright held by the owner/author(s).
+ACM ISBN 979-8-4007-2220-2/25/11
+https://doi.org/10.1145/3768292.3770366
+scandals to more moderate incidents requiring restatements and
+resubmissions of annual financial reports.
+2 Background and related work
+learning from positive and unlabeled data.
+2.1 Machine learning for misstatement
+detection
+The vast majority of prior work on machine
+2.2 PU learning
+Positive-unlabeled learning addresses the absence of labeled negatives.
+3 Misstatements under the PU learning
+framework
+To model financial misstatement detection
+4 Experimental setup
+We follow the framework described in Section 3, evaluating all
+4.1 Experimental results
+Table 1 presents the empirical results for all evaluated methods.
+HDT PU 0.0319 0.0306 0.0377 0.0321
+HRF PU 0.1342 0.0920 0.1822 0.1281
+4.2 Per year analysis
+72008200920102011201220132014
+Years
+0
+20
+40
+60
+80
+100Counts
+# Misstatements
+# Serial Misstatements
+Figure 3: Misstatements per year in each test set (blue), along-
+0.35Score
+AP
+CIK
+EBIT
+soft_assets
+Figure 4: Per-year AP score (blue bar) along with correspond-
+5 Conclusions
+We presented a PU learning framework.
+References
+[1] A reference entry.
