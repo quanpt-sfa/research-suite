@@ -12,7 +12,7 @@ Layering (see docs/ARCHITECTURE.md):
 * ``legacy``      - adapters over the v8.4.4 harness (vendored primitives, migration)
 """
 
-__version__ = "9.0.0"
+__version__ = "9.2.0"
 PROTOCOL_VERSION = "9.0.0"
 SUPPORTED_PROTOCOL_VERSIONS = ("9.0.0",)
 SCHEMA_VERSION = "9.0"

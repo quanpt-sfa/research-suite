@@ -1,0 +1,75 @@
+{
+  "form_version": "1",
+  "instructions": "Fill this form from the paper and its replication package BEFORE you look at anything the system produced. For each element write what the authors did, in your own words, give the passage that shows it (quote and source id) or say that the paper does not state it (`not_stated` with a reason). Do not copy the system's wording. The time you store this form is recorded; a form stored after any system output about the same sources is not blind and will be refused.",
+  "sources": [
+    "SRC_ZAVITSANOS2025"
+  ],
+  "replication_package": "PKG_PUHRF",
+  "annotator": "",
+  "second_reader": "",
+  "elements": [
+    {
+      "id": "label_source_and_timing",
+      "question": "Where does the label (outcome) come from, and when is it known relative to the period it is used to predict?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "sample_construction",
+      "question": "How was the sample constructed: population, period, filters, exclusions, missing-data handling?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "estimand_or_prediction_target",
+      "question": "What is estimated or predicted, and in what form?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "specification_or_feature_set",
+      "question": "What model or specification, and which features or regressors?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "standard_errors_or_validation_scheme",
+      "question": "How is uncertainty or out-of-sample performance assessed (standard errors, splits, folds, baselines)?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "diagnostics",
+      "question": "Which diagnostics or checks does the paper run on its model, data or inference?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "interpretation_limits",
+      "question": "How do the authors say the results may and may not be interpreted?",
+      "reference": "",
+      "source_id": "",
+      "quote": "",
+      "not_stated": false,
+      "not_stated_reason": ""
+    }
+  ]
+}

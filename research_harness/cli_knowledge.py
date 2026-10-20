@@ -494,6 +494,8 @@ def register(sub: Any) -> None:
     q.set_defaults(func=cmd_journal_policy_lookup)
 
     register_m3(sub)
+    register_m4(sub)
+    register_publish(sub)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -728,3 +730,202 @@ def register_m3(sub: Any) -> None:
                 q.add_argument("--rate", type=float, default=0.2)
                 _common(q, token=False)
                 q.set_defaults(func=cmd_adjudicate_coverage)
+
+
+# --------------------------------------------------------------------------------------------------
+# M4: benchmarks and gates
+# --------------------------------------------------------------------------------------------------
+
+def cmd_benchmark_logic(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.logic import run_logic_benchmark
+
+    def text(o):
+        for c in o["cases"]:
+            print(f"  [{'ok' if c['passed'] and c['perturbation_changes_outcome'] else 'FAIL'}] {c['id']}" + (f"  {c['error']}" if c["error"] else ""))
+        print(f"{o['passed']}/{o['total']} cases pass. {o['statement']}")
+    return _run(args, run_logic_benchmark, text)
+
+
+def cmd_benchmark_gate_l_synthetic(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_l import run_synthetic_gate_l
+
+    def text(o):
+        r = o["report"]
+        print("  ".join(f"{k}={'ok' if r[k]['passed'] else 'NO'}" for k in ("L1", "L2", "L3", "L4", "L5")))
+        print(o["statement"])
+    return _run(args, run_synthetic_gate_l, text)
+
+
+def cmd_gate_k_form(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import blank_annotation_form
+
+    def go():
+        form = blank_annotation_form(_ids(args.sources), args.package)
+        Path(args.out).write_text(json.dumps(form, indent=2, ensure_ascii=False), encoding="utf-8")
+        return {"form": str(args.out), "elements": [e["id"] for e in form["elements"]]}
+    return _run(args, go, lambda o: print(f"blank form written to {o['form']} ({len(o['elements'])} elements). Fill it before looking at any system output."))
+
+
+def cmd_gate_k_annotate(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import record_reference_annotation
+    return _run(args, lambda: record_reference_annotation(_store(args), _helpers()._resolve_token(args), _json_arg(args.file, "--file"),
+                                                          annotation_id=args.id), lambda o: print(f"{o['annotation_id']} stored (sha256 {o['sha256'][:16]})"))
+
+
+def cmd_gate_k_blindness(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import blindness
+    return _run(args, lambda: blindness(_store(args), args.annotation),
+                lambda o: print("blind" if o["blind"] else f"NOT BLIND: system output existed before the annotation: {', '.join(o['system_outputs_before_annotation'])}"))
+
+
+def cmd_gate_k_sheet(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import comparison_sheet
+
+    def go():
+        sheet = comparison_sheet(_store(args), args.annotation, args.playbook, args.plan)
+        if args.out:
+            Path(args.out).write_text(json.dumps(sheet, indent=2, ensure_ascii=False), encoding="utf-8")
+        return sheet
+    return _run(args, go)
+
+
+def cmd_gate_k_score(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import record_scores
+    return _run(args, lambda: record_scores(_store(args), _helpers()._resolve_token(args), args.annotation, args.playbook, args.plan, _json_arg(args.file, "--file"),
+                                            scorer=args.scorer, scores_id=args.id), lambda o: print(f"{o['scores_id']} stored"))
+
+
+def cmd_gate_k_evaluate(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import evaluate_gate_k
+
+    def text(o):
+        print("  ".join(f"{k}={'ok' if o[k]['passed'] else 'NO'}" for k in ("K1", "K2", "K3", "K4")) + f"  -> {'PASSED' if o['passed'] else 'NOT PASSED'}")
+    return _run(args, lambda: evaluate_gate_k(_store(args), args.scores, package_id=args.package, real_pilot=args.real), text)
+
+
+def cmd_gate_k_export(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks.gate_k import export_artifacts
+    return _run(args, lambda: export_artifacts(_store(args), args.scores, args.out, package_id=args.package, real_pilot=args.real),
+                lambda o: print(f"artefacts written to {args.out}; gate K {'passed' if o['passed'] else 'not passed'}"))
+
+
+def cmd_gate_validate(args: argparse.Namespace) -> int:
+    from research_harness.benchmarks import gate_k, gate_l
+    fn = gate_k.validate_artifacts if args.gate == "K" else gate_l.validate_artifacts
+
+    def text(o):
+        print("OK" if o["ok"] else "NOT OK")
+        for p in o["problems"]:
+            print(f"  - {p}")
+    res: dict[str, Any] = {}
+    rc = _run(args, lambda: res.update(fn(args.directory)) or res, text)
+    return rc if rc else (0 if res.get("ok") else 1)
+
+
+def register_m4(sub: Any) -> None:
+    p = sub.add_parser("benchmark", help="Benchmarks that run without a model")
+    s = p.add_subparsers(dest="benchmark_cmd", required=True)
+    q = s.add_parser("logic", help="Synthetic logic benchmark: the software follows its designed logic (not evidence of usefulness)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_benchmark_logic)
+    q = s.add_parser("gate-l-synthetic", help="The Gate L procedure on invented material (never passes Gate L)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_benchmark_gate_l_synthetic)
+
+    p = sub.add_parser("gate-k", help="Gate K: method fidelity against a blind reference annotation")
+    s = p.add_subparsers(dest="gate_k_cmd", required=True)
+    q = s.add_parser("form", help="Write the blank annotation form")
+    q.add_argument("--sources", required=True)
+    q.add_argument("--package")
+    q.add_argument("--out", required=True)
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_gate_k_form)
+    q = s.add_parser("annotate", help="Store the filled form (author or owner token): before any system output")
+    q.add_argument("--file", required=True)
+    q.add_argument("--id", default="REFANN_PILOT")
+    _common(q, library=False)
+    q.set_defaults(func=cmd_gate_k_annotate)
+    q = s.add_parser("blindness")
+    q.add_argument("annotation")
+    _common(q, library=False, token=False)
+    q.set_defaults(func=cmd_gate_k_blindness)
+    q = s.add_parser("sheet", help="Reference and system side by side, scores left empty")
+    q.add_argument("--annotation", required=True)
+    q.add_argument("--playbook", required=True)
+    q.add_argument("--plan", required=True)
+    q.add_argument("--out")
+    _common(q, library=False, token=False)
+    q.set_defaults(func=cmd_gate_k_sheet)
+    q = s.add_parser("score", help="Store your element scores (author or owner token)")
+    q.add_argument("--annotation", required=True)
+    q.add_argument("--playbook", required=True)
+    q.add_argument("--plan", required=True)
+    q.add_argument("--file", required=True, help="JSON list: [{element, score, note}]")
+    q.add_argument("--scorer", required=True)
+    q.add_argument("--id", default="GATEK_SCORES_PILOT")
+    _common(q, library=False)
+    q.set_defaults(func=cmd_gate_k_score)
+    q = s.add_parser("evaluate")
+    q.add_argument("--scores", required=True)
+    q.add_argument("--package")
+    q.add_argument("--real", action="store_true", help="Mark the evaluation as the real pilot")
+    _common(q, library=False, token=False)
+    q.set_defaults(func=cmd_gate_k_evaluate)
+    q = s.add_parser("export", help="Write the artefact directory that the acceptance test checks")
+    q.add_argument("--scores", required=True)
+    q.add_argument("--package")
+    q.add_argument("--out", required=True)
+    q.add_argument("--real", action="store_true")
+    _common(q, library=False, token=False)
+    q.set_defaults(func=cmd_gate_k_export)
+
+    q = sub.add_parser("gate-validate", help="Check an exported Gate K or Gate L artefact directory")
+    q.add_argument("gate", choices=["K", "L"])
+    q.add_argument("directory")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_gate_validate)
+
+
+def cmd_library_export(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import publish
+    return _run(args, lambda: publish.export_bundle(_lib(args), args.pin, args.out),
+                lambda o: print(f"bundle written to {args.out}: {o['objects']} object(s), {o['artifacts']} file(s), closure {o['closure_digest'][:16]}"))
+
+
+def cmd_library_import(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import publish
+    cli = _helpers()
+
+    def go():
+        target = cli._resolve_store(cli._resolve_project_id(args), args.home) if getattr(args, "project", None) else _lib(args)
+        return publish.import_bundle(target, cli._resolve_token(args), args.bundle)
+    return _run(args, go, lambda o: print(f"{o['status']}: {o['objects_imported']} object(s) imported, {o['objects_already_present']} already present"))
+
+
+def cmd_library_release_notes(args: argparse.Namespace) -> int:
+    from research_harness.knowledge import publish
+
+    def go():
+        notes = publish.release_notes(_lib(args), args.pin)
+        return {**notes, "markdown": publish.render_notes(notes)} if args.json else notes
+
+    def text(o):
+        print(publish.render_notes(o))
+    return _run(args, go, text)
+
+
+def register_publish(sub: Any) -> None:
+    lib = sub.choices["library"]._subparsers._group_actions[0]
+    q = lib.add_parser("export", help="Write an item with its whole closure to a new directory (a portable bundle)")
+    q.add_argument("--pin", required=True)
+    q.add_argument("--out", required=True)
+    _common(q, project=False, library=False, token=False)
+    q.set_defaults(func=cmd_library_export)
+    q = lib.add_parser("import", help="Verify a bundle completely, then import it in one transaction (into the library, or a project with --project)")
+    q.add_argument("--bundle", required=True)
+    _common(q, library=False)
+    q.set_defaults(func=cmd_library_import)
+    q = lib.add_parser("release-notes", help="Each dimension, per context, as recorded now")
+    q.add_argument("--pin", required=True)
+    _common(q, project=False, library=False, token=False)
+    q.set_defaults(func=cmd_library_release_notes)

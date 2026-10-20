@@ -7,6 +7,7 @@ _Generated from pytest results; no status is written by hand._
 | M1 | Trustworthy core | PASS |
 | M2 | Knowledge infrastructure | PASS |
 | M3 | Pilot domain end-to-end | PASS |
+| M4 | Evidence of value | FAIL |
 
 ## M1 — Trustworthy core (phases 0, 1, 2, 3A.1, 4.1)
 
@@ -34,3 +35,11 @@ _Generated from pytest results; no status is written by hand._
 | `tests/test_playbooks.py::test_extracted_and_reproduced_playbook_not_valid_by_default` | PASSED |
 | `tests/test_results_dag.py::test_diagnostic_concern_never_blocks_or_passes` | PASSED |
 | `tests/test_pilot_chain.py::test_pilot_chain_end_to_end_on_synthetic_fixture` | PASSED |
+
+## M4 — Evidence of value (phases 6, 7)
+
+| Required integration test | Outcome |
+|---|---|
+| `tests/test_benchmark_logic.py::test_synthetic_logic_benchmark` | PASSED |
+| `tests/test_gate_k_l_artifacts.py::test_gate_k_real_pilot_artifacts_present` | SKIPPED |
+| `tests/test_gate_k_l_artifacts.py::test_gate_l_cold_warm_artifacts_present` | SKIPPED |
