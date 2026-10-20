@@ -31,7 +31,7 @@ from jsonschema import Draft202012Validator
 from research_harness import taxonomy
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.knowledge.common import (
-    WRITE_ROLES, KnowledgeError, engine_origin, head_or_raise, next_numbered_id)
+    WRITE_ROLES, KnowledgeError, engine_origin, head_or_raise, next_numbered_id, scope_id)
 from research_harness.knowledge.corpus import verify_passage
 from research_harness.state import workflow_runs
 from research_harness.state.store import StateStore
@@ -251,8 +251,8 @@ def _counter_evidence(conn: Any, store: StateStore, statement: StatementRef) -> 
     return out
 
 
-def _next_adj_id(conn: Any) -> str:
-    return next_numbered_id(conn, "ADJ_", "Adjudication")
+def _next_adj_id(conn: Any, store: StateStore) -> str:
+    return next_numbered_id(conn, scope_id(store, "ADJ_"), "Adjudication")
 
 
 def _write_record(store: StateStore, token: Optional[str], roles: tuple, content: dict[str, Any], statement: StatementRef,
@@ -273,7 +273,7 @@ def _write_record(store: StateStore, token: Optional[str], roles: tuple, content
             edges.append(("supports", statement.object_id, statement.revision, {"origin": "eca_confirmed"}))
         elif verdict == "NOT_SUPPORTED":
             edges.append(("challenges", statement.object_id, statement.revision, {"origin": "eca"}))
-        aid = _next_adj_id(tx.conn)
+        aid = _next_adj_id(tx.conn, store)
         subject = tx.get(statement.object_id, statement.revision)
         content = {**content, "subject": {"object_id": statement.object_id, "revision": statement.revision},
                    "subject_revision_digest": subject["revision_digest"], "adjudicated_at": tx.at, "is_historical": False,
@@ -315,7 +315,8 @@ def adjudicate(store: StateStore, token: Optional[str], statement: StatementRef,
     if reuse:
         for adj in _adjudication_for(store, statement.object_id):
             c = adj["content"]
-            if (not c.get("confirms") and c["subject"]["revision"] == statement.revision and (c.get("statement") or {}).get("element") == statement.element
+            if (not c.get("confirms") and (c.get("statement") or {}).get("text_sha256") == statement.to_dict()["text_sha256"]
+                    and (c.get("statement") or {}).get("element") == statement.element
                     and (c.get("passage") or {}).get("object_id") == passage_id and c["passage"].get("revision") == passage["revision"]):
                 with store.read() as conn:
                     row = conn.execute("SELECT run_id FROM workflow_runs WHERE workflow='eca_adjudication' AND input_fingerprint=? "
@@ -395,31 +396,31 @@ def confirm(store: StateStore, token: Optional[str], adjudication_id: str, *, ve
     prop = adj["content"]
     if prop.get("confirms"):
         raise KnowledgeError("ALREADY_A_CONFIRMATION", f"{adjudication_id} is itself a confirmation")
-    sid, srev = prop["subject"]["object_id"], prop["subject"]["revision"]
-    statement_text = prop["statement"]
-    with store.read() as conn:
-        head = store.get_object(sid, conn=conn)
+    sid = prop["subject"]["object_id"]
+    element = (prop["statement"] or {}).get("element")
+    current = resolve_statement(store, sid, element=element)
+    text_changed = current.to_dict()["text_sha256"] != prop["statement"]["text_sha256"]
     applied = None
     if verdict == "SUPPORTED_IF_QUALIFIED":
         applied = qualification_applied_in
-        if not applied or applied.get("object_id") != sid or not isinstance(applied.get("revision"), int) or applied["revision"] <= srev:
+        if not text_changed or not applied or applied.get("object_id") != sid or not isinstance(applied.get("revision"), int):
             raise KnowledgeError("QUALIFICATION_NOT_APPLIED",
-                                 "a SUPPORTED_IF_QUALIFIED verdict verifies nothing until the qualification is written into a "
-                                 f"new revision of {sid}: pass qualification_applied_in={{object_id, revision}} with a revision later than {srev}")
-        if applied["revision"] != head["revision"]:
-            raise KnowledgeError("QUALIFICATION_REVISION_NOT_HEAD", f"{sid} is at revision {head['revision']}, not {applied['revision']}")
-    if head["revision"] != srev and not applied:
-        raise KnowledgeError("STATEMENT_REVISED_SINCE", f"{sid} was revised after this adjudication (now revision {head['revision']}); "
-                             "adjudicate the new revision")
+                                 "a SUPPORTED_IF_QUALIFIED verdict verifies nothing until the qualification is written into the "
+                                 f"statement: revise {sid} so its text carries it, then pass qualification_applied_in="
+                                 "{object_id, revision} naming that revision")
+        if applied["revision"] != current.revision:
+            raise KnowledgeError("QUALIFICATION_REVISION_NOT_HEAD", f"{sid} is at revision {current.revision}, not {applied['revision']}")
+    elif text_changed:
+        raise KnowledgeError("STATEMENT_REVISED_SINCE", f"the text of {sid} changed after this adjudication; adjudicate the new text")
     pref = prop["passage"]
     passage = store.get_object(pref["object_id"])
     if not passage or passage["revision"] != pref["revision"]:
         raise KnowledgeError("STALE_PASSAGE", f"{pref['object_id']} was revised after this adjudication; adjudicate again")
-    statement = StatementRef(sid, applied["revision"] if applied else srev, "", statement_text.get("element"),
-                             statement_text.get("generated_by", "legacy"), prop.get("risk_tier", "STANDARD"))
+    statement = current
+    statement_text = current.to_dict()
     content = {
         "kind": "evidence_claim", "assessment_kind": "semantic_entailment", "statement": statement_text, "passage": pref,
-        "risk_tier": prop.get("risk_tier", "STANDARD"), "source_match": prop["source_match"],
+        "risk_tier": prop.get("risk_tier", current.risk_tier), "source_match": prop["source_match"],
         "qualifier_cues": prop["qualifier_cues"], "passage_proposition": prop["passage_proposition"],
         "equivalence": prop["equivalence"], "dropped_conditions": prop["dropped_conditions"], "cue_handling": prop["cue_handling"],
         "counter_evidence": prop["counter_evidence"], "eca_verdict": verdict, "verdict": _LEGACY_VERDICT[verdict],
@@ -439,18 +440,22 @@ def confirm(store: StateStore, token: Optional[str], adjudication_id: str, *, ve
 # ---------------------------------------------------------------------------------------------------
 
 def statement_assessment(store: StateStore, statement: StatementRef) -> dict[str, Any]:
-    """The assessment the current revision of a statement may carry (never above what `apply_caps` and I16 allow).
+    """The assessment the current text of a statement may carry (never above what `apply_caps` and I16 allow).
 
-    CONTESTED: an unresolved `challenges` edge, or any ECA verdict NOT_SUPPORTED for this revision.
+    An adjudication belongs to the exact words it read, not to a revision number: editing something else on the object
+    (an attribute, a validation result) leaves it valid, and editing the statement's text makes it not apply.
+
+    CONTESTED: an unresolved `challenges` edge, or any ECA verdict NOT_SUPPORTED for this text.
     VERIFIED_WITHIN_SCOPE: only with a researcher confirmation of a supporting verdict; a `SUPPORTED_IF_QUALIFIED`
-    confirmation counts only for the revision that carries the qualification. A HIGH-risk statement without such a
+    confirmation counts only for the text that carries the qualification. A HIGH-risk statement without such a
     confirmation stays at most PROVISIONAL whoever generated it (I16).
     """
     with store.read() as conn:
         counter = _counter_evidence(conn, store, statement)
         records = _adjudication_for(store, statement.object_id, conn=conn)
     mine = [r for r in records if (r["content"].get("statement") or {}).get("element") == statement.element]
-    at_rev = [r for r in mine if r["content"]["subject"]["revision"] == statement.revision]
+    digest = statement.to_dict()["text_sha256"]
+    at_rev = [r for r in mine if (r["content"].get("statement") or {}).get("text_sha256") == digest]
     confirmations = [r for r in at_rev if r["content"].get("confirms")]
     decided = {r["content"]["confirms"] for r in confirmations}
     proposals = [r for r in at_rev if not r["content"].get("confirms")]
@@ -481,6 +486,8 @@ def statement_assessment(store: StateStore, statement: StatementRef) -> dict[str
         reasons.append("high-impact statement: needs a researcher-confirmed supporting adjudication to be verified")
     if not mine:
         reasons.append("no adjudication recorded")
+    elif not at_rev:
+        reasons.append("earlier adjudications read different wording; adjudicate the current text")
     pending_qual = [p for p in mine if p["content"]["eca_verdict"] == "SUPPORTED_IF_QUALIFIED" and not p["content"].get("confirms")]
     if pending_qual and not confirmed:
         reasons.append("supported only if qualified: " + "; ".join(pending_qual[-1]["content"]["required_qualification"]))
@@ -496,7 +503,6 @@ def queue(store: StateStore) -> list[dict[str, Any]]:
     with store.read() as conn:
         adjs = [store.get_object(r[0], conn=conn) for r in conn.execute(
             "SELECT object_id FROM object_heads WHERE object_type='Adjudication' ORDER BY object_id")]
-        heads = {r["object_id"]: r["head_revision"] for r in conn.execute("SELECT object_id, head_revision FROM object_heads")}
         claims = [store.get_object(r[0], conn=conn) for r in conn.execute(
             "SELECT object_id FROM object_heads WHERE object_type IN ('Claim','KnowledgeItem') ORDER BY object_id")]
     ecas = [a for a in adjs if a["content"].get("kind") == "evidence_claim"]
@@ -507,7 +513,11 @@ def queue(store: StateStore) -> list[dict[str, Any]]:
         covered.add((c["subject"]["object_id"], (c.get("statement") or {}).get("element")))
         if c.get("confirms") or a["object_id"] in confirmed or c.get("risk_tier") != "HIGH":
             continue
-        stale = heads.get(c["subject"]["object_id"]) != c["subject"]["revision"]
+        try:
+            now = resolve_statement(store, c["subject"]["object_id"], element=(c.get("statement") or {}).get("element"))
+            stale = now.to_dict()["text_sha256"] != (c.get("statement") or {}).get("text_sha256")
+        except KnowledgeError:
+            stale = True
         items.append({"adjudication_id": a["object_id"], "statement": c["subject"], "element": (c.get("statement") or {}).get("element"),
                       "eca_verdict": c["eca_verdict"], "guard": c.get("guard"), "state": "STALE" if stale else "AWAITING_CONFIRMATION"})
     for obj in claims:

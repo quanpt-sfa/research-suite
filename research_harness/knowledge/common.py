@@ -31,6 +31,13 @@ def id_fragment(text: str, limit: int = 40) -> str:
     return (frag or "X")[:limit]
 
 
+def scope_id(store: StateStore, object_id: str) -> str:
+    """Ids written to the library carry the LIB_ prefix (plan v3, 2.1); in a project they are left as they are."""
+    if store.project_id == LIBRARY_ID and not object_id.startswith(LIB_PREFIX):
+        return LIB_PREFIX + object_id
+    return object_id
+
+
 def digest16(content_digest: str) -> str:
     return content_digest[:16]
 

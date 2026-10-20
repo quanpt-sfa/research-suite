@@ -12,6 +12,7 @@ dependencies = ["jsonschema>=4.17"]
 [project.optional-dependencies]
 test = ["pytest>=7"]
 model = ["anthropic>=1.0"]
+pdf = ["pypdf>=4"]
 
 [project.scripts]
 research = "research_harness.cli:main"

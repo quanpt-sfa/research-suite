@@ -1153,6 +1153,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_userep.add_argument("--json", action="store_true", help="Output JSON")
     p_userep.set_defaults(func=cmd_usage_report)
 
+    from research_harness import cli_knowledge
+    cli_knowledge.register(sub)
+
     return parser
 
 

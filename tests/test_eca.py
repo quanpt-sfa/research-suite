@@ -262,3 +262,19 @@ def test_the_adjudication_request_is_one_call_with_the_flagged_cues_shown(proj):
     adj = store.get_object("ADJ_000001")
     assert adj["object_type"] == "Adjudication" and adj["content"]["assessment_kind"] == "semantic_entailment"
     assert adj["content"]["verdict"] == "SUPPORTED" and adj["origin"]["operation"] == "adjudicate"
+
+
+def test_an_adjudication_belongs_to_the_words_it_read_not_to_a_revision_number(proj):
+    store, token, passage = proj
+    add_claim(store, token, "CLAIM_W", generated_by="researcher")
+    res = eca.adjudicate(store, token, stmt(store, "CLAIM_W"), "EP_BALANCE", answer(equivalence="NARROWER", dropped_conditions=[], verdict="SUPPORTED_AS_STATED",
+                         cue_handling=[{"cue": "only when", "handling": "carried"}], required_qualification=[]))
+    eca.confirm(store, token, res["adjudication_id"], verdict="SUPPORTED_AS_STATED", rationale="Reads the passage correctly.")
+    # an edit that leaves the statement's words alone (an attribute) keeps the adjudication valid
+    revise_claim(store, token, "CLAIM_W", WIDE, generated_by="researcher", note_to_self="tidied")
+    s2 = stmt(store, "CLAIM_W")
+    assert s2.revision == 2 and eca.statement_assessment(store, s2)["assessment"] == "VERIFIED_WITHIN_SCOPE"
+    # an edit to the words does not
+    revise_claim(store, token, "CLAIM_W", WIDE + " It also works for short panels.", generated_by="researcher")
+    out = eca.statement_assessment(store, stmt(store, "CLAIM_W"))
+    assert out["assessment"] == "PROVISIONAL" and out["adjudications"] == [] and "earlier adjudications read different wording; adjudicate the current text" in out["reasons"]

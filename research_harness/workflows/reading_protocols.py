@@ -28,7 +28,7 @@ from typing import Any, Optional
 from jsonschema import Draft202012Validator
 
 from research_harness.core.canonical import canonical_json_hash
-from research_harness.knowledge.common import WRITE_ROLES, KnowledgeError, engine_origin, id_fragment
+from research_harness.knowledge.common import WRITE_ROLES, KnowledgeError, engine_origin, id_fragment, scope_id
 from research_harness.knowledge.corpus import source_sections, source_text
 from research_harness.state import workflow_runs
 from research_harness.state.store import StateStore
@@ -250,7 +250,7 @@ def _store_records(store: StateStore, token: Optional[str], protocol: ReadingPro
         for rec in records:
             section = next((s for s in sections if s["char_start"] <= rec["char_start"] < s["char_end"]), None)
             content = _passage_content(protocol, obj, rec, key, model, (section or {}).get("heading") or (section or {}).get("label") or "")
-            pid = f"EP_{frag}_{proto}_{rec['char_start']}"
+            pid = scope_id(store, f"EP_{frag}_{proto}_{rec['char_start']}")
             head = tx.head(pid)
             if head:
                 cur = tx.get(pid)

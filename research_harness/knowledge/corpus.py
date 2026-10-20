@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from research_harness.knowledge.common import (
-    WRITE_ROLES, KnowledgeError, engine_origin, head_or_raise, id_fragment)
+    WRITE_ROLES, KnowledgeError, engine_origin, head_or_raise, id_fragment, scope_id)
 from research_harness.state.store import StateStore
 from research_harness.workflows import quotes
 from research_harness.workflows.fulltext import body_of, text_sha256
@@ -60,7 +60,7 @@ def import_source(store: StateStore, token: Optional[str], *, citation_key: str,
     unknown = set(bibliographic) - allowed
     if unknown:
         raise KnowledgeError("UNKNOWN_SOURCE_FIELDS", f"unsupported Source fields: {sorted(unknown)}")
-    oid = source_id or source_id_for(citation_key, id_prefix)
+    oid = scope_id(store, source_id or source_id_for(citation_key, id_prefix))
     data = text.encode("utf-8")
     artifact = store.artifacts.put_bytes(data)
     sections = [s.to_dict() for s in detect_sections(text)]
@@ -143,7 +143,7 @@ def add_passage(store: StateStore, token: Optional[str], *, source_id: str, quot
         content.pop("section")
     with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
         head_or_raise(tx, source_id, "Source")
-        oid = passage_id or f"{id_prefix}{id_fragment(source_id, 30)}_{start}"
+        oid = scope_id(store, passage_id or f"{id_prefix}{id_fragment(source_id, 30)}_{start}")
         if tx.head(oid):
             raise KnowledgeError("ID_ALREADY_EXISTS", f"{oid} already exists")
         res = tx.add_revision(object_id=oid, object_type="EvidencePassage", content=content,
