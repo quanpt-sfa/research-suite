@@ -2,31 +2,89 @@
   "version": "1",
   "protocols": {
     "RP_INTRO_ARGUMENT": {
-      "version": "1",
+      "version": "2",
       "label": "Introduction argument",
       "purpose": "Reconstruct the argument an Introduction makes for its contribution. What the authors assert is author-asserted, not verified.",
       "dimension": "introduction_argument",
       "instructions": "Read the text and report only what the authors themselves state. For every record, quote the exact words that carry it. Do not judge whether the argument is correct, and do not supply a component the authors did not state.",
       "fields": [
-        {"name": "phenomenon", "description": "the problem or phenomenon the paper says needs explaining", "required": true},
-        {"name": "established_knowledge", "description": "what the authors say prior work has shown or explained", "required": true, "repeatable": true},
-        {"name": "unresolved_tension", "description": "the disagreement, limitation, untested assumption or open question the authors identify", "required": true, "repeatable": true},
-        {"name": "proposed_contribution", "description": "what the authors say the paper adds, changes or bounds", "required": true, "repeatable": true},
-        {"name": "evidence_needed", "description": "the evidence or tests the authors say are needed to defend the contribution", "required": false, "repeatable": true}
+        {
+          "name": "phenomenon",
+          "description": "the problem or phenomenon the paper says needs explaining",
+          "required": true
+        },
+        {
+          "name": "established_knowledge",
+          "description": "what the authors say prior work has shown or explained",
+          "required": true,
+          "repeatable": true
+        },
+        {
+          "name": "unresolved_tension",
+          "description": "the disagreement, limitation, untested assumption or open question the authors identify",
+          "required": true,
+          "repeatable": true
+        },
+        {
+          "name": "proposed_contribution",
+          "description": "what the authors say the paper adds, changes or bounds (give `type` when the authors' wording makes it clear)",
+          "required": true,
+          "repeatable": true,
+          "types": [
+            "extends",
+            "challenges",
+            "bounds",
+            "reconciles",
+            "new_measurement",
+            "new_setting_with_theoretical_reason",
+            "new_setting_only"
+          ]
+        },
+        {
+          "name": "evidence_needed",
+          "description": "the evidence or tests the authors say are needed to defend the contribution",
+          "required": false,
+          "repeatable": true
+        }
       ]
     },
     "RP_THEORY": {
-      "version": "1",
+      "version": "2",
       "label": "Theory and mechanism",
       "purpose": "Record the theory a paper invokes, the mechanism it assumes, how it defines its constructs and which assumptions it tests.",
       "dimension": "theory",
       "instructions": "Report only what the paper states. Quote construct definitions verbatim. If the paper does not state an assumption or a mechanism, leave the field out and list it under gaps; do not infer one.",
       "fields": [
-        {"name": "theory_invoked", "description": "the theory or theoretical framing the paper relies on", "required": false, "repeatable": true},
-        {"name": "assumed_mechanism", "description": "the mechanism the paper assumes links its constructs", "required": false, "repeatable": true},
-        {"name": "construct_definition", "description": "a construct as the paper defines it (quote the definition)", "required": false, "repeatable": true},
-        {"name": "stated_assumption", "description": "an assumption the paper states", "required": false, "repeatable": true},
-        {"name": "assumption_tested", "description": "an assumption the paper says it tests", "required": false, "repeatable": true}
+        {
+          "name": "theory_invoked",
+          "description": "the theory or theoretical framing the paper relies on (put its name in `label`)",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "assumed_mechanism",
+          "description": "the mechanism the paper assumes links its constructs (put its name in `label`)",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "construct_definition",
+          "description": "a construct as the paper defines it (quote the definition; put the construct's name in `label`)",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "stated_assumption",
+          "description": "an assumption the paper states",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "assumption_tested",
+          "description": "an assumption the paper says it tests",
+          "required": false,
+          "repeatable": true
+        }
       ]
     },
     "RP_METHOD": {
@@ -36,14 +94,54 @@
       "dimension": "design",
       "instructions": "Report each design choice the paper states, with the words that state it. Do not complete a procedure from general knowledge of the method. A choice the paper does not state is a gap.",
       "fields": [
-        {"name": "study_design", "description": "the research design or type of study", "required": false, "repeatable": true},
-        {"name": "sample_selection", "description": "how the sample or data were selected, including filters and exclusions", "required": false, "repeatable": true},
-        {"name": "label_construction", "description": "how the outcome or label was defined and where it comes from", "required": false, "repeatable": true},
-        {"name": "variable_measurement", "description": "how a variable or feature is measured", "required": false, "repeatable": true},
-        {"name": "model_or_estimator", "description": "the model, estimator or algorithm used", "required": false, "repeatable": true},
-        {"name": "validation_or_tests", "description": "how results are validated, tested or compared (splits, baselines, tests)", "required": false, "repeatable": true},
-        {"name": "interpretation_rule", "description": "how the paper says estimates or scores should be interpreted", "required": false, "repeatable": true},
-        {"name": "limitation_handling", "description": "how the paper addresses a limitation or threat", "required": false, "repeatable": true}
+        {
+          "name": "study_design",
+          "description": "the research design or type of study",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "sample_selection",
+          "description": "how the sample or data were selected, including filters and exclusions",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "label_construction",
+          "description": "how the outcome or label was defined and where it comes from",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "variable_measurement",
+          "description": "how a variable or feature is measured",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "model_or_estimator",
+          "description": "the model, estimator or algorithm used",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "validation_or_tests",
+          "description": "how results are validated, tested or compared (splits, baselines, tests)",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "interpretation_rule",
+          "description": "how the paper says estimates or scores should be interpreted",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "limitation_handling",
+          "description": "how the paper addresses a limitation or threat",
+          "required": false,
+          "repeatable": true
+        }
       ]
     },
     "RP_CONTRIBUTION": {
@@ -53,11 +151,36 @@
       "dimension": "introduction_argument",
       "instructions": "Report what the authors state about their question, design, setting, mechanism and contribution. Their statement of contribution is author-asserted. Quote the words; do not summarise beyond them.",
       "fields": [
-        {"name": "research_question", "description": "the question the paper asks", "required": false, "repeatable": true},
-        {"name": "design", "description": "the design or approach, as stated", "required": false, "repeatable": true},
-        {"name": "setting", "description": "the setting, sample or context, as stated", "required": false, "repeatable": true},
-        {"name": "mechanism", "description": "the mechanism the paper proposes or tests", "required": false, "repeatable": true},
-        {"name": "claimed_contribution", "description": "what the paper says it contributes", "required": true, "repeatable": true}
+        {
+          "name": "research_question",
+          "description": "the question the paper asks",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "design",
+          "description": "the design or approach, as stated",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "setting",
+          "description": "the setting, sample or context, as stated",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "mechanism",
+          "description": "the mechanism the paper proposes or tests",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "claimed_contribution",
+          "description": "what the paper says it contributes",
+          "required": true,
+          "repeatable": true
+        }
       ]
     }
   }

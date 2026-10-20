@@ -100,6 +100,9 @@ def dependency_closure(lib: StateStore, pin_text: str) -> ClosureManifest:
                 src = lib.get_object(e["source_id"], e["source_revision"], conn=conn)
                 if src and src["object_type"] == "Adjudication":
                     queue.append((e["source_id"], e["source_revision"], f"adjudication of {oid}@{rev}"))
+                elif (src and src["object_type"] == "EvidencePassage" and e["relation"] == "derived_from"
+                      and src["content"].get("extraction_key")):
+                    queue.append((e["source_id"], e["source_revision"], f"extraction of {oid}@{rev}"))
             blobs |= artifact_digests_in(obj["content"])
     artifacts = []
     for sha in sorted(blobs):

@@ -1,0 +1,22 @@
+SYNTHETIC TEST PAPER B. Invented text written for the test suite; it is not a real study and states no real result.
+
+Abstract
+We propose an out-of-time validation design for restatement prediction. The findings are illustrative only.
+
+1 Introduction
+Restatements damage investor confidence and are hard to predict. Earlier work reports that accrual measures predict restatements, usually with random cross-validation. A gap remains because random folds let information from later years leak into earlier ones. Our contribution is an out-of-time validation design for restatement prediction that never trains on later years than it tests.
+
+2 Background and related work
+Managers facing weak monitoring misreport more often. We define restatement risk as the share of firm-years followed by a restated report within three years. We assume that monitoring quality is stable over the sample window, and we test this assumption with a rolling estimate.
+
+3 Research design
+We use all annual reports filed between 2008 and 2018 and keep firms with at least five years of data. The outcome label equals one when a restated report follows within three years. Models are validated by training on years before the test year only.
+
+4 Results
+Average precision falls from 0.14 under random folds to 0.07 under out-of-time folds. This gap is consistent with leakage under random folds.
+
+5 Conclusions
+Out-of-time validation lowers measured performance in this sample. Future work should apply it to other outcomes.
+
+References
+[1] A reference entry used only to end the document.

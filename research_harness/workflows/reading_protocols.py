@@ -77,7 +77,8 @@ class ReadingProtocol:
                     "type": "object",
                     "properties": {"field": {"enum": [f["name"] for f in self.fields]},
                                    "value": {"type": "string", "minLength": 1},
-                                   "quote": {"type": "string", "minLength": 1}},
+                                   "quote": {"type": "string", "minLength": 1},
+                                   "label": {"type": "string"}, "type": {"type": "string"}},
                     "required": ["field", "value", "quote"]}},
                 "gaps": {"type": "array", "items": {"type": "string"}},
             },
@@ -121,7 +122,7 @@ def _fingerprint(key: str, protocol: ReadingProtocol) -> str:
 
 def build_system_prompt(protocol: ReadingProtocol) -> str:
     fields = "\n".join(f"- `{f['name']}`: {f['description']}" + (" (may repeat)" if f.get("repeatable") else " (once)")
-                       for f in protocol.fields)
+                       + (f" Allowed types: {', '.join(f['types'])}." if f.get("types") else "") for f in protocol.fields)
     return (
         f"You are extracting facts from one academic paper for a research assistant ({protocol.id}: {protocol.label}).\n\n"
         f"Purpose: {protocol.purpose}\n\n## Instructions\n{protocol.instructions}\n\n## Fields\n{fields}\n\n"
@@ -129,6 +130,8 @@ def build_system_prompt(protocol: ReadingProtocol) -> str:
         f"{json.dumps(protocol.output_schema(), indent=2, sort_keys=True)}\n\n"
         "Rules:\n- `quote` must be an exact span copied from the text you are shown, long enough to be unambiguous. "
         "Do not paraphrase inside `quote`. A record without a verbatim quote is discarded.\n"
+        "- `label` (optional) names what the record is about, for example the construct a definition defines. `type` (optional) "
+        "is one of the allowed types listed for a field, when it has any.\n"
         "- `value` is your concise statement of what the quote says for that field. Do not add anything the quote does not say.\n"
         "- If the text does not state something a field asks for, omit the field and name it in `gaps`. "
         "Do not fill it from general knowledge.\n")
@@ -204,10 +207,17 @@ def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, ch
         if counts.get(rec["field"], 0) >= 1 and not (spec or {}).get("repeatable"):
             reject("field_not_repeatable")
             continue
+        if rec.get("type") and (spec or {}).get("types") and rec["type"] not in spec["types"]:
+            reject("type_not_allowed")
+            continue
         seen.add((rec["field"], start, end))
         counts[rec["field"]] = counts.get(rec["field"], 0) + 1
-        accepted.append({"field": rec["field"], "value": rec["value"].strip(), "quote": full_text[start:end],
-                         "char_start": start, "char_end": end})
+        item = {"field": rec["field"], "value": rec["value"].strip(), "quote": full_text[start:end],
+                "char_start": start, "char_end": end}
+        for extra in ("label", "type"):
+            if rec.get(extra):
+                item[extra] = rec[extra].strip()
+        accepted.append(item)
     return accepted, rejected, [str(g) for g in parsed.get("gaps", [])], None
 
 
@@ -237,6 +247,10 @@ def _passage_content(protocol: ReadingProtocol, obj: dict[str, Any], rec: dict[s
          "generated_by": f"model:{model.get('model_id') or model.get('provider')}", "extraction_key": key, "model": model}
     if section:
         c["section"] = section
+    if rec.get("label"):
+        c["item_label"] = rec["label"]
+    if rec.get("type"):
+        c["item_type"] = rec["type"]
     return c
 
 
@@ -288,6 +302,13 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
                                source_revision=obj["revision"], text_digest=text_digest, reused_from=row["run_id"],
                                protocol=protocol)
             return {**cached, "reused": True, "run_id": run_id, "reused_from_run_id": row["run_id"]}
+        imported = _cached_from_passages(store, key, protocol, obj)
+        if imported is not None:  # the extraction came with the source (a library import): no model call, same result
+            run_id = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, context=ContextStatus.COMPLETE,
+                               assessment=AssessmentStatus.PROVISIONAL, legacy_status="SUCCESS", reason="reused_imported_passages",
+                               usage={"llm_calls": 0, "usage_source": "not_available"}, model=imported.get("model"), artifact=None,
+                               source_id=source_id, source_revision=obj["revision"], text_digest=text_digest, protocol=protocol)
+            return {**imported, "reused": True, "run_id": run_id, "reused_from": "imported_passages"}
 
     sections_all = source_sections(store, obj, text)
     chosen = sections_for_dimension([Section(**s) for s in sections_all], protocol.dimension)
@@ -358,6 +379,32 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
                        artifact=artifact, source_id=source_id, source_revision=obj["revision"], text_digest=text_digest,
                        protocol=protocol)
     return {**result, "reused": False, "run_id": run_id}
+
+
+def _cached_from_passages(store: StateStore, key: str, protocol: ReadingProtocol, obj: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Rebuild an extraction from EvidencePassages that carry this extraction key (they arrive with an imported Source)."""
+    with store.read() as conn:
+        rows = conn.execute(
+            "SELECT o.object_id, o.revision FROM objects o JOIN object_heads h ON h.object_id=o.object_id AND h.head_revision=o.revision "
+            "WHERE o.object_type='EvidencePassage' AND json_extract(o.content,'$.extraction_key')=? ORDER BY o.object_id", (key,)).fetchall()
+        passages = [store.get_object(r[0], r[1], conn=conn) for r in rows]
+    if not passages:
+        return None
+    records = []
+    for p in passages:
+        c = p["content"]
+        rec = {"passage_id": p["object_id"], "revision": p["revision"], "field": c["field"], "value": c["value"], "quote": c["quote"],
+               "char_start": c["char_start"], "char_end": c["char_end"]}
+        if c.get("item_label"):
+            rec["label"] = c["item_label"]
+        if c.get("item_type"):
+            rec["type"] = c["item_type"]
+        records.append(rec)
+    records.sort(key=lambda r: (r["char_start"], r["field"]))
+    return {"protocol": protocol.pin, "protocol_digest": protocol.digest, "source_id": obj["object_id"], "source_revision": obj["revision"],
+            "extraction_key": key, "status": "EXTRACTED", "records": records, "rejected": [], "gaps": [], "chunks": 0,
+            "sections_read": [], "section_fallback": False, "context_status": "COMPLETE", "assessment": "PROVISIONAL",
+            "model": passages[0]["content"].get("model")}
 
 
 def _load_cached(store: StateStore, row: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:

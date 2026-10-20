@@ -1,0 +1,22 @@
+SYNTHETIC FOCUS MANUSCRIPT. Invented text written for the test suite; it is not a real study and states no real result.
+
+Abstract
+We ask whether a restatement model estimated on some industries still works for firms in industries it has not seen.
+
+1 Introduction
+Restatements of annual reports are costly for investors and for the firms involved. Prior studies show that accrual-based indicators predict restatements within a single industry. It remains unclear whether a model estimated on some industries still works for firms in industries it has not seen. We contribute by evaluating out-of-industry transfer of a restatement model with out-of-time folds, which prior work has not combined. We would need a leave-one-industry-out evaluation and a comparison against a constant predictor to defend this claim.
+
+2 Background and related work
+Agency theory predicts that weak monitoring raises the incentive to misreport. We define restatement risk as the probability that a firm's annual report is later amended for an accounting error.
+
+3 Experimental setup
+We use annual reports filed between 2005 and 2015 and drop firms with fewer than three consecutive annual observations. Models are validated by training on earlier years and testing on later years.
+
+4 Results
+Results are reported in the tables below.
+
+5 Conclusions
+Conclusions follow the results.
+
+References
+[1] A reference entry used only to end the document.
