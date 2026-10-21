@@ -1,0 +1,51 @@
+{
+  "form": "wp14-expert-cases-1",
+  "instructions": [
+    "Written by the researcher (and optionally a second reader) from field knowledge, WITHOUT running the WP14 rules and without copying fixtures_v2.json.",
+    "Each case: the candidate's claim(s), the competitor(s) (a real passage with source, or a precise description), your facet coding, and your expected outcome with a short reason.",
+    "Leave a field null rather than guessing. Do not let a model fill this form: the cases are the scientific reference against which the rules are tested (MA2).",
+    "Minimum 20 cases. Required coverage is listed under required_situations; tick each case's situations."
+  ],
+  "author": null,
+  "second_reader": null,
+  "written_at": null,
+  "rules_version_seen_before_writing": null,
+  "required_situations": [
+    "rival explanations with the same variables and similar results",
+    "working paper fully developing a mechanism, not peer reviewed",
+    "future-research mention followed by a full test in the candidate",
+    "one work in several versions; the journal version withdraws or changes a result",
+    "two papers jointly covering the claim's scope",
+    "two papers covering the scope with contrary findings",
+    "a correction already published / a flaw identified without correction",
+    "pooled subsample versus a separately reported condition",
+    "similar but different measure (different construct)",
+    "causal language on a correlational design",
+    "same mechanism, different market, with and without a rationale for the market",
+    "a case you believe the seven claim kinds cannot express (if any)"
+  ],
+  "cases": [
+    {
+      "case_id": "E01",
+      "situations": [],
+      "candidate_claims": [
+        {"claim_id": "C1", "kind": null, "statement": null, "scope": null, "condition": null, "rationale": null, "rival": null, "target_work": null}
+      ],
+      "competitors": [
+        {"competitor_id": "P1", "work_id": null, "citation": null, "document_type": null, "review_status": null, "first_public_date": null,
+         "version": null, "passage_or_description": null, "locator": null}
+      ],
+      "your_coding": [
+        {"claim_id": "C1", "competitor_id": "P1",
+         "facets": {"claim_rel": null, "question_rel": null, "disclosure": null, "scope_cover": null, "condition_rel": null,
+                    "method_rel": null, "evidence_rel": null, "critique_rel": null, "correction_rel": null},
+         "expected_precedence": null, "expected_remaining": null, "reason": null}
+      ],
+      "expected_claim_outcomes": {"C1": null},
+      "expected_candidate_summary": null,
+      "expected_credibility_note": null,
+      "expected_editorial_relevance": null,
+      "notes": null
+    }
+  ]
+}

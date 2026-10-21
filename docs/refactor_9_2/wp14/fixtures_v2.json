@@ -1,0 +1,478 @@
+{
+  "version": "wp14-fixtures-2",
+  "rules": "M5_WP14_PRECEDENCE_RULES_V2.md",
+  "status": "design fixtures: expected values follow the v2 rules and are to be confirmed by the owner; they are NOT the independent expert cases",
+  "conventions": {
+    "omitted_facet": "N/A",
+    "pair.confirmed": "researcher-confirmed facets; unconfirmed pairs carry proposed facets",
+    "claim_state": ["assessment_progress", "corpus_currency", "precedence_outcome"],
+    "scope": "period = closed year interval; population/market = tags from the domain spec"
+  },
+  "fixtures": [
+    {
+      "id": "F1", "purpose": "same population and period, different mechanism: no precedence (review 1, example 1)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "mechanism M2 explains fraud persistence"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true,
+                 "facets": {"claim_rel": "REL"}, "expected_precedence": "RELATED"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F2", "purpose": "same mechanism tested in another market, no rationale: mechanism preceded, finding builds on (review 2, row-7 case)",
+      "claims": [
+        {"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"},
+        {"claim_id": "C2", "kind": "FINDING", "statement": "X holds in Vietnam", "scope": {"period": [2010, 2022], "market": ["VN_listed"]}}
+      ],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED"}, "expected_precedence": "PRECEDES"},
+        {"claim_id": "C2", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2015], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "DIS"}, "expected_precedence": "BUILDS_ON"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {
+        "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"},
+        "C2": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS",
+               "flags": ["NEW_SETTING_WITHOUT_RATIONALE"]}
+      },
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "F3", "purpose": "F2 plus a boundary claim; pooled sample does not test the boundary",
+      "claims": [
+        {"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"},
+        {"claim_id": "C3", "kind": "BOUNDARY", "statement": "X fails under state ownership", "condition": "SOE", "rationale": "state ownership weakens market discipline"}
+      ],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED"}, "expected_precedence": "PRECEDES"},
+        {"claim_id": "C3", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "condition_rel": "POOLED"}, "expected_precedence": "BUILDS_ON"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {
+        "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"},
+        "C3": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}
+      },
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "F4", "purpose": "boundary reported separately: preceded",
+      "claims": [{"claim_id": "C1", "kind": "BOUNDARY", "statement": "K fails in small firms", "condition": "small_firms", "rationale": "r"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "condition_rel": "TESTED"}, "expected_precedence": "PRECEDES"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED"
+    },
+    {
+      "id": "F5", "purpose": "base finding without the condition: builds on",
+      "claims": [{"claim_id": "C1", "kind": "BOUNDARY", "statement": "K fails in small firms", "condition": "small_firms", "rationale": "r"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "condition_rel": "NOT_TESTED"}, "expected_precedence": "BUILDS_ON"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F6", "purpose": "contrary finding is a contest, not precedence",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2020], "market": ["US_listed"]},
+                 "facets": {"claim_rel": "OPP"}, "expected_precedence": "CONTESTS"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS", "flags": ["CONTESTED"]}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F7", "purpose": "flawed earlier test still precedes; flaw yields a residual opportunity (review 2.2)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [1995, 2020], "market": ["US_listed"]},
+                 "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "COV"},
+                 "credibility": {"inference": "NOT_SUPPORTED", "reason": "look-ahead features"},
+                 "expected_precedence": "PRECEDES", "expected_residual": ["credible_test"]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED",
+      "invariant": "I-1: replacing credibility by any other value leaves expected_precedence unchanged"
+    },
+    {
+      "id": "F7b", "purpose": "flaw already identified, correction not done: flaw claim preceded, corrected result not (review 3.A)",
+      "claims": [
+        {"claim_id": "C1", "kind": "FLAW_IDENTIFICATION", "statement": "study W uses look-ahead features", "target_work": "W_TARGET"},
+        {"claim_id": "C2", "kind": "CORRECTED_RESULT", "statement": "without look-ahead, K' holds", "target_work": "W_TARGET"}
+      ],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"critique_rel": "SAME", "disclosure": "PROPOSED"}, "expected_precedence": "PRECEDES"},
+        {"claim_id": "C2", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "NA"}, "inspection_record": true, "expected_precedence": "UNRELATED"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {
+        "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"},
+        "C2": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}
+      },
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "F8", "purpose": "new evidence type builds on correlational evidence",
+      "claims": [{"claim_id": "C1", "kind": "EVIDENCE", "statement": "quasi-experimental test of K", "evidence_type": "quasi_experimental"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "evidence_rel": "OTHER_TYPE"}, "expected_precedence": "BUILDS_ON"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F9", "purpose": "same design already used: preceded",
+      "claims": [{"claim_id": "C1", "kind": "EVIDENCE", "statement": "quasi-experimental test of K", "evidence_type": "quasi_experimental"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "evidence_rel": "SAME_TYPE"}, "expected_precedence": "PRECEDES"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED"
+    },
+    {
+      "id": "F9b", "purpose": "author's causal wording on a cross-sectional design does not make it the same evidence type (I-8)",
+      "claims": [{"claim_id": "C1", "kind": "EVIDENCE", "statement": "quasi-experimental test of K", "evidence_type": "quasi_experimental"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "author_label": "causal", "described_design": "cross_sectional_regression",
+                 "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "evidence_rel": "OTHER_TYPE"}, "expected_precedence": "BUILDS_ON"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F10", "purpose": "same method for the same question: preceded",
+      "claims": [{"claim_id": "C1", "kind": "METHOD", "statement": "text-based pressure measure answers Q"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"question_rel": "SAME", "disclosure": "APPLIED", "method_rel": "SAME"}, "expected_precedence": "PRECEDES"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED"
+    },
+    {
+      "id": "F10b", "purpose": "similar method (different construct): partial (P16 path)",
+      "claims": [{"claim_id": "C1", "kind": "METHOD", "statement": "text-based pressure measure answers Q"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"question_rel": "SAME", "disclosure": "APPLIED", "method_rel": "SIMILAR"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "method"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "F10c", "purpose": "unrelated method: builds on (counterexample of F10b)",
+      "claims": [{"claim_id": "C1", "kind": "METHOD", "statement": "text-based pressure measure answers Q"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"question_rel": "SAME", "disclosure": "APPLIED", "method_rel": "DIFF"}, "expected_precedence": "BUILDS_ON"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "F11", "purpose": "appendix cited but not held: undecidable, not absent (I-5)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "U"},
+                 "inspection_record": {"sections_missing": ["online appendix B"]}, "expected_precedence": "UNDETERMINED"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "INSUFFICIENT_COVERAGE"}},
+      "expected_candidate_summary": "INSUFFICIENT_COVERAGE"
+    },
+    {
+      "id": "F12a", "purpose": "terminology drift, R2 enabled: competitor found",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "financial reporting fraud adapts to detection"}],
+      "retrieval": {"R2": true, "assessed_set": ["P1", "P2"], "gold_competitors": ["P1"]},
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "PROPOSED"}, "expected_precedence": "PRECEDES"},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "facets": {"claim_rel": "REL"}, "expected_precedence": "RELATED"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED",
+      "expected_gate_m": {"retrieval_miss": false}
+    },
+    {
+      "id": "F12b", "purpose": "terminology drift, R2 disabled: competitor missed; outcome is stated over the assessed set and Gate M counts a retrieval miss (review 3.E)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "financial reporting fraud adapts to detection"}],
+      "retrieval": {"R2": false, "assessed_set": ["P2"], "corpus_size": 2, "gold_competitors": ["P1"]},
+      "pairs": [{"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "facets": {"claim_rel": "REL"}, "expected_precedence": "RELATED"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS",
+                                 "coverage_must_state": ["assessed 1 of 2 sources", "R2 disabled"]}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS",
+      "expected_gate_m": {"retrieval_miss": true, "ma3a_missed_precedence": true}
+    },
+    {
+      "id": "F13", "purpose": "model codes NA wrongly; outcome open until confirmed; MA3a records the miss, MA3b the corrected result",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"}],
+      "stages": [
+        {"stage": "proposed", "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": false, "facets": {"claim_rel": "NA"}, "inspection_record": true}],
+         "expected_claims": {"C1": {"assessment_progress": "NONE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_YET_DETERMINED"}},
+         "expected_gate_m": {"ma3a_missed_precedence": true}},
+        {"stage": "corrected", "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "PROPOSED"}, "expected_precedence": "PRECEDES"}],
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+         "expected_gate_m": {"ma3b_missed_precedence": false}}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false}
+    },
+    {
+      "id": "F14", "purpose": "held-out competitor: absence becomes stale, then challenged after screening (I20)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "stages": [
+        {"stage": "S1", "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1"},
+         "pairs": [{"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "facets": {"claim_rel": "REL"}}],
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}}},
+        {"stage": "S2 imported, not screened", "corpus": {"current_snapshot": "S2", "screened_snapshot": "S1", "delta": ["P_STAR"], "screened": 0},
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "STALE_FOR_CORPUS(S1->S2, 0 of 1)", "precedence_outcome": "NOT_YET_DETERMINED"}}},
+        {"stage": "S2 screened", "corpus": {"current_snapshot": "S2", "screened_snapshot": "S2"},
+         "pairs": [{"claim_id": "C1", "competitor": "P_STAR", "work_id": "W3", "confirmed": true, "bm25_rank_above_k": true,
+                    "scope_of_competitor": {"period": [2000, 2020], "market": ["US_listed"]},
+                    "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "COV"}, "expected_precedence": "PRECEDES"}],
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S2", "precedence_outcome": "CHALLENGED"}},
+         "history_kept": ["NOT_CHALLENGED_IN_SEARCHED_CORPUS@S1"]}
+      ]
+    },
+    {
+      "id": "F14b", "purpose": "a positive outcome stays while the corpus is stale; the three fields are shown together (review 3.C)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "PROPOSED"}, "expected_precedence": "PRECEDES"},
+                {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": false, "facets": {"claim_rel": "REL"}}],
+      "corpus": {"current_snapshot": "S2", "screened_snapshot": "S1", "delta": ["P9", "P10"], "screened": 1},
+      "expected_claims": {"C1": {"assessment_progress": "PARTIAL(1 of 2)", "corpus_currency": "STALE_FOR_CORPUS(S1->S2, 1 of 2)", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED"
+    },
+    {
+      "id": "X1", "purpose": "future-research mention, specific: partial (MECHANISM partial path)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "MENTIONED_SPECIFIC"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "disclosure", "missing": "PROPOSED"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X2", "purpose": "vague mention: related (counterexample of X1)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "MENTIONED_VAGUE"}, "expected_precedence": "RELATED"}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}},
+      "expected_candidate_summary": "NO_CLAIM_CHALLENGED_IN_SEARCHED_CORPUS"
+    },
+    {
+      "id": "X3", "purpose": "narrower mechanism proposed: partial; a PART component never reaches PRECEDES (R-PART)",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z for all fraud types"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SUBSET", "disclosure": "TESTED"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "proposition"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X4", "purpose": "finding with overlapping scope: partial (P8 path)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2010, 2025], "market": ["US_listed"]},
+                 "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "scope", "missing": {"period": [2000, 2009], "market": ["US_listed"]}}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X5", "purpose": "finding hypothesised but not tested: partial (disclosure below TESTED)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2020], "market": ["US_listed"]},
+                 "facets": {"claim_rel": "SAME", "disclosure": "PROPOSED", "scope_cover": "COV"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "disclosure", "missing": "TESTED"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X6", "purpose": "boundary under a related condition: partial (P12 path)",
+      "claims": [{"claim_id": "C1", "kind": "BOUNDARY", "statement": "K fails under SOE", "condition": "SOE", "rationale": "r"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "condition_rel": "TESTED_PART"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "condition"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X7", "purpose": "evidence of the same type for a narrower claim: partial",
+      "claims": [{"claim_id": "C1", "kind": "EVIDENCE", "statement": "quasi-experimental test of K", "evidence_type": "quasi_experimental"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SUBSET", "disclosure": "TESTED", "evidence_rel": "SAME_TYPE"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "proposition"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X8", "purpose": "flaw stated less specifically: partial",
+      "claims": [{"claim_id": "C1", "kind": "FLAW_IDENTIFICATION", "statement": "W uses look-ahead features", "target_work": "W_TARGET"}],
+      "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"critique_rel": "PART", "disclosure": "PROPOSED"},
+                 "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "proposition"}]}],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "X9", "purpose": "re-estimation with a different fix: partial; re-estimation for other reasons: builds on",
+      "claims": [{"claim_id": "C1", "kind": "CORRECTED_RESULT", "statement": "without look-ahead, K' holds", "target_work": "W_TARGET"}],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "correction_rel": "OTHER_CORRECTION"},
+         "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "correction"}]},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "correction_rel": "NONE"}, "expected_precedence": "BUILDS_ON"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "R1", "purpose": "same variables and results, different explanations: same numbers never make the contributions the same",
+      "claims": [
+        {"claim_id": "C1", "kind": "MECHANISM", "statement": "X2 rather than X1 explains Z", "rival": "X1"},
+        {"claim_id": "C2", "kind": "FINDING", "statement": "relation K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}
+      ],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "note": "P1 explains the same estimates by X1", "facets": {"claim_rel": "REL"}, "expected_precedence": "RELATED"},
+        {"claim_id": "C2", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2020], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "COV"}, "expected_precedence": "PRECEDES"},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "note": "P2 develops X2 and X1 side by side without a discriminating test",
+         "facets": {"claim_rel": "SAME", "disclosure": "DEVELOPED"}, "expected_precedence": "PARTIALLY_PRECEDES",
+         "expected_remaining": [{"component": "disclosure", "missing": "TESTED (discriminating test)"}]}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {
+        "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"},
+        "C2": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}
+      },
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "J1", "purpose": "two papers jointly cover the period: jointly preceded (review 3.D)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2010], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "scope_of_competitor": {"period": [2011, 2020], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_joint": {"result": "JOINTLY_PRECEDED", "basis": ["W1", "W2"]},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}},
+      "expected_candidate_summary": "ALL_CLAIMS_CHALLENGED"
+    },
+    {
+      "id": "J2", "purpose": "second paper contradicts for its period: contested cells, partial",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2010], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "scope_of_competitor": {"period": [2011, 2020], "market": ["US_listed"]},
+         "facets": {"claim_rel": "OPP"}, "expected_precedence": "CONTESTS"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_joint": {"result": "JOINTLY_PARTIAL", "contrary": [{"period": [2011, 2020], "market": ["US_listed"]}], "contested": [], "remaining": []},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED", "flags": ["CONTESTED"]}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "J3", "purpose": "second paper's population not stated: not eligible, its cells unknown",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2010], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"},
+        {"claim_id": "C1", "competitor": "P2", "work_id": "W2", "confirmed": true, "scope_of_competitor": {"period": [2011, 2020], "market": "NS"},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "NS"}, "expected_precedence": "UNDETERMINED"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_joint": {"result": "JOINTLY_PARTIAL", "remaining": [{"period": [2011, 2020], "market": ["US_listed"], "state": "UNKNOWN"}]},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "J4", "purpose": "two versions of one work count once (I-11)",
+      "claims": [{"claim_id": "C1", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}],
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1v1", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2010], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"},
+        {"claim_id": "C1", "competitor": "P1v2", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2010], "market": ["US_listed"]},
+         "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_joint": {"result": "JOINTLY_PARTIAL", "basis_works": ["W1"], "independent_studies": 1, "remaining": [{"period": [2011, 2020], "market": ["US_listed"]}]},
+      "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"}},
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "W1", "purpose": "working paper fully develops the mechanism, not peer reviewed: precedence, credibility and editorial relevance are separate",
+      "claims": [{"claim_id": "C1", "kind": "MECHANISM", "statement": "firms adapt presentation after a major fraud is detected"}],
+      "sources": {"P1": {"document_type": "working_paper", "review_status": "NOT_REVIEWED", "first_public_date": "2025-03-10", "date_evidence": "repository posting record"}},
+      "variants": [
+        {"variant": "no policy recorded", "journal_policy": null,
+         "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "DEVELOPED"}}],
+         "expected_dimensions": {"intellectual_precedence": "PRECEDES", "evidentiary_credibility": {"inference": "NOT_ASSESSED"}, "editorial_relevance": "NO_POLICY_RECORDED"},
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}}},
+        {"variant": "target journal policy: preprints not prior publication (registry record with official excerpt)", "journal_policy": "EXCLUDES_PREPRINTS",
+         "pairs": [{"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "DEVELOPED"}}],
+         "expected_dimensions": {"intellectual_precedence": "PRECEDES", "evidentiary_credibility": {"inference": "NOT_ASSESSED"}, "editorial_relevance": "EXCLUDED_BY_POLICY"},
+         "expected_claims": {"C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED"}}}
+      ],
+      "invariant": "I-10: changing review_status or journal policy never changes intellectual_precedence or credibility"
+    },
+    {
+      "id": "W2", "purpose": "working paper mentions the mechanism as future research; the new study proposes and tests it",
+      "claims": [
+        {"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"},
+        {"claim_id": "C2", "kind": "EVIDENCE", "statement": "first empirical test of X with EDGAR data", "evidence_type": "correlational"}
+      ],
+      "sources": {"P1": {"document_type": "working_paper", "review_status": "NOT_REVIEWED", "first_public_date": "2024-11-02", "date_evidence": "repository posting record"}},
+      "pairs": [
+        {"claim_id": "C1", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "MENTIONED_SPECIFIC"},
+         "expected_precedence": "PARTIALLY_PRECEDES", "expected_remaining": [{"component": "disclosure", "missing": "PROPOSED"}]},
+        {"claim_id": "C2", "competitor": "P1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "MENTIONED_SPECIFIC", "evidence_rel": "NO_EVIDENCE"},
+         "expected_precedence": "BUILDS_ON"}
+      ],
+      "corpus": {"current_snapshot": "S1", "screened_snapshot": "S1", "below_floor": false},
+      "expected_claims": {
+        "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "PARTIALLY_ADDRESSED"},
+        "C2": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "NOT_CHALLENGED_IN_SEARCHED_CORPUS"}
+      },
+      "expected_candidate_summary": "MIXED"
+    },
+    {
+      "id": "W3", "purpose": "one work in three versions; the journal version withdraws part of V2's result (I-11, I-12)",
+      "claims": [
+        {"claim_id": "C1", "kind": "MECHANISM", "statement": "X explains Z"},
+        {"claim_id": "C2", "kind": "FINDING", "statement": "K holds", "scope": {"period": [2000, 2020], "market": ["US_listed"]}}
+      ],
+      "sources": {
+        "V1": {"document_type": "working_paper", "review_status": "NOT_REVIEWED", "first_public_date": "2024-02-01", "work_id": "W1", "version_id": "v1"},
+        "V2": {"document_type": "working_paper", "review_status": "NOT_REVIEWED", "first_public_date": "2025-01-15", "work_id": "W1", "version_id": "v2"},
+        "J":  {"document_type": "journal_article", "review_status": "PUBLISHED", "first_public_date": "2026-06-30", "work_id": "W1", "version_relations": {"is_version_of": "V2"}}
+      },
+      "stages": [
+        {"stage": "S1: V1 and V2 held",
+         "pairs": [
+           {"claim_id": "C1", "competitor": "V1", "work_id": "W1", "confirmed": true, "facets": {"claim_rel": "SAME", "disclosure": "PROPOSED"}, "expected_precedence": "PRECEDES"},
+           {"claim_id": "C2", "competitor": "V2", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2020], "market": ["US_listed"]},
+            "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "COV"}, "expected_precedence": "PRECEDES"}
+         ],
+         "expected_claims": {
+           "C1": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED", "precedence_date": "2024-02-01 (V1)"},
+           "C2": {"assessment_progress": "COMPLETE", "corpus_currency": "CURRENT@S1", "precedence_outcome": "CHALLENGED", "precedence_date": "2025-01-15 (V2)"}
+         }},
+        {"stage": "S2: journal version imported, not screened",
+         "corpus": {"current_snapshot": "S2", "screened_snapshot": "S1", "delta": ["J"], "screened": 0},
+         "expected_claims": {
+           "C1": {"corpus_currency": "STALE_FOR_CORPUS(S1->S2, 0 of 1)", "precedence_outcome": "CHALLENGED"},
+           "C2": {"corpus_currency": "STALE_FOR_CORPUS(S1->S2, 0 of 1)", "precedence_outcome": "CHALLENGED"}
+         }},
+        {"stage": "S2 screened: J keeps the mechanism, reports K only for 2000-2012",
+         "pairs": [
+           {"claim_id": "C2", "competitor": "J", "work_id": "W1", "confirmed": true, "scope_of_competitor": {"period": [2000, 2012], "market": ["US_listed"]},
+            "facets": {"claim_rel": "SAME", "disclosure": "TESTED", "scope_cover": "OVL"}, "expected_precedence": "PARTIALLY_PRECEDES"}
+         ],
+         "expected_claims": {
+           "C1": {"corpus_currency": "CURRENT@S2", "precedence_outcome": "CHALLENGED"},
+           "C2": {"corpus_currency": "CURRENT@S2", "precedence_outcome": "CHALLENGED", "precedence_date": "2025-01-15 (V2)",
+                  "credibility_annotation": {"V2": "withdrawn_in_later_version: 2013-2020"}, "expected_residual": ["credible_test for 2013-2020"]}
+         },
+         "expected_joint": {"independent_studies": 1},
+         "history_kept": ["S1 assessments of V1 and V2"]}
+      ]
+    }
+  ],
+  "not_in_this_file": {
+    "F15": "crowded realistic corpus: built as a corpus fixture in WP11",
+    "F16": "cold start A1-A4 and exploratory mode: task-level tests in WP11"
+  }
+}
