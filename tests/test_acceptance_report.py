@@ -48,6 +48,24 @@ def test_cli_exit_codes(tmp_path):
     assert ar.main(["--junit", str(junit), "--manifest", str(manifest), "--milestone", "MD", "--out", str(tmp_path / "r.md")]) == 1
 
 
+def test_red_ci_fails_every_milestone_and_no_ci_is_local_only(tmp_path):
+    junit = tmp_path / "j.xml"
+    junit.write_text(JUNIT, encoding="utf-8")
+    manifest = tmp_path / "m.json"
+    manifest.write_text(json.dumps(MANIFEST), encoding="utf-8")
+    out = tmp_path / "r.md"
+    assert ar.main(["--junit", str(junit), "--manifest", str(manifest), "--milestone", "MA", "--out", str(out)]) == 0
+    assert "PASS (local only, CI not recorded)" in out.read_text(encoding="utf-8")
+    red = tmp_path / "ci_red.json"
+    red.write_text(json.dumps({"databaseId": 1, "conclusion": "failure", "headSha": "abc"}), encoding="utf-8")
+    assert ar.main(["--junit", str(junit), "--manifest", str(manifest), "--milestone", "MA", "--ci-run", str(red), "--out", str(out)]) == 1
+    green = tmp_path / "ci_green.json"
+    green.write_text(json.dumps({"databaseId": 2, "conclusion": "success", "headSha": "abc"}), encoding="utf-8")
+    assert ar.main(["--junit", str(junit), "--manifest", str(manifest), "--milestone", "MA", "--ci-run", str(green), "--out", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "| MA | all pass | PASS |" in text and "CI run 2 on abc: **success**" in text
+
+
 def test_shipped_manifest_is_valid():
     manifest = json.loads((SCRIPT.parent.parent / "docs" / "refactor_9_2" / "milestones.json").read_text(encoding="utf-8"))
     assert set(manifest["milestones"]) == {"M1", "M2", "M3", "M4"}

@@ -6,7 +6,11 @@ a skip or a missing test does not count) and no test of a `no_xfail_files` entry
 
 Usage:
     pytest --junitxml=reports/junit.xml
-    python scripts/acceptance_report.py --junit reports/junit.xml [--milestone M1] [--out report.md]
+    gh run view <run-id> --json databaseId,conclusion,headSha > reports/ci_run.json
+    python scripts/acceptance_report.py --junit reports/junit.xml --ci-run reports/ci_run.json [--milestone M1] [--out report.md]
+
+A local test run alone is not evidence of a met milestone: without `--ci-run` a passing milestone is shown as
+"PASS (local only, CI not recorded)", and with a CI run whose conclusion is not `success` every milestone fails.
 
 Exit code 0 only if every selected milestone passes.
 """
@@ -75,12 +79,32 @@ def evaluate(manifest: dict, results: dict[str, str], selected: list[str] | None
     return report
 
 
+def apply_ci(report: dict[str, dict], ci: dict | None) -> dict[str, dict]:
+    """A CI run that is not green fails every milestone; no CI run leaves passes marked as local only."""
+    for r in report.values():
+        r["ci"] = ci
+        if ci is not None and ci.get("conclusion") != "success":
+            r["passed"] = False
+    return report
+
+
+def _result(r: dict) -> str:
+    if not r["passed"]:
+        return "FAIL"
+    return "PASS" if r.get("ci") else "PASS (local only, CI not recorded)"
+
+
 def render(report: dict[str, dict]) -> str:
     lines = ["# Research Suite 9.2 — milestone acceptance report", "",
              "_Generated from pytest results; no status is written by hand._", ""]
+    ci = next(iter(report.values())).get("ci") if report else None
+    if ci:
+        lines += [f"CI run {ci.get('databaseId')} on {ci.get('headSha')}: **{ci.get('conclusion')}**", ""]
+    else:
+        lines += ["CI run: **not recorded** (a milestone is not met on a local run alone)", ""]
     lines += ["| Milestone | Title | Result |", "|---|---|---|"]
     for mid, r in report.items():
-        lines.append(f"| {mid} | {r['title']} | {'PASS' if r['passed'] else 'FAIL'} |")
+        lines.append(f"| {mid} | {r['title']} | {_result(r)} |")
     for mid, r in report.items():
         lines += ["", f"## {mid} — {r['title']} (phases {', '.join(r['phases'])})", "",
                   "| Required integration test | Outcome |", "|---|---|"]
@@ -97,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     ap.add_argument("--milestone", action="append", help="limit to this milestone (repeatable)")
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--ci-run", type=Path, help="JSON of `gh run view <id> --json databaseId,conclusion,headSha`")
     args = ap.parse_args(argv)
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -104,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     if not report:
         print("no milestone selected", file=sys.stderr)
         return 2
+    apply_ci(report, json.loads(args.ci_run.read_text(encoding="utf-8")) if args.ci_run else None)
     text = render(report)
     if args.out:
         args.out.write_text(text, encoding="utf-8")

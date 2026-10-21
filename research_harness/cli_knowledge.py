@@ -80,8 +80,15 @@ def _run(args: argparse.Namespace, fn: Callable[[], Any], text: Optional[Callabl
 def _json_arg(value: Optional[str], what: str) -> Any:
     if value is None:
         return None
-    path = Path(value)
-    raw = path.read_text(encoding="utf-8") if path.is_file() else value
+    raw = value
+    # Inline JSON is never a path; asking the file system about it fails on Linux once it exceeds the name limit (ENAMETOOLONG).
+    if value.lstrip()[:1] not in ("[", "{"):
+        try:
+            path = Path(value)
+            if path.is_file():
+                raw = path.read_text(encoding="utf-8")
+        except OSError:
+            pass
     try:
         return json.loads(raw)
     except json.JSONDecodeError as e:
