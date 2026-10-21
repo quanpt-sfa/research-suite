@@ -62,7 +62,7 @@ def test_extraction_runs_real_protocols_with_quote_verification(proj):
         assert p["object_type"] == "EvidencePassage" and p["content"]["quote_verified"] is True
         assert text[p["content"]["char_start"]:p["content"]["char_end"]] == p["content"]["quote"]
         assert p["content"]["generated_by"] == "model:scripted-extractor"   # the value's producer, apart from the quote
-        assert p["content"]["protocol"] == "RP_METHOD@1" and p["origin"]["operation"] == "extract"
+        assert p["content"]["protocol"] == "RP_METHOD@2" and p["origin"]["operation"] == "extract"
         assert corpus.verify_passage(store, rec["passage_id"])["source_match"] == "VERIFIED"
         with store.read() as conn:
             assert [(e["relation"], e["target_id"]) for e in store.edges_from(conn, rec["passage_id"], rec["revision"])] == [
@@ -202,3 +202,25 @@ def test_protocols_on_the_real_pilot_paper(tmp_path):
     assert out["status"] == "EXTRACTED" and out["records"] and not out["rejected"]
     for rec in out["records"]:
         assert corpus.verify_passage(store, rec["passage_id"])["source_match"] == "VERIFIED"
+
+
+def test_method_protocol_also_reads_sample_measurement_and_unlabeled_sections(tmp_path):
+    """On the real pilot paper the label and sample construction sit under a heading that matches no label ("3 Misstatements under ..."),
+    so a protocol that reads only the method-labelled sections never saw them."""
+    store, token = StateStore.create(tmp_path / "home", "PRJ_UNL", owner_id="researcher")
+    text = ("Abstract\nA study.\n\n1 Introduction\nWe motivate it.\n\n3 Misstatements under the PU framework\nLabels come from restatement dates in a public database. "
+            "We keep firm-years with complete financial data.\n\n4 Experimental setup\nWe train on three earlier years.\n\n4.1 Experimental results\nAverage precision is low.\n\n"
+            "Data\nVariables are measured at fiscal year end.\n\nReferences\n[1] x\n")
+    corpus.import_source(store, token, citation_key="unl2026", text=text)
+    from research_harness.workflows.sections import detect_sections
+    labels = {s.heading: s.label for s in detect_sections(text) if s.heading}
+    assert labels["3 Misstatements under the PU framework"] == "other" and labels["Data"] == "data_sample"
+    method = answering([])
+    out = rp.run_protocol(store, token, "SRC_UNL2026", "RP_METHOD", method)
+    assert out["sections_read"] == ["3 Misstatements under the PU framework", "4 Experimental setup", "Data"] and out["section_fallback"] is False
+    shown = seen_text(method)
+    assert "restatement dates" in shown and "complete financial data" in shown and "fiscal year end" in shown and "Average precision is low" not in shown
+    theory = answering([])
+    out = rp.run_protocol(store, token, "SRC_UNL2026", "RP_THEORY", theory)
+    assert "restatement dates" not in seen_text(theory)          # protocols that did not ask for unlabeled sections do not get them
+    assert rp.get_protocol("RP_METHOD").include_unlabeled is True and rp.get_protocol("RP_THEORY").include_unlabeled is False

@@ -88,7 +88,7 @@
       ]
     },
     "RP_METHOD": {
-      "version": "1",
+      "version": "2",
       "label": "Method record",
       "purpose": "Record how a study was done, as candidate input to a method playbook. Fidelity to the source is checked before anything is reused.",
       "dimension": "design",
@@ -142,7 +142,12 @@
           "required": false,
           "repeatable": true
         }
-      ]
+      ],
+      "extra_dimensions": [
+        "sample_construction",
+        "measurement"
+      ],
+      "include_unlabeled": true
     },
     "RP_CONTRIBUTION": {
       "version": "1",

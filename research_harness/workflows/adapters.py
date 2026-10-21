@@ -328,3 +328,113 @@ class AnthropicMessagesAdapter:
             raise ModelOutputTruncated(
                 f"output reached max_output_tokens={self.max_output_tokens}", usage=usage, partial_output=text or None)
         return text, usage
+
+
+# ---------------------------------------------------------------------------------------------------
+# OpenAI-compatible live adapter (optional, standard library only)
+# ---------------------------------------------------------------------------------------------------
+
+class OpenAICompatibleAdapter:
+    """Live adapter over an OpenAI-compatible `chat/completions` endpoint (DeepSeek, among others). Standard library only.
+
+    * The model id is configuration, never a default: pass `model_id` or set `RESEARCH_MODEL`.
+    * The API key comes from the argument or `RESEARCH_API_KEY` and is never stored, logged, or part of `describe()`; an error
+      message never contains it.
+    * Sampling parameters are not sent. JSON mode is requested (`response_format: json_object`) and the answer is still validated
+      by the caller: JSON mode is a request, not a guarantee.
+    * Usage is what the provider reports (`usage_source: provider`); a figure it does not report stays `None`.
+    * `finish_reason: length` raises `ModelOutputTruncated`; `content_filter` raises `ModelRefusal`. Transient failures (HTTP 429 and 5xx,
+      network errors) are retried a few times with a pause; anything else fails at once.
+    * Reasoning text that a model returns beside its answer is not used and not stored.
+    """
+
+    ADAPTER_VERSION = "1"
+
+    def __init__(self, model_id: Optional[str] = None, *, base_url: Optional[str] = None, api_key: Optional[str] = None,
+                 max_output_tokens: int = 16000, timeout: float = 300.0, retries: int = 3, backoff_seconds: float = 2.0,
+                 json_mode: bool = True, opener: Any = None):
+        resolved = model_id or os.environ.get("RESEARCH_MODEL")
+        if not resolved:
+            raise ValueError("OpenAICompatibleAdapter needs a model id: pass model_id=... or set RESEARCH_MODEL. The model is part of every run's identity, so it is never defaulted.")
+        url = base_url or os.environ.get("RESEARCH_BASE_URL")
+        if not url:
+            raise ValueError("OpenAICompatibleAdapter needs a base URL (for example https://api.deepseek.com): pass base_url=... or set RESEARCH_BASE_URL.")
+        key = api_key or os.environ.get("RESEARCH_API_KEY")
+        if not key:
+            raise ValueError("OpenAICompatibleAdapter needs an API key: pass api_key=... or set RESEARCH_API_KEY (it is never stored).")
+        self.model_id = resolved
+        self.base_url = url.rstrip("/")
+        self._key = key
+        self.max_output_tokens, self.timeout, self.retries, self.backoff_seconds, self.json_mode = max_output_tokens, timeout, retries, backoff_seconds, json_mode
+        self._opener = opener  # a callable `(request, timeout) -> response`, for tests
+
+    def __repr__(self) -> str:
+        return f"OpenAICompatibleAdapter(model_id={self.model_id!r}, base_url={self.base_url!r})"
+
+    def describe(self) -> dict[str, Any]:
+        return {"provider": "openai-compatible", "base_url": self.base_url, "model_id": self.model_id, "adapter_version": self.ADAPTER_VERSION,
+                "max_output_tokens": self.max_output_tokens, "json_mode": self.json_mode, "temperature_sent": False}
+
+    def count_tokens(self, system_prompt: str, user_prompt: str) -> Optional[int]:
+        return None  # no counting endpoint: the dispatcher falls back to its local estimate
+
+    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+        import json as _json
+        import time
+        import urllib.error
+        import urllib.request
+        url = self.base_url + "/chat/completions"
+        last = "no attempt was made"
+        for attempt in range(max(1, self.retries)):
+            req = urllib.request.Request(url, data=_json.dumps(body).encode("utf-8"), method="POST",
+                                         headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
+            try:
+                opener = self._opener or urllib.request.urlopen
+                with opener(req, timeout=self.timeout) as resp:
+                    return _json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as exc:
+                detail = ""
+                try:
+                    detail = exc.read().decode("utf-8", errors="replace")[:300].replace(self._key, "[key]")
+                except Exception:  # noqa: BLE001
+                    pass
+                last = f"HTTP {exc.code}: {detail}"
+                if exc.code != 429 and exc.code < 500:
+                    raise ModelError(f"the provider refused the request ({last})") from None
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                last = f"{type(exc).__name__}: {str(exc).replace(self._key, '[key]')[:200]}"
+            if attempt + 1 < max(1, self.retries):
+                time.sleep(self.backoff_seconds * (attempt + 1))
+        raise ModelError(f"the provider could not be reached after {max(1, self.retries)} attempt(s) ({last})")
+
+    @staticmethod
+    def _usage(data: dict[str, Any], model_id: str) -> TaskUsage:
+        u = data.get("usage") or {}
+        hit = u.get("prompt_cache_hit_tokens")
+        if hit is None:
+            hit = (u.get("prompt_tokens_details") or {}).get("cached_tokens")
+        return TaskUsage(workflow="model_adapted", task_id="TASK_MODEL", model=data.get("model") or model_id,
+                         input_tokens=u.get("prompt_tokens"), output_tokens=u.get("completion_tokens"),
+                         cache_read_tokens=hit, llm_calls=1, usage_source="provider")
+
+    def generate(self, system_prompt: str, user_prompt: str, *, expected_schema: Optional[dict[str, Any]] = None,
+                 temperature: float = 0.0) -> tuple[Any, TaskUsage]:
+        body: dict[str, Any] = {"model": self.model_id, "max_tokens": self.max_output_tokens, "stream": False,
+                                "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]}
+        if self.json_mode:
+            body["response_format"] = {"type": "json_object"}
+        data = self._post(body)
+        usage = self._usage(data, self.model_id)
+        choices = data.get("choices") or []
+        if not choices:
+            raise ModelError("the provider returned no choices", usage=usage)
+        choice = choices[0]
+        text = ((choice.get("message") or {}).get("content")) or ""
+        finish = choice.get("finish_reason")
+        if finish == "content_filter":
+            raise ModelRefusal("the provider's content filter declined the request", usage=usage, partial_output=text or None)
+        if finish == "length":
+            raise ModelOutputTruncated(f"output reached max_output_tokens={self.max_output_tokens}", usage=usage, partial_output=text or None)
+        if not text.strip():
+            raise ModelError("the provider returned an empty answer", usage=usage)
+        return text, usage

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -42,6 +43,14 @@ def _store(args: argparse.Namespace):
 
 
 def _adapter(args: argparse.Namespace) -> Any:
+    """The model adapter named by `--provider` (or RESEARCH_PROVIDER): `anthropic` (default) or `openai-compatible` (needs --base-url and
+    RESEARCH_API_KEY; the key is read from the environment only, never from an argument)."""
+    provider = getattr(args, "provider", None) or os.environ.get("RESEARCH_PROVIDER") or "anthropic"
+    if provider == "openai-compatible":
+        from research_harness.workflows.adapters import OpenAICompatibleAdapter
+        return OpenAICompatibleAdapter(getattr(args, "model", None), base_url=getattr(args, "base_url", None))
+    if provider != "anthropic":
+        raise ValueError(f"unknown provider {provider!r}: use anthropic or openai-compatible")
     from research_harness.workflows.adapters import AnthropicMessagesAdapter
     return AnthropicMessagesAdapter(getattr(args, "model", None))
 
@@ -496,6 +505,7 @@ def register(sub: Any) -> None:
     register_m3(sub)
     register_m4(sub)
     register_publish(sub)
+    _add_provider_options(sub)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -929,3 +939,22 @@ def register_publish(sub: Any) -> None:
     q.add_argument("--pin", required=True)
     _common(q, project=False, library=False, token=False)
     q.set_defaults(func=cmd_library_release_notes)
+
+
+def _add_provider_options(sub: Any) -> None:
+    """Every command that takes --model also takes --provider and --base-url (the API key is only ever read from RESEARCH_API_KEY)."""
+    seen: set[int] = set()
+
+    def walk(parser: Any) -> None:
+        if id(parser) in seen:
+            return
+        seen.add(id(parser))
+        if "--model" in parser._option_string_actions and "--provider" not in parser._option_string_actions:
+            parser.add_argument("--provider", choices=["anthropic", "openai-compatible"], help="Model provider (default: anthropic, or RESEARCH_PROVIDER)")
+            parser.add_argument("--base-url", dest="base_url", help="Base URL of an OpenAI-compatible API, e.g. https://api.deepseek.com (or RESEARCH_BASE_URL)")
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for child in action.choices.values():
+                    walk(child)
+    for parser in sub.choices.values():
+        walk(parser)

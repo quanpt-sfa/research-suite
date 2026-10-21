@@ -56,6 +56,12 @@ class ReadingProtocol:
     dimension: str
     instructions: str
     fields: tuple[dict[str, Any], ...]
+    extra_dimensions: tuple[str, ...] = ()   # further comparison dimensions whose sections are read as well
+    include_unlabeled: bool = False          # also read sections whose heading matched no label (`other`)
+
+    @property
+    def dimensions(self) -> tuple[str, ...]:
+        return (self.dimension, *self.extra_dimensions)
 
     @property
     def pin(self) -> str:
@@ -64,7 +70,7 @@ class ReadingProtocol:
     @property
     def digest(self) -> str:
         return canonical_json_hash({"id": self.id, "version": self.version, "dimension": self.dimension,
-                                    "instructions": self.instructions, "fields": list(self.fields)})
+                                    "extra_dimensions": list(self.extra_dimensions), "include_unlabeled": self.include_unlabeled, "instructions": self.instructions, "fields": list(self.fields)})
 
     def field(self, name: str) -> Optional[dict[str, Any]]:
         return next((f for f in self.fields if f["name"] == name), None)
@@ -90,7 +96,7 @@ class ReadingProtocol:
 def _load() -> dict[str, ReadingProtocol]:
     raw = json.loads(_DATA.read_text(encoding="utf-8"))
     return {pid: ReadingProtocol(pid, p["version"], p["label"], p["purpose"], p["dimension"], p["instructions"],
-                                 tuple(p["fields"])) for pid, p in raw["protocols"].items()}
+                                 tuple(p["fields"]), tuple(p.get("extra_dimensions", ())), bool(p.get("include_unlabeled", False))) for pid, p in raw["protocols"].items()}
 
 
 def list_protocols() -> list[ReadingProtocol]:
@@ -311,7 +317,16 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
             return {**imported, "reused": True, "run_id": run_id, "reused_from": "imported_passages"}
 
     sections_all = source_sections(store, obj, text)
-    chosen = sections_for_dimension([Section(**s) for s in sections_all], protocol.dimension)
+    typed = [Section(**s) for s in sections_all]
+    picked: dict[int, Section] = {}
+    for dim in protocol.dimensions:
+        for sec in sections_for_dimension(typed, dim):
+            picked[sec.char_start] = sec
+    if protocol.include_unlabeled:   # a heading that matched no label may still hold what the protocol asks for: it is read, and the run says so
+        for sec in typed:
+            if sec.label == "other" and sec.heading:
+                picked[sec.char_start] = sec
+    chosen = [picked[k] for k in sorted(picked)]
     fallback = not chosen
     spans = [(s.char_start, s.char_end) for s in chosen] or [(0, len(text))]
     section_note = ", ".join(s.heading or s.label for s in chosen) if chosen else "whole text (no section matched)"

@@ -845,6 +845,8 @@ def cmd_usage_report(args: argparse.Namespace) -> int:
         store = _resolve_store(pid, args.home)
         tracker = UsageTracker(store)
         summary = tracker.get_summary(workflow=getattr(args, "workflow", None))
+        from research_harness.benchmarks.gate_l import effort_from_registry
+        summary["registry"] = effort_from_registry(store)   # runs of the knowledge layer (extraction, adjudication, execution) are registered, not tracked
     except Exception as e:
         sys.stderr.write(f"Usage report error: {e}\n")
         return 1
@@ -860,6 +862,9 @@ def cmd_usage_report(args: argparse.Namespace) -> int:
         print(f"  Total Reused Artifacts: {summary['total_reused_artifacts']}")
         print(f"  Total Model Calls:      {summary['total_llm_calls']}")
         print(f"  Total Elapsed Time:     {summary['total_elapsed_ms']}ms")
+        r = summary["registry"]
+        print(f"  Run registry: {r['registry_runs']} run(s), {r['model_calls']} model call(s), {r['reused_runs']} reused, {r['commands']} command(s); tokens "
+              f"{r['tokens']['input']} in / {r['tokens']['output']} out (basis: {', '.join(f'{k}={v}' for k, v in r['tokens']['basis'].items()) or 'none reported'})")
         if summary.get("by_workflow"):
             print("  Breakdown by Workflow:")
             for wf, d in summary["by_workflow"].items():
