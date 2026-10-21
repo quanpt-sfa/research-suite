@@ -505,6 +505,7 @@ def register(sub: Any) -> None:
     register_m3(sub)
     register_m4(sub)
     register_publish(sub)
+    register_review(sub)
     _add_provider_options(sub)
 
 
@@ -958,3 +959,52 @@ def _add_provider_options(sub: Any) -> None:
                     walk(child)
     for parser in sub.choices.values():
         walk(parser)
+
+
+def cmd_adjudicate_run_pending(args: argparse.Namespace) -> int:
+    from research_harness.workflows import eca
+
+    def text(o):
+        print(f"{o['adjudicated']} adjudicated ({o['model_calls']} model call(s)); verdicts {o['verdicts']}; guard fired {o['guard_fired']}; "
+              f"skipped {len(o['skipped'])}, failed {len(o['failed'])}, left over {o['remaining_after_limit']}")
+    return _run(args, lambda: eca.run_pending(_store(args), _helpers()._resolve_token(args), _adapter(args), rate=args.rate, limit=args.limit), text)
+
+
+def cmd_adjudicate_sheet(args: argparse.Namespace) -> int:
+    from research_harness.workflows import eca
+
+    def go():
+        rows = eca.review_sheet(_store(args))
+        if args.out:
+            Path(args.out).write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+        return rows
+
+    def text(rows):
+        print(f"{len(rows)} proposal(s) await your decision" + (f"; written to {args.out}" if args.out else ""))
+        for r in rows:
+            print(f"  {'!' if r['needs_attention'] else ' '} {r['adjudication_id']}  {r['model']['verdict']:<24} {r['statement']['object_id']}#{r['statement']['element']}: {r['statement']['text'][:70]}")
+    return _run(args, go, text)
+
+
+def cmd_adjudicate_confirm_batch(args: argparse.Namespace) -> int:
+    from research_harness.workflows import eca
+    return _run(args, lambda: eca.confirm_batch(_store(args), _helpers()._resolve_token(args), _json_arg(args.file, "--file") or []),
+                lambda o: print(f"{len(o['confirmed'])} confirmed, {len(o['failed'])} not applied" + "".join(f"\n  - {f['adjudication_id']}: {f['error']}" for f in o["failed"])))
+
+
+def register_review(sub: Any) -> None:
+    grp = sub.choices["adjudicate"]._subparsers._group_actions[0]
+    q = grp.add_parser("run-pending", help="Adjudicate everything the coverage policy still asks for (proposals only; one model call each)")
+    q.add_argument("--rate", type=float, default=0.2)
+    q.add_argument("--limit", type=int)
+    q.add_argument("--model")
+    _common(q)
+    q.set_defaults(func=cmd_adjudicate_run_pending)
+    q = grp.add_parser("sheet", help="Every high-impact proposal awaiting your decision, with what you need to decide it; decisions left empty")
+    q.add_argument("--out")
+    _common(q, token=False)
+    q.set_defaults(func=cmd_adjudicate_sheet)
+    q = grp.add_parser("confirm-batch", help="Apply your decisions from one file: [{adjudication_id, verdict, rationale}]; there is no default verdict")
+    q.add_argument("--file", required=True)
+    _common(q)
+    q.set_defaults(func=cmd_adjudicate_confirm_batch)

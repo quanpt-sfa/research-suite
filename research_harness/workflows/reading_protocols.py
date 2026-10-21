@@ -128,7 +128,8 @@ def _fingerprint(key: str, protocol: ReadingProtocol) -> str:
 
 def build_system_prompt(protocol: ReadingProtocol) -> str:
     fields = "\n".join(f"- `{f['name']}`: {f['description']}" + (" (may repeat)" if f.get("repeatable") else " (once)")
-                       + (f" Allowed types: {', '.join(f['types'])}." if f.get("types") else "") for f in protocol.fields)
+                       + (f" Allowed types: {', '.join(f['types'])}." if f.get("types") else "")
+                       + (f" At most {f['max_records']} records, the most decision-relevant first." if f.get("max_records") else "") for f in protocol.fields)
     return (
         f"You are extracting facts from one academic paper for a research assistant ({protocol.id}: {protocol.label}).\n\n"
         f"Purpose: {protocol.purpose}\n\n## Instructions\n{protocol.instructions}\n\n## Fields\n{fields}\n\n"
@@ -375,10 +376,19 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
         return {"protocol": protocol.pin, "source_id": source_id, "source_revision": obj["revision"], "status": "FAILED",
                 "reason": reason, "message": message, "records": [], "rejected": rejected_all, "run_id": run_id, "reused": False}
 
-    # one record per (field, span) across chunks
+    # one record per (field, span) across chunks, and no more per field than the protocol allows (the rest is listed, not silently dropped)
     uniq: dict[tuple, dict[str, Any]] = {}
+    kept_per_field: dict[str, int] = {}
     for rec in accepted_all:
-        uniq.setdefault((rec["field"], rec["char_start"], rec["char_end"]), rec)
+        key_ = (rec["field"], rec["char_start"], rec["char_end"])
+        if key_ in uniq:
+            continue
+        cap = (protocol.field(rec["field"]) or {}).get("max_records")
+        if cap and kept_per_field.get(rec["field"], 0) >= cap:
+            rejected_all.append({**rec, "reason": "over_cap", "cap": cap})
+            continue
+        kept_per_field[rec["field"]] = kept_per_field.get(rec["field"], 0) + 1
+        uniq[key_] = rec
     stored = _store_records(store, token, protocol, obj, list(uniq.values()), key, model, sections_all)
     context = ContextStatus.PARTIAL if fallback else ContextStatus.COMPLETE
     assessment = apply_caps(AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, context=context,

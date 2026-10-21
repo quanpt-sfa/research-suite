@@ -28,8 +28,9 @@ Pilot: Zavitsanos et al., ICAIF 2025, and the `pu_finance` package (see `PILOT_R
    (`SRC_ZAVITSANOS2025`), or `not_stated` with a reason. A second reader may be named (`second_reader`).
 3. **Store it**: `research gate-k annotate --project PRJ_PILOT_REAL --file <filled form> --token-file <token file>`. Check
    `research gate-k blindness REFANN_PILOT --project PRJ_PILOT_REAL`: it must say *blind*.
-4. **Let the system run**: literature (method) review, playbook draft, your ECA confirmations of its HIGH elements, a validity assessment for
-   the pilot context with a methodological basis, an analysis plan, the replication reproduction (`research replication reproduce`).
+4. **Let the system run**: `research playbook draft` (a method review and a draft playbook), `research adjudicate run-pending` (proposals for every high-impact element),
+   then `research adjudicate sheet --out sheet.json`: you write a verdict and a rationale for each item in `decisions.json` and apply them with `research adjudicate confirm-batch`.
+   Then a validity assessment for the pilot context with a methodological basis, an analysis plan, and the replication reproduction (`research replication reproduce`).
 5. **Compare**: `research gate-k sheet --annotation REFANN_PILOT --playbook <PB> --plan <PLAN> --out sheet.json` writes reference and system side by
    side with empty `score` and `note` fields.
 6. **Score each element yourself**: `MATCH`, `JUSTIFIED_ADAPTATION`, `PARTIAL` or `MISMATCH`, with a note for the last two. Store with

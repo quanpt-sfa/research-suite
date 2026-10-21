@@ -62,7 +62,7 @@ def test_extraction_runs_real_protocols_with_quote_verification(proj):
         assert p["object_type"] == "EvidencePassage" and p["content"]["quote_verified"] is True
         assert text[p["content"]["char_start"]:p["content"]["char_end"]] == p["content"]["quote"]
         assert p["content"]["generated_by"] == "model:scripted-extractor"   # the value's producer, apart from the quote
-        assert p["content"]["protocol"] == "RP_METHOD@2" and p["origin"]["operation"] == "extract"
+        assert p["content"]["protocol"] == "RP_METHOD@4" and p["origin"]["operation"] == "extract"
         assert corpus.verify_passage(store, rec["passage_id"])["source_match"] == "VERIFIED"
         with store.read() as conn:
             assert [(e["relation"], e["target_id"]) for e in store.edges_from(conn, rec["passage_id"], rec["revision"])] == [

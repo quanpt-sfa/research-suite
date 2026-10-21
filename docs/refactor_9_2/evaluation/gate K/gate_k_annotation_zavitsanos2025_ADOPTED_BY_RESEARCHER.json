@@ -1,0 +1,83 @@
+{
+  "form_version": "1",
+  "instructions": "Fill this form from the paper and its replication package BEFORE you look at anything the system produced. For each element write what the authors did, in your own words, give the passage that shows it (quote and source id) or say that the paper does not state it (`not_stated` with a reason). Do not copy the system's wording. The time you store this form is recorded; a form stored after any system output about the same sources is not blind and will be refused.",
+  "sources": [
+    "SRC_ZAVITSANOS2025"
+  ],
+  "replication_package": "PKG_PUHRF",
+  "annotator": "Quan Truong Pham (the researcher)",
+  "second_reader": "",
+  "elements": [
+    {
+      "id": "label_source_and_timing",
+      "question": "Where does the label (outcome) come from, and when is it known relative to the period it is used to predict?",
+      "reference": "PDF p.3, §3 and Figure 1; p.2 Introduction. Outcomes represent firm-year financial misstatements/restatements, with restatement announcement/disclosure dates drawn from Audit Analytics. Authors first construct 12 train/test folds. In each training fold for test year t, a positive training observation whose restatement date is >= t is recoded as 0 (UNLABELED, not a verified true negative); earlier-known positive remains 1. The test fold keeps the original retrospectively observed 0/1 misstatement labels as ground truth. The authors report ~40% of positive training cases hidden on average. IMPORTANT: test labels are hindsight ground truth, not necessarily known at time t. Repo README.md §Labels confirms recoding, and https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/utils.py loads target_col=\"Misstatement\". The repository contains pre-made yearly splits; the derivation of Audit Analytics restatement dates and original label-source assembly cannot be independently reconstructed from the published code reviewed. No assumption that all retrospectively negative cases are actually verified negatives.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "restatement dates from the Audit Analytics database",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "sample_construction",
+      "question": "How was the sample constructed: population, period, filters, exclusions, missing-data handling?",
+      "reference": "PDF p.3, §3, Figure 1; p.4 §4. Authors compile a historical firm-year sample covering financial reports 2000–2014, extending prior financial-misstatement datasets [3,47], and report 47,086 firm-year observations with about 1% positive retrospective labels. Twelve test years 2003–2014; at t, train on t−3,t−2,t−1 and test on t. Repo has data/split_2003/… through split_2014/… with train_instances.csv and test_instances.csv. https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/utils.py reads these preconstructed CSV files; FINANCIAL_FEATURES plus optional metadata are selected. Its drop_nan flag defaults to False; the default analytical scripts impute missing numeric values using SimpleImputer(mean), while https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/scripts/run_pu_trees.py sets drop_nan=True and drops missing rows in BOTH train/test. Thus the published 47,086 total is not a verified identical effective sample size across models. PDF and published repo do not document a complete upstream population frame, firm inclusion/exclusion criteria, all original raw-data joins, source vintage, or exact missing-data filter leading to 47,086; these are explicitly NOT REPORTED / NOT REPRODUCED from the reviewed materials.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "In total, there are 47086 firm-year instances in the data.",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "estimand_or_prediction_target",
+      "question": "What is estimated or predicted, and in what form?",
+      "reference": "PDF pp.3–4, §3; p.5 §4. The prediction unit is a firm-year financial report. Models score/rank firm-years on their likelihood of being a misstatement (positive class), treating previously unidentified positives as unlabeled during training. This is a predictive ranking/classification target, NOT a causal estimand. Outer testing evaluates each hold-out year t against retrospective complete labels, while training labels respect delayed public restatement discovery at t. Primary empirical estimands of model performance are year-specific Average Precision and R-precision, macro-averaged across the 12 test years. Repo https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/utils.py: target_col=\"Misstatement\"; https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/metrics.py: get_ranking_scores(y_true,y_probas). The authors do not establish real-time availability of all test-year data vintages; do not claim a prospective/live 2003–2014 deployment trial.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "Test sets retain all original labels to",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "specification_or_feature_set",
+      "question": "What model or specification, and which features or regressors?",
+      "reference": "PDF p.3 §3, p.4 §4, p.5 §4.1 and Tables 1–2. Features: 28 financial indices + 14 Dechow et al. [11]-derived financial features (=42 numeric measures); paper also names SIC and incorporation/operation states as 3 metadata fields. Experiments contrast Financial vs Financial+Metadata and later add company identifier CIK for serial-misstater sensitivity. Compared algorithms: Logistic Regression, CatBoost, RUSBoost, XGBOD, DevNet, Elkan–Noto, weighted Elkan–Noto, Hellinger Decision Tree and Hellinger Random Forest (HRF/PUHRF). Code https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/utils.py: 42 FINANCIAL_FEATURES and METADATA_TO_USE=[\"CIK\",\"SIC\",\"State of Inc\"], not \"State of Op\". https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/scripts/run_pu_trees.py actually selects [\"SIC\",\"State of Inc\"], sets drop_nan=True, OneHotEncoder, mean imputation, StandardScaler and a PURandomForestClassifier with random_state=42 and p_y=observed positive training share. https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/scripts/baseline_catboost.py: loss=\"Logloss\", scale_pos_weight=2, despite the published text specifying CatBoost with Focal Loss (PDF p.4 §4). These are OPEN CODE–PAPER DISCREPANCIES, not resolved model specifications. The repository does not expose runnable scripts for every model appearing in Table 1.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "28 financial indices, such as assets, debt, receivables, liabilities, and",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "standard_errors_or_validation_scheme",
+      "question": "How is uncertainty or out-of-sample performance assessed (standard errors, splits, folds, baselines)?",
+      "reference": "PDF p.3 Figure 1 and §3; pp.4–5 §4; Table 1 on p.6. Evaluation is rolling-origin / time-respecting: test year t=2003,…,2014; training uses prior 3 fiscal years, i.e. t−3 to t−1, with retrospective test labels retained. Scores are computed separately each year then macro-averaged without prevalence rebalancing. AP is area-under-precision-recall-style ranking summary; R-precision is recall among the top R ranked cases, R equal to the number of test positives, rather than precision at an externally fixed 0.5 threshold. Repo https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/pu_finance/metrics.py uses average_precision_score and rec_at_k(...,k=\"precision\"), and separately emits F1 (threshold 0.5 by default). https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/scripts/baseline_catboost.py creates a random 10% stratified validation subset WITHIN historical training data for early stopping, not a second temporal outer test. The paper reports annual means but does NOT report confidence intervals, standard errors, hypothesis-test results, bootstrap distributions or statistical uncertainty for the between-model AP/R-precision differences. Also explicitly states no systematic hyperparameter tuning in the study.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "test for 12 years from 2003 to 2014.",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "diagnostics",
+      "question": "Which diagnostics or checks does the paper run on its model, data or inference?",
+      "reference": "PDF p.3 Figure 2; p.6 §4.2 Figures 3–4, Table 2; p.7 Figure 5. Diagnostics/checks: (1) quantify share of labeled positives available by t and training-year distance (Figure 2), supporting ~40% hidden positive recoding; (2) compare financial-only vs financial+metadata Table 1; (3) analyze early vs late test years and proportion of serial misstaters, 40–50% in earliest years declining to ~10% later (Figure 3); (4) add CIK directly as a predictor, rerun and compare models (Table 2); (5) compare CatBoost per-year AP to importance of CIK, EBIT and soft_assets (Figure 4); (6) stratify positive-class F1 for already-seen vs unseen firms (Figure 5). Authors note that hyperparameter tuning was deliberately not performed (p.5). Repo https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/scripts/run_pu_trees.py iterates the 12 folds and logs AP, ndcg, rec-precision, F1, time and train/test counts; https://github.com/iit-Demokritos/pu_finance/blob/504a951d64df895137c4d4d5ecb57b50e98f82f5/results/PUHRF_baseline_meta_noCIK.csv contains annual outputs. The repository does not show a comprehensive diagnostic suite for performance-uncertainty intervals, leakage-free preprocessing vintage, independent unseen-firm folds, sensitivity to alternative label-discovery mechanisms, or statistical significance testing.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "we conducted a more detailed analysis by year",
+      "not_stated": false,
+      "not_stated_reason": ""
+    },
+    {
+      "id": "interpretation_limits",
+      "question": "How do the authors say the results may and may not be interpreted?",
+      "reference": "PDF pp.6–7 §§4.2–5, Figures 3–5. Authors caution that apparently strong misstatement-ranking performance may be partly driven by repeated firm identities (serial misstaters) rather than learning generalizable misstatement mechanisms; first three years have a much higher serial-misstater share. In the unseen-firm analysis, the positive-class F1 is zero in 7 of the 11 test years evaluated, while unseen firms account for only 5–12% of annual test cases. This materially limits transport to new issuers. Paper asks for more recent data with fewer serial misstaters and richer/multimodal features; it identifies unbiased PU hyperparameter tuning / model selection as unresolved (p.5). Authors frame results as performance on THIS historical benchmark, not proof of detection on newly listed firms, in present-day regimes, or under fully prospective labeling. SCAR/SAR/PG mechanisms are conceptual justifications (§2.2), not separately established as true for Audit Analytics case selection. Repo lacks direct implementation for all diagnostic claims (e.g. unseen-firm analysis), so those are paper-reported until independently reproduced.",
+      "source_id": "SRC_ZAVITSANOS2025",
+      "quote": "high performance may reflect overfitting to company identifiers,",
+      "not_stated": false,
+      "not_stated_reason": ""
+    }
+  ],
+  "provenance": {
+    "drafted_by": "GPT-6 — AI-prepared independent reference draft; requires researcher review (NOT a signed human blind annotation)",
+    "draft_file": "gate_k_annotation_zavitsanos2025_AI_DRAFT.json",
+    "draft_sha256": "3f3ff6609e6b8333eee18f3778a3e546976efb618e3de5a854184528227aa3af",
+    "adopted_by": "Quan Truong Pham (the researcher)",
+    "how": "the researcher stated in the working session on 2026-10-21 that they had signed the reference annotation; the assistant recorded that statement and changed no element text",
+    "caveat": "the draft was prepared by an AI that had read the paper and code; it is the researcher's adopted reference, not an annotation written by the researcher from a blank form"
+  }
+}

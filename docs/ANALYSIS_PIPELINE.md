@@ -47,3 +47,15 @@ Acceptance: `docs/refactor_9_2/milestone_report.md`. End-to-end proof: `tests/te
 * Claim effects are entered by the researcher (or a model's proposal the researcher reviews); there is no automatic drafting of them.
 * For result-based statements (a claim change) the confirmation is the researcher's; ECA compares a statement with a *source passage*.
 * The Gate K blind-annotation forms and the Gate L cold/warm comparison belong to M4.
+
+## Keeping the confirmation workload proportionate
+
+A first real run on the pilot paper (DeepSeek, `RP_METHOD@1`) produced a playbook of 47 elements, all high-impact, each needing a confirmed adjudication. What changed:
+
+* **Caps per field** (protocol data, `max_records`): the model is told how many records a field may have and to put the most decision-relevant first; extra records are rejected as `over_cap` and listed. The caps are a judgement; raise them for a paper that compares many methods.
+* **Decisive versus supporting.** A field marked `decisive: false` (study design) yields *supporting* elements: quote-verified, STANDARD risk, sampled for adjudication under the 20% policy, not critical, and not required of a plan or of promotion.
+* **One element per passage.** Records that point at the same words (whatever field they came under) are one element (`also_extracted_as`).
+* **A value restates only its own quote** (protocol instruction); the quote check cannot see a value that adds details, but the adjudication does.
+* **Batch tools.** `research adjudicate run-pending` runs the adjudications the coverage policy still asks for (proposals only); `research adjudicate sheet --out sheet.json` writes every high-impact proposal with the statement, passage, the model's reading, the flagged cues and any guard, items needing attention first and every decision left empty; `research adjudicate confirm-batch --file decisions.json` applies your decisions, each with its own verdict and rationale. There is no default verdict and no "agree with all".
+
+Measured on the same paper with `RP_METHOD@4`: 23 elements (21 decisive, 2 supporting) against 47; 22 adjudications, 16 supported as stated, 6 flagged (statements that add something to their quote, such as a name for what the quote calls "positives"). Those are for you to decide; they are what the check is for.

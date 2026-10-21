@@ -1,0 +1,17 @@
+{
+  "created_at_utc": "2026-10-20T23:23:09+00:00",
+  "status": "AI_REFERENCE_DRAFT_PENDING_HUMAN_BLIND_CONFIRMATION",
+  "input_pdf_sha256": "2e370a4ec81cc8db0c8feb7d146e957030dc90ae4b934b78fa258d9c6c06fce4",
+  "original_form_sha256": "d3e93157ed620f230f2c11e51f828f817ef2cb1dda18c98d3265be30901b379a",
+  "output_sha256": "3f3ff6609e6b8333eee18f3778a3e546976efb618e3de5a854184528227aa3af",
+  "github_repository": "https://github.com/iit-Demokritos/pu_finance",
+  "github_commit": "504a951d64df895137c4d4d5ecb57b50e98f82f5",
+  "evidence_coverage": {
+    "elements": 7,
+    "paper_quote_verified": 7,
+    "model_reproduction_performed": false,
+    "paper_code_differences_open": true
+  },
+  "warning": "This annotation was generated with AI after the source paper was read. It is not the owner's timestamped blind annotation. Do not represent it as independently human-verified Gate K K2/K3.",
+  "review_notes_file": "gate_k_zavitsanos2025_review_notes.md"
+}

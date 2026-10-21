@@ -88,59 +88,75 @@
       ]
     },
     "RP_METHOD": {
-      "version": "2",
+      "version": "4",
       "label": "Method record",
       "purpose": "Record how a study was done, as candidate input to a method playbook. Fidelity to the source is checked before anything is reused.",
       "dimension": "design",
-      "instructions": "Report each design choice the paper states, with the words that state it. Do not complete a procedure from general knowledge of the method. A choice the paper does not state is a gap.",
+      "instructions": "Report each design choice the paper states, with the words that state it. Do not complete a procedure from general knowledge of the method. A choice the paper does not state is a gap. Each `value` restates only what its own `quote` says. If a detail you want is in another sentence, make a second record whose quote is that sentence; never merge two sentences into one value, and never add an example, a name or a number that is not in the quote.",
       "fields": [
         {
           "name": "study_design",
           "description": "the research design or type of study",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 2,
+          "decisive": false
         },
         {
           "name": "sample_selection",
           "description": "how the sample or data were selected, including filters and exclusions",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 3,
+          "decisive": true
         },
         {
           "name": "label_construction",
           "description": "how the outcome or label was defined and where it comes from",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 3,
+          "decisive": true
         },
         {
           "name": "variable_measurement",
           "description": "how a variable or feature is measured",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 3,
+          "decisive": true
         },
         {
           "name": "model_or_estimator",
           "description": "the model, estimator or algorithm used",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 6,
+          "decisive": true
         },
         {
           "name": "validation_or_tests",
           "description": "how results are validated, tested or compared (splits, baselines, tests)",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 3,
+          "decisive": true
         },
         {
           "name": "interpretation_rule",
           "description": "how the paper says estimates or scores should be interpreted",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 2,
+          "decisive": true
         },
         {
           "name": "limitation_handling",
           "description": "how the paper addresses a limitation or threat",
           "required": false,
-          "repeatable": true
+          "repeatable": true,
+          "max_records": 3,
+          "decisive": true
         }
       ],
       "extra_dimensions": [

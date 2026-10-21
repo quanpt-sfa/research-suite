@@ -43,6 +43,11 @@ EXECUTOR = "playbooks@1"
 _ASSESS_ORDER = {"NOT_ASSESSED": 0, "PROVISIONAL": 1, "SUPPORTED_WITHIN_SCOPE": 2}
 
 
+def _overlap_share(a: dict[str, Any], b: dict[str, Any]) -> float:
+    inter = max(0, min(a["char_end"], b["char_end"]) - max(a["char_start"], b["char_start"]))
+    return inter / max(1, min(a["char_end"] - a["char_start"], b["char_end"] - b["char_start"]))
+
+
 def _model_label(model: Optional[dict[str, Any]]) -> str:
     return f"model:{(model or {}).get('model_id') or (model or {}).get('provider') or 'unknown'}"
 
@@ -81,6 +86,9 @@ def draft_playbook_from_methods(store: StateStore, token: Optional[str], method_
     elements: list[dict[str, Any]] = []
     sources: dict[str, int] = {}
     passage_edges: list[tuple[str, int]] = []
+    from research_harness.workflows import reading_protocols as _rp
+    method_protocol = _rp.get_protocol("RP_METHOD")
+    candidates: list[dict[str, Any]] = []
     for mr in method_review["method_records"]:
         sources[mr["source_id"]] = mr["source_revision"]
         gen = _model_label(mr.get("model"))
@@ -88,12 +96,30 @@ def draft_playbook_from_methods(store: StateStore, token: Optional[str], method_
             category = FIELD_CATEGORY.get(fld)
             if category is None:
                 continue
+            decisive = bool((method_protocol.field(fld) or {}).get("decisive", True))
             for rec in recs:
-                elements.append({"id": f"E{len(elements) + 1:02d}", "category": category, "critical": category in CRITICAL, "text": rec["value"],
-                                 "source_field": fld, "source_id": mr["source_id"], "generated_by": gen, "risk_tier": "HIGH",
-                                 "evidence_basis": [{"kind": "source_passage", "ref": rec["passage_id"], "quote_verified": True,
-                                                     "char_start": rec["char_start"], "char_end": rec["char_end"]}]})
-                passage_edges.append((rec["passage_id"], 0))
+                candidates.append({"category": category, "field": fld, "decisive": decisive, "source_id": mr["source_id"], "gen": gen, "rec": rec})
+    # records that point at the same words are one element, whichever field they were extracted under; a decisive field wins, then the longer quote
+    kept: list[dict[str, Any]] = []
+    for c in sorted(candidates, key=lambda c: (not c["decisive"], -(c["rec"]["char_end"] - c["rec"]["char_start"]), c["rec"]["char_start"])):
+        twin = next((k for k in kept if k["source_id"] == c["source_id"] and _overlap_share(k["rec"], c["rec"]) >= 0.5), None)
+        if twin is None:
+            c["also_fields"] = []
+            kept.append(c)
+        elif c["field"] != twin["field"] and c["field"] not in twin["also_fields"]:
+            twin["also_fields"].append(c["field"])
+    for c in sorted(kept, key=lambda c: (c["source_id"], c["rec"]["char_start"])):
+        rec = c["rec"]
+        critical = c["category"] in CRITICAL and c["decisive"]
+        el = {"id": f"E{len(elements) + 1:02d}", "category": c["category"], "critical": critical, "text": rec["value"], "source_field": c["field"],
+              "source_id": c["source_id"], "generated_by": c["gen"], "risk_tier": "HIGH" if critical else "STANDARD",
+              "evidence_basis": [{"kind": "source_passage", "ref": rec["passage_id"], "quote_verified": True, "char_start": rec["char_start"], "char_end": rec["char_end"]}]}
+        if c["also_fields"]:
+            el["also_extracted_as"] = c["also_fields"]
+        if not c["decisive"]:
+            el["supporting"] = True    # context for the reader: quote-verified, sampled for adjudication (D15), not required of a plan
+        elements.append(el)
+        passage_edges.append((rec["passage_id"], 0))
     if not elements:
         raise KnowledgeError("NO_ELEMENTS", "the method review has no records to build a playbook from")
     order = {c: i for i, c in enumerate(CATEGORY_ORDER)}

@@ -30,6 +30,7 @@ from jsonschema import Draft202012Validator
 
 from research_harness import taxonomy
 from research_harness.core.canonical import canonical_json_hash
+from research_harness.core.errors import AuthorizationError
 from research_harness.knowledge.common import (
     WRITE_ROLES, KnowledgeError, engine_origin, head_or_raise, next_numbered_id, scope_id)
 from research_harness.knowledge.corpus import verify_passage
@@ -666,3 +667,90 @@ def coverage_report(store: StateStore, *, rate: float = STANDARD_SAMPLE_RATE) ->
     return {"high_total": len(plan["high"]), "high_adjudicated": len(plan["high"]) - len(high_missing), "high_not_adjudicated": high_missing,
             "standard_sampled": len(plan["standard_sampled"]), "sample_not_adjudicated": sample_missing, "by_stratum": plan["by_stratum"],
             "complete": not high_missing and not sample_missing}
+
+
+# ---------------------------------------------------------------------------------------------------
+# working through many statements: run what the coverage policy asks for, review on one sheet, decide in one file
+# ---------------------------------------------------------------------------------------------------
+
+def basis_passage(store: StateStore, object_id: str, element: Optional[str]) -> Optional[str]:
+    """The passage an element rests on (its first source-passage basis), as an object id; None for a statement with no passage."""
+    obj = store.get_object(object_id)
+    el = next((e for e in (obj["content"].get("elements") or []) if isinstance(e, dict) and e.get("id") == element), None) if obj and element else None
+    for b in (el or {}).get("evidence_basis", []):
+        if b.get("kind") == "source_passage" and b.get("ref"):
+            return b["ref"].split("@")[0].replace("LIB:", "") if b["ref"].startswith("LIB:") else b["ref"]
+    return None
+
+
+def run_pending(store: StateStore, token: Optional[str], adapter: Any, *, rate: float = STANDARD_SAMPLE_RATE, limit: Optional[int] = None) -> dict[str, Any]:
+    """Adjudicate (one model call each, proposals only) every statement the coverage policy still asks for: all HIGH ones and the
+    sampled STANDARD ones, each against the passage it rests on. A statement with no passage is listed, not guessed at."""
+    cov = coverage_report(store, rate=rate)
+    todo = cov["high_not_adjudicated"] + cov["sample_not_adjudicated"]
+    done: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    for s in todo[:limit] if limit else todo:
+        passage = basis_passage(store, s["object_id"], s["element"])
+        if passage is None:
+            skipped.append({"object_id": s["object_id"], "element": s["element"], "why": "no source passage to adjudicate against"})
+            continue
+        try:
+            res = adjudicate(store, token, resolve_statement(store, s["object_id"], element=s["element"]), passage, adapter)
+        except KnowledgeError as exc:
+            failed.append({"object_id": s["object_id"], "element": s["element"], "error": exc.code})
+            continue
+        if res.get("status") == "FAILED":
+            failed.append({"object_id": s["object_id"], "element": s["element"], "error": res.get("reason")})
+            continue
+        done.append({"object_id": s["object_id"], "element": s["element"], "adjudication_id": res["adjudication_id"], "eca_verdict": res["eca_verdict"],
+                     "guard": res.get("guard"), "tier": s["risk_tier"], "reused": bool(res.get("reused"))})
+    verdicts: dict[str, int] = {}
+    for d in done:
+        verdicts[d["eca_verdict"]] = verdicts.get(d["eca_verdict"], 0) + 1
+    return {"adjudicated": len(done), "model_calls": sum(1 for d in done if not d["reused"]), "verdicts": verdicts, "guard_fired": sum(1 for d in done if d["guard"]),
+            "skipped": skipped, "failed": failed, "remaining_after_limit": max(0, len(todo) - (limit or len(todo))), "items": done}
+
+
+def review_sheet(store: StateStore) -> list[dict[str, Any]]:
+    """Every high-impact proposal awaiting the researcher, with what is needed to decide it on one page: the statement, the passage,
+    the model's reading, the flagged cues and any guard. Items that need attention (a guard, or anything but supported as stated) come first.
+    `decision` is left empty; nothing is pre-filled."""
+    rows = []
+    for item in queue(store):
+        if item["state"] != "AWAITING_CONFIRMATION":
+            continue
+        adj = store.get_object(item["adjudication_id"])["content"]
+        passage = store.get_object(adj["passage"]["object_id"])
+        stmt = resolve_statement(store, item["statement"]["object_id"], element=item.get("element"))
+        rows.append({"adjudication_id": item["adjudication_id"], "statement": {"object_id": stmt.object_id, "element": stmt.element, "text": stmt.text, "generated_by": stmt.generated_by},
+                     "passage": {"object_id": adj["passage"]["object_id"], "quote": (passage or {}).get("content", {}).get("quote")},
+                     "model": {"verdict": adj["eca_verdict"], "equivalence": adj["equivalence"], "proposition": adj["passage_proposition"],
+                               "dropped_conditions": adj["dropped_conditions"], "required_qualification": adj["required_qualification"], "guard": adj.get("guard")},
+                     "qualifier_cues": [c["cue"] for c in adj["qualifier_cues"]], "needs_attention": bool(adj.get("guard")) or adj["eca_verdict"] != "SUPPORTED_AS_STATED",
+                     "decision": {"verdict": "", "rationale": "", "qualification_revision": None}})
+    return sorted(rows, key=lambda r: (not r["needs_attention"], r["adjudication_id"]))
+
+
+def confirm_batch(store: StateStore, token: Optional[str], decisions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply the researcher's decisions from one file. Each item is its own confirmation (author or owner token), with its own verdict and
+    rationale; an item that is incomplete or refused is reported and the others are still applied. There is no default verdict."""
+    confirmed, failed, seen = [], [], set()
+    for d in decisions:
+        aid = d.get("adjudication_id")
+        if not aid or aid in seen:
+            failed.append({"adjudication_id": aid, "error": "MISSING_OR_DUPLICATE_ID"})
+            continue
+        seen.add(aid)
+        if not d.get("verdict"):
+            failed.append({"adjudication_id": aid, "error": "NO_VERDICT: a decision is the researcher's; there is no default"})
+            continue
+        qual = {"object_id": (store.get_object(aid) or {}).get("content", {}).get("subject", {}).get("object_id"), "revision": d["qualification_revision"]} \
+            if d.get("qualification_revision") else None
+        try:
+            r = confirm(store, token, aid, verdict=d["verdict"], rationale=d.get("rationale") or "", qualification_applied_in=qual)
+            confirmed.append({"adjudication_id": aid, "confirmation": r["adjudication_id"], "verdict": d["verdict"]})
+        except (KnowledgeError, AuthorizationError, ValueError) as exc:
+            failed.append({"adjudication_id": aid, "error": getattr(exc, "code", None) or str(exc)})
+    return {"confirmed": confirmed, "failed": failed}
