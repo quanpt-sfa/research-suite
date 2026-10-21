@@ -515,6 +515,8 @@ def register(sub: Any) -> None:
     register_review(sub)
     register_reconsider(sub)
     register_export(sub)
+    from research_harness.tasks import cli as _task_cli
+    _task_cli.register(sub)
     _add_provider_options(sub)
 
 

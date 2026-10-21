@@ -26,7 +26,8 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "migrate_profiles.py"
 def test_new_types_are_registered_after_the_existing_ones_and_are_proposable():
     assert OBJECT_TYPES[:14] == ("ResearchQuestion", "Theory", "Construct", "Mechanism", "Proxy", "Dataset", "Source",
                                  "EvidencePassage", "Analysis", "Result", "Claim", "ManuscriptArtifact", "Adjudication", "Approval")
-    assert OBJECT_TYPES[14:] == NEW_TYPES
+    assert OBJECT_TYPES[14:20] == NEW_TYPES
+    assert OBJECT_TYPES[20:] == ("ResearchTask",)         # M5: engine-written, never proposed
     assert all(t in PROPOSABLE_TYPES and t not in SERVER_ONLY_TYPES for t in NEW_TYPES)
     assert all(f"object_{t}.v" in " ".join(all_schemas()) for t in NEW_TYPES)
 

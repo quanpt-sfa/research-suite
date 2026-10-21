@@ -11,9 +11,11 @@ upgrade, as `legacy` rows: kept as history, never reusable, each tagged with the
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import shutil
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -28,7 +30,7 @@ _COLUMNS = (
     "artifact_sha256", "execution_status", "context_status", "assessment_status", "applicability", "legacy_status",
     "status_reason", "usage", "reused_from_run_id", "parent_run_id", "upstream_run_ids", "plan_id", "step_id",
     "domain_step_id", "domain_workflow_pin", "playbook_pins", "journal_policy_pins", "closure_digest", "legacy",
-    "known_defects",
+    "known_defects", "task_id", "task_step_id",
 )
 _REQUIRED = ("workflow", "input_fingerprint", "executor", "execution_status", "context_status", "assessment_status",
              "applicability", "legacy_status")
@@ -71,6 +73,49 @@ def _decode(row: Any) -> dict[str, Any]:
     return d
 
 
+class TaskScope:
+    """While a task step runs, every run row inserted by this thread belongs to the step: `task_id` and `task_step_id` are filled in, and the
+    ids and usage of those runs are collected so the step can be summarised, charged against the budget and linked to its runs."""
+
+    def __init__(self, task_id: str, step_id: str):
+        self.task_id, self.step_id = task_id, step_id
+        self.run_ids: list[str] = []
+        self.llm_calls = 0
+        self.tokens = 0
+
+
+_TASK_SCOPE: contextvars.ContextVar = contextvars.ContextVar("research_task_scope", default=None)
+
+
+@contextmanager
+def task_scope(task_id: str, step_id: str):
+    scope = TaskScope(task_id, step_id)
+    token = _TASK_SCOPE.set(scope)
+    try:
+        yield scope
+    finally:
+        _TASK_SCOPE.reset(token)
+
+
+def has_task_columns(conn: Any) -> bool:
+    return any(r[1] == "task_id" for r in conn.execute("PRAGMA table_info(workflow_runs)"))
+
+
+def tokens_of(usage: Optional[dict]) -> int:
+    u = usage or {}
+    return int(u.get("input_tokens") or 0) + int(u.get("output_tokens") or 0)
+
+
+def task_spent(conn: Any, task_id: str) -> dict[str, int]:
+    """Model calls and tokens charged to a task: every run row carrying its id except the step summaries (which repeat their runs)."""
+    calls = tokens = 0
+    for (usage,) in conn.execute("SELECT usage FROM workflow_runs WHERE task_id=? AND workflow NOT LIKE 'task_step:%'", (task_id,)):
+        u = json.loads(usage or "{}")
+        calls += int(u.get("llm_calls") or 0)
+        tokens += tokens_of(u)
+    return {"llm_calls": calls, "tokens": tokens}
+
+
 def insert_run(conn: Any, row: dict[str, Any], *, state_revision: int) -> str:
     """Insert one run row on `conn` (the caller owns the transaction). Returns the run id."""
     from research_harness.workflows.status import Applicability, AssessmentStatus, ContextStatus, ExecutionStatus
@@ -85,6 +130,12 @@ def insert_run(conn: Any, row: dict[str, Any], *, state_revision: int) -> str:
     AssessmentStatus(row["assessment_status"]), Applicability(row["applicability"])
 
     values = dict(row)
+    scope = _TASK_SCOPE.get()
+    if scope is not None and not values.get("task_id"):
+        if not has_task_columns(conn):
+            raise HarnessError("SCHEMA_UPGRADE_REQUIRED", "this project's database predates task support (schema 9.0.4); "
+                               "run `research project upgrade-schema` with the owner token")
+        values["task_id"], values["task_step_id"] = scope.task_id, scope.step_id
     values.setdefault("run_id", new_run_id())
     values.setdefault("created_at", datetime.now(timezone.utc).isoformat())
     values["state_revision"] = state_revision
@@ -95,6 +146,10 @@ def insert_run(conn: Any, row: dict[str, Any], *, state_revision: int) -> str:
     cols = [c for c in _COLUMNS if c in values]
     conn.execute(f"INSERT INTO workflow_runs({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
                  [values[c] for c in cols])
+    if scope is not None and values.get("task_id") == scope.task_id:
+        scope.run_ids.append(values["run_id"])
+        scope.llm_calls += int((json.loads(values["usage"]) if isinstance(values["usage"], str) else values["usage"]).get("llm_calls") or 0)
+        scope.tokens += tokens_of(json.loads(values["usage"]) if isinstance(values["usage"], str) else values["usage"])
     return values["run_id"]
 
 
@@ -241,3 +296,13 @@ def archive_legacy_cache(store: Any, files: Sequence[Path]) -> None:
         (Path(store.paths.root) / "workflow_cache").rmdir()
     except OSError:
         pass  # not empty (e.g. an unreadable file was left in place)
+
+
+def task_rows(conn: Any, task_id: str, *, steps: Optional[bool] = None) -> list[dict[str, Any]]:
+    """Rows that belong to a task, newest first: `steps=True` only the step summaries, `False` only the runs they produced."""
+    sql = "SELECT * FROM workflow_runs WHERE task_id=?"
+    if steps is True:
+        sql += " AND workflow LIKE 'task_step:%'"
+    elif steps is False:
+        sql += " AND workflow NOT LIKE 'task_step:%'"
+    return [_decode(r) for r in conn.execute(sql + " ORDER BY rowid DESC", (task_id,))]

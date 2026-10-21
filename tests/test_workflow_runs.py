@@ -67,12 +67,12 @@ def rows(proj, **kw):
 # schema
 # --------------------------------------------------------------------------------------------------
 
-def test_fresh_project_has_the_registry_at_schema_9_0_3(proj):
+def test_fresh_project_has_the_registry_at_schema_9_0_4(proj):
     store, _ = proj
-    assert DB_SCHEMA_VERSION == "9.0.3"
+    assert DB_SCHEMA_VERSION == "9.0.4"
     with store.read() as c:
         assert workflow_runs.has_registry(c)
-        assert c.execute("SELECT value FROM meta WHERE key='db_schema_version'").fetchone()[0] == "9.0.3"
+        assert c.execute("SELECT value FROM meta WHERE key='db_schema_version'").fetchone()[0] == "9.0.4"
 
 
 def test_registry_rows_cannot_be_updated_or_deleted(proj):
@@ -347,7 +347,7 @@ def test_upgrade_imports_the_old_cache_as_legacy_history_and_archives_the_files(
     store, token = proj
     legacy = _downgrade_to_9_0_2_with_legacy_cache(proj)
     result = upgrade_schema(store, token)
-    assert (result["status"], result["from_version"], result["to_version"]) == ("UPGRADED", "9.0.2", "9.0.3")
+    assert (result["status"], result["from_version"], result["to_version"]) == ("UPGRADED", "9.0.2", "9.0.4")
     assert result["legacy_runs_imported"] == 2
 
     legacy_rows = list_workflow_runs(store, legacy=True)

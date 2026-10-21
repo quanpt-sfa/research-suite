@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from research_harness.graph.relations import RELATIONS
 
-DB_SCHEMA_VERSION = "9.0.3"
+DB_SCHEMA_VERSION = "9.0.4"
 
 # 9.0.3: append-only registry of workflow runs (derived data: it is not part of the state digest, so the scientific
 # integrity hashes are unchanged). Written by the workflow layer without bumping the state revision.
@@ -60,6 +60,8 @@ WORKFLOW_RUNS_DDL = """CREATE TABLE IF NOT EXISTS workflow_runs(
   step_id TEXT,
   domain_step_id TEXT,
   domain_workflow_pin TEXT,
+  task_id TEXT,
+  task_step_id TEXT,
   playbook_pins TEXT NOT NULL DEFAULT '[]',
   journal_policy_pins TEXT NOT NULL DEFAULT '[]',
   closure_digest TEXT,
@@ -68,6 +70,8 @@ WORKFLOW_RUNS_DDL = """CREATE TABLE IF NOT EXISTS workflow_runs(
 )"""
 WORKFLOW_RUNS_INDEX = ("CREATE INDEX IF NOT EXISTS workflow_runs_fingerprint "
                        "ON workflow_runs(workflow, input_fingerprint, created_at)")
+WORKFLOW_RUNS_TASK_INDEX = ("CREATE INDEX IF NOT EXISTS workflow_runs_task "
+                           "ON workflow_runs(task_id, task_step_id, created_at)")
 
 _REL_CHECK = ",".join(f"'{r}'" for r in RELATIONS)
 
@@ -229,6 +233,7 @@ CREATE TABLE audit_log(
 
 {WORKFLOW_RUNS_DDL};
 {WORKFLOW_RUNS_INDEX};
+{WORKFLOW_RUNS_TASK_INDEX};
 """
 
 _APPEND_ONLY = ["objects", "edges", "events", "status_log", "state_revisions",
@@ -278,6 +283,7 @@ SQL_SCHEMA = _TABLES + _triggers()
 WORKFLOW_RUNS_UPGRADE_STATEMENTS = [
     WORKFLOW_RUNS_DDL,
     WORKFLOW_RUNS_INDEX,
+    WORKFLOW_RUNS_TASK_INDEX,
     "CREATE TRIGGER IF NOT EXISTS workflow_runs_no_update BEFORE UPDATE ON workflow_runs "
     "BEGIN SELECT RAISE(ABORT,'workflow_runs is append-only'); END",
     "CREATE TRIGGER IF NOT EXISTS workflow_runs_no_delete BEFORE DELETE ON workflow_runs "
@@ -294,6 +300,7 @@ def upgrade_schema(store, token: str | None = None) -> dict:
 
     Requires an authenticated owner token. Steps, each idempotent:
       * 9.0.1 -> 9.0.2: re-apply EDGE_SEAL_TRIGGER and attest the actor registry into the event log;
+      * 9.0.3 -> 9.0.4: add the nullable `task_id` / `task_step_id` columns to `workflow_runs` (M5 tasks);
       * 9.0.2 -> 9.0.3: create the append-only `workflow_runs` registry and import any 9.1.1 `workflow_cache/*.json`
         outputs into it as legacy/unverified history (kept, never reused; the files are moved to
         `workflow_cache_legacy/` after the transaction commits).
@@ -320,6 +327,13 @@ def upgrade_schema(store, token: str | None = None) -> dict:
                 conn.execute(statement)
             imported, legacy_files = workflow_runs.import_legacy_cache(store, conn)
             result["legacy_runs_imported"] = imported
+        if _version_tuple(current_version) < (9, 0, 4):
+            # 9.0.4: a run can belong to a task (nullable; every older row stays NULL, so no digest and no history changes)
+            have = {r[1] for r in conn.execute("PRAGMA table_info(workflow_runs)")}
+            for col in ("task_id", "task_step_id"):
+                if col not in have:
+                    conn.execute(f"ALTER TABLE workflow_runs ADD COLUMN {col} TEXT")
+            conn.execute(WORKFLOW_RUNS_TASK_INDEX)
         conn.execute("UPDATE meta SET value=? WHERE key='db_schema_version'", (DB_SCHEMA_VERSION,))
     workflow_runs.archive_legacy_cache(store, legacy_files)
     return result

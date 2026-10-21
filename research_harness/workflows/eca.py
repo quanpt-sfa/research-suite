@@ -710,11 +710,14 @@ def basis_passage(store: StateStore, object_id: str, element: Optional[str]) -> 
     return None
 
 
-def run_pending(store: StateStore, token: Optional[str], adapter: Any, *, rate: float = STANDARD_SAMPLE_RATE, limit: Optional[int] = None) -> dict[str, Any]:
+def run_pending(store: StateStore, token: Optional[str], adapter: Any, *, rate: float = STANDARD_SAMPLE_RATE, limit: Optional[int] = None,
+                only_objects: Optional[set[str]] = None) -> dict[str, Any]:
     """Adjudicate (one model call each, proposals only) every statement the coverage policy still asks for: all HIGH ones and the
     sampled STANDARD ones, each against the passage it rests on. A statement with no passage is listed, not guessed at."""
     cov = coverage_report(store, rate=rate)
     todo = cov["high_not_adjudicated"] + cov["sample_not_adjudicated"]
+    if only_objects is not None:      # a task works on one playbook, not on the whole project
+        todo = [s for s in todo if s["object_id"] in only_objects]
     done: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []

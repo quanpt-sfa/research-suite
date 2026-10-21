@@ -65,8 +65,10 @@ OBJECT_TYPES = (
     "Approval",
     # 9.2 knowledge types (appended: existing types and their order are unchanged)
     "DomainWorkflow", "MethodPlaybook", "JournalPolicy", "KnowledgeItem", "ContributionArgument", "AnalysisPlan",
+    # M5 (appended): a researcher's goal with its plan and checkpoints; written by the task engine, never proposed
+    "ResearchTask",
 )
-SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication"})  # can never be created through a proposal
+SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask"})  # can never be created through a proposal
 
 CLAIM_TIERS = (
     "descriptive", "associational", "predictive", "mechanism_consistent", "causal",
