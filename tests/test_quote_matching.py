@@ -18,6 +18,7 @@ TEXT = ("The estimator is robust.\nWe note that no hyper-\nparameter tuning was 
     "Serial misstatements can inflate results",                          # ligature fl in the text
     "See ElkanNoto [14]",                                                # a hyphen anywhere is not significant
     "See Elkan-Noto [14].",
+    "See Elkan-Noto [ 14 ].",                                            # space just inside brackets (PDF citation spacing)
 ])
 def test_the_same_words_match_whatever_the_hyphens_quotes_and_ligatures(quote):
     span = quotes.find_quote(TEXT, quote)

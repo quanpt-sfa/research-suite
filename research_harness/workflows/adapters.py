@@ -351,7 +351,7 @@ class OpenAICompatibleAdapter:
     ADAPTER_VERSION = "1"
 
     def __init__(self, model_id: Optional[str] = None, *, base_url: Optional[str] = None, api_key: Optional[str] = None,
-                 max_output_tokens: int = 16000, timeout: float = 300.0, retries: int = 3, backoff_seconds: float = 2.0,
+                 max_output_tokens: Optional[int] = None, timeout: float = 600.0, retries: int = 3, backoff_seconds: float = 2.0,
                  json_mode: bool = True, opener: Any = None):
         resolved = model_id or os.environ.get("RESEARCH_MODEL")
         if not resolved:
@@ -365,7 +365,9 @@ class OpenAICompatibleAdapter:
         self.model_id = resolved
         self.base_url = url.rstrip("/")
         self._key = key
-        self.max_output_tokens, self.timeout, self.retries, self.backoff_seconds, self.json_mode = max_output_tokens, timeout, retries, backoff_seconds, json_mode
+        # reasoning models spend output tokens on thinking before the answer: the ceiling must leave room for both (RESEARCH_MAX_OUTPUT_TOKENS overrides)
+        self.max_output_tokens = int(max_output_tokens or os.environ.get("RESEARCH_MAX_OUTPUT_TOKENS") or 64000)
+        self.timeout, self.retries, self.backoff_seconds, self.json_mode = timeout, retries, backoff_seconds, json_mode
         self._opener = opener  # a callable `(request, timeout) -> response`, for tests
 
     def __repr__(self) -> str:

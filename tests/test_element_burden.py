@@ -159,3 +159,40 @@ def test_the_sheet_and_batch_through_the_cli(proj, tmp_path, capsys):
     assert main(["adjudicate", "confirm-batch", "--file", str(decisions), *base]) == 0
     assert "1 confirmed, 0 not applied" in capsys.readouterr().out
     assert main(["adjudicate", "confirm-batch", "--file", str(decisions), *base]) == 0 and "not applied" in capsys.readouterr().out
+
+
+def test_reconsider_rederives_an_extraction_from_the_model_answer_without_a_model_call(proj, monkeypatch):
+    store, token = proj
+    answer = [R("sample_selection", SAMPLE_Q), *[R("sample_selection", q) for q in EXTRA], R("label_construction", LABEL_Q)]
+    real_find = rp.quotes.find_quote
+    monkeypatch.setattr(rp.quotes, "find_quote", lambda text, quote: None if quote == LABEL_Q else real_find(text, quote))   # a matcher that was stricter then
+    ex = scripted(answer)
+    first = rp.run_protocol(store, token, fx.PAPER_A, "RP_METHOD", ex)
+    monkeypatch.undo()
+    assert [r["field"] for r in first["records"]].count("sample_selection") == 3 and {r["reason"] for r in first["rejected"]} == {"over_cap", "quote_not_in_text_shown"}
+    calls = len(ex.recorded_requests)
+
+    out = rp.reconsider(store, token, fx.PAPER_A, "RP_METHOD", caps={"sample_selection": 5})
+    assert len(ex.recorded_requests) == calls and out["reused"] is False                       # no model call
+    assert [r["field"] for r in out["records"]].count("sample_selection") == 5 and [r["field"] for r in out["records"]].count("label_construction") == 1
+    assert out["gained_by_matcher"] == 1 and out["rejected"] == [] and out["caps"]["sample_selection"] == 5 and out["reconsidered_from_run_id"] == first["run_id"]
+    for r in out["records"]:
+        assert corpus.verify_passage(store, r["passage_id"])["source_match"] == "VERIFIED"      # everything kept is still a verified span of the stored text
+    with store.read() as conn:
+        row = conn.execute("SELECT status_reason, usage FROM workflow_runs WHERE run_id=?", (out["run_id"],)).fetchone()
+    assert row[0] == "reconsidered" and json.loads(row[1])["llm_calls"] == 0
+    # later reuse finds the reconsidered result, not the first one
+    again = rp.run_protocol(store, token, fx.PAPER_A, "RP_METHOD", ex)
+    assert again["reused"] is True and len(again["records"]) == 6 and len(ex.recorded_requests) == calls
+    # the default caps apply again when none are given; a quote that is still not in the text stays rejected
+    back = rp.reconsider(store, token, fx.PAPER_A, "RP_METHOD")
+    assert [r["field"] for r in back["records"]].count("sample_selection") == 3 and sum(1 for r in back["rejected"] if r["reason"] == "over_cap") == 2
+    with pytest.raises(KnowledgeError, match="CAP_INVALID"):
+        rp.parse_caps(["sample_selection=0"])
+    assert rp.parse_caps(["a=2", "b=3"]) == {"a": 2, "b": 3}
+
+
+def test_reconsider_needs_an_extraction_to_start_from(proj):
+    store, token = proj
+    with pytest.raises(KnowledgeError, match="NOTHING_TO_RECONSIDER"):
+        rp.reconsider(store, token, fx.PAPER_A, "RP_METHOD")

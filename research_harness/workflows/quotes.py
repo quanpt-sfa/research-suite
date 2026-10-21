@@ -48,12 +48,15 @@ def _normalize_with_map(text: str) -> tuple[str, list[int]]:
             prev_space = True if not out else False
             continue
         if ch.isspace():
-            if not prev_space and not drop_ws:
+            if not prev_space and not drop_ws and not (out and out[-1] == "["):   # "[ 35]" and "[35]" are the same citation
                 out.append(" ")
                 index_map.append(i)
             prev_space = True
             continue
         drop_ws = False
+        if ch == "]" and out and out[-1] == " ":
+            out.pop()
+            index_map.pop()
         for c in _LIGATURES.get(ord(ch), _TYPO.get(ord(ch), ch)):
             out.append(c)
             index_map.append(i)

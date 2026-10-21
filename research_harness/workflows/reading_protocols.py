@@ -456,3 +456,72 @@ def extraction_status(store: StateStore, source_id: str, protocol_id: str) -> di
         row = workflow_runs.latest_reusable(conn, f"reading_protocol:{protocol.id}", _fingerprint(key, protocol), ["SUCCESS"])
     return {"protocol": protocol.pin, "extraction_key": key, "cached": _load_cached(store, row) is not None,
             "run_id": row["run_id"] if row else None}
+
+
+def parse_caps(items: Optional[list[str]]) -> dict[str, int]:
+    caps: dict[str, int] = {}
+    for it in items or []:
+        name, _, n = it.partition("=")
+        if not name or not n.isdigit() or int(n) < 1:
+            raise KnowledgeError("CAP_INVALID", f"{it!r}: use field=N with N >= 1")
+        caps[name] = int(n)
+    return caps
+
+
+def reconsider(store: StateStore, token: Optional[str], source_id: str, protocol_id: str, *, caps: Optional[dict[str, int]] = None) -> dict[str, Any]:
+    """Re-derive an extraction from the model answer already paid for, under the rules as they are now: no model call.
+
+    The records the last successful run kept, the ones it rejected because their quote was not found, and the ones it set aside for a field's
+    cap are checked again against the whole stored text (the quote matcher may have changed) and capped again (`caps` overrides the
+    protocol's caps for named fields). Records that now verify become passages; the result is registered as a new run
+    (`reason: reconsidered`, zero model calls) and is what later reuse finds. Nothing is invented: every record is one the model produced.
+    """
+    protocol = get_protocol(protocol_id)
+    obj, text = source_text(store, source_id)
+    text_digest = _text_digest(obj, text)
+    key = extraction_key(source_id, obj["revision"], text_digest, protocol)
+    fingerprint = _fingerprint(key, protocol)
+    with store.read() as conn:
+        row = workflow_runs.latest_reusable(conn, f"reading_protocol:{protocol.id}", fingerprint, ["SUCCESS"])
+    if row is None or not row.get("artifact_sha256") or not store.artifacts.has(row["artifact_sha256"]):
+        raise KnowledgeError("NOTHING_TO_RECONSIDER", f"no successful {protocol.pin} extraction of {source_id} is on record")
+    prev = json.loads(store.artifacts.get_bytes(row["artifact_sha256"]).decode("utf-8"))
+    pool: list[dict[str, Any]] = []
+    for r in prev["records"]:
+        pool.append({k: r[k] for k in ("field", "value", "quote", "char_start", "char_end", "label", "type") if k in r})
+    for r in prev["rejected"]:
+        if r.get("reason") == "over_cap":
+            pool.append({k: r[k] for k in ("field", "value", "quote", "char_start", "char_end", "label", "type") if k in r})
+        elif r.get("reason") == "quote_not_in_text_shown":
+            found = quotes.find_quote(text, r["quote"]) if len(quotes.normalize_whitespace(r["quote"])) >= MIN_QUOTE_CHARS else None
+            if found:
+                pool.append({"field": r["field"], "value": r["value"], "quote": text[found[0]:found[1]], "char_start": found[0], "char_end": found[1],
+                             **{k: r[k] for k in ("label", "type") if k in r}})
+    effective = {f["name"]: (caps or {}).get(f["name"], f.get("max_records")) for f in protocol.fields}
+    kept, rejected, seen, counts = [], [r for r in prev["rejected"] if r.get("reason") not in ("over_cap", "quote_not_in_text_shown")], set(), {}
+    for rec in pool:
+        k = (rec["field"], rec["char_start"], rec["char_end"])
+        if k in seen:
+            continue
+        seen.add(k)
+        spec = protocol.field(rec["field"]) or {}
+        if rec.get("type") and spec.get("types") and rec["type"] not in spec["types"]:
+            rejected.append({**rec, "reason": "type_not_allowed"})
+        elif effective.get(rec["field"]) and counts.get(rec["field"], 0) >= effective[rec["field"]]:
+            rejected.append({**rec, "reason": "over_cap", "cap": effective[rec["field"]]})
+        else:
+            counts[rec["field"]] = counts.get(rec["field"], 0) + 1
+            kept.append(rec)
+    model = prev.get("model") or {}
+    sections_all = source_sections(store, obj, text)
+    stored = _store_records(store, token, protocol, obj, kept, key, model, sections_all)
+    still = [r for r in prev["rejected"] if r.get("reason") == "quote_not_in_text_shown" and not quotes.find_quote(text, r["quote"])]
+    result = {**{k: v for k, v in prev.items() if k not in ("records", "rejected")}, "records": stored, "rejected": rejected + still,
+              "status": "EXTRACTED" if stored else "NO_RECORDS", "reconsidered_from_run_id": row["run_id"],
+              "caps": {k: v for k, v in effective.items() if v}, "gained_by_matcher": sum(1 for r in prev["rejected"] if r.get("reason") == "quote_not_in_text_shown") - len(still)}
+    artifact = store.artifacts.put_bytes(json.dumps(result, sort_keys=True, default=str).encode("utf-8"))
+    run_id = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, context=ContextStatus(prev.get("context_status", "COMPLETE")),
+                       assessment=AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, legacy_status="SUCCESS", reason="reconsidered",
+                       usage={"llm_calls": 0, "usage_source": "not_available"}, model=model, artifact=artifact, source_id=source_id,
+                       source_revision=obj["revision"], text_digest=text_digest, protocol=protocol)
+    return {**result, "reused": False, "run_id": run_id, "previous_records": len(prev["records"])}

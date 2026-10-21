@@ -506,6 +506,7 @@ def register(sub: Any) -> None:
     register_m4(sub)
     register_publish(sub)
     register_review(sub)
+    register_reconsider(sub)
     _add_provider_options(sub)
 
 
@@ -1008,3 +1009,24 @@ def register_review(sub: Any) -> None:
     q.add_argument("--file", required=True)
     _common(q)
     q.set_defaults(func=cmd_adjudicate_confirm_batch)
+
+
+def cmd_reconsider(args: argparse.Namespace) -> int:
+    from research_harness.workflows import reading_protocols as rp
+
+    def go():
+        return rp.reconsider(_store(args), _helpers()._resolve_token(args), args.source, args.protocol, caps=rp.parse_caps(args.cap))
+
+    def text(o):
+        print(f"{o['protocol']} on {o['source_id']}: {len(o['records'])} record(s) (was {o['previous_records']}), {o['gained_by_matcher']} gained by the matcher, "
+              f"{sum(1 for r in o['rejected'] if r['reason'] == 'over_cap')} set aside for caps; no model call (run {o['run_id']})")
+    return _run(args, go, text)
+
+
+def register_reconsider(sub: Any) -> None:
+    q = sub.add_parser("reconsider", help="Re-derive an extraction from the model answer already paid for, under today's matcher and caps (no model call)")
+    q.add_argument("--source", required=True)
+    q.add_argument("--protocol", required=True)
+    q.add_argument("--cap", action="append", help="Override a field's cap: field=N (repeatable)")
+    _common(q)
+    q.set_defaults(func=cmd_reconsider)
