@@ -514,6 +514,7 @@ def register(sub: Any) -> None:
     register_publish(sub)
     register_review(sub)
     register_reconsider(sub)
+    register_export(sub)
     _add_provider_options(sub)
 
 
@@ -1037,3 +1038,57 @@ def register_reconsider(sub: Any) -> None:
     q.add_argument("--cap", action="append", help="Override a field's cap: field=N (repeatable)")
     _common(q)
     q.set_defaults(func=cmd_reconsider)
+
+
+# --------------------------------------------------------------------------------------------------
+# readable exports (M5 WP2)
+# --------------------------------------------------------------------------------------------------
+
+def cmd_export_methods(args: argparse.Namespace) -> int:
+    from pathlib import Path as _P
+    from research_harness.export.manifest import write_export
+    from research_harness.export.methods import build_methods_export
+
+    def go():
+        store = _store(args)
+        exp = build_methods_export(store, args.playbook, args.plan)
+        return write_export(store, exp, _P(args.out) if args.out else None, into_repo=args.into_repo)
+
+    def text(o):
+        print(f"exported to {o['out']} (closure {o['closure_digest'][:12]}): " + ", ".join(o["files"]))
+        for n in o["not_available"]:
+            print(f"  NOT_AVAILABLE {n['file']}: {n['reason']}")
+    return _run(args, go, text)
+
+
+def cmd_export_verify(args: argparse.Namespace) -> int:
+    from research_harness.export.manifest import verify_export
+    from research_harness.export.methods import build_methods_export
+
+    outcome: dict = {}
+
+    def go():
+        store = _store(args)
+        outcome.update(verify_export(store, args.directory, lambda scope: build_methods_export(store, scope["playbook"], scope.get("plan"))))
+        return outcome
+
+    def text(o):
+        print(o["status"] + ("" if o["status"] == "VERIFIED" else ": " + json.dumps({k: v for k, v in o.items() if k != "status"}, default=str)))
+    rc = _run(args, go, text)
+    return rc or (0 if outcome.get("status") == "VERIFIED" else 1)
+
+
+def register_export(sub: Any) -> None:
+    p = sub.add_parser("export", help="Readable files for a researcher, with a manifest that ties every line back to the store (no model call)")
+    s = p.add_subparsers(dest="export_cmd", required=True)
+    q = s.add_parser("methods", help="Playbook, extraction, adjudication sheet, fidelity report and cost of a Methods run")
+    q.add_argument("--playbook", required=True)
+    q.add_argument("--plan", help="An AnalysisPlan resting on the playbook (adds the fidelity report)")
+    q.add_argument("--out", help="Directory to create (default: <home>/exports/<project>/...); never inside a store or .git")
+    q.add_argument("--into-repo", action="store_true", help="Allow a directory inside the repository's tracked tree (for artefacts the repository holds)")
+    _common(q, token=False)
+    q.set_defaults(func=cmd_export_methods)
+    q = s.add_parser("verify", help="Are the files as written, and does the store still produce exactly them?")
+    q.add_argument("directory")
+    _common(q, token=False)
+    q.set_defaults(func=cmd_export_verify)

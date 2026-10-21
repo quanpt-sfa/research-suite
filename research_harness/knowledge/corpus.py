@@ -167,3 +167,18 @@ def verify_passage(store: StateStore, passage_id: str) -> dict[str, Any]:
         return {"object_id": passage_id, "source_match": "FAILED", "reason": exc.code}
     check = quotes.verify_span(text, c["char_start"], c["char_end"], c.get("quote"))
     return {"object_id": passage_id, "source_match": "VERIFIED" if check.ok else "FAILED", "reason": check.reason}
+
+
+def corpus_snapshot_id(store: StateStore) -> str:
+    """Identity of the corpus as it is now: every Source head with its text digest and full-text status.
+
+    Adding, revising (an erratum) or replacing a source changes it; importing an identical text again does not. Conclusions that rest on
+    not finding something are bound to it (M5, invariant I20)."""
+    from research_harness.core.canonical import canonical_json_hash
+    rows = []
+    with store.read() as conn:
+        for (oid,) in conn.execute("SELECT object_id FROM object_heads WHERE object_type='Source' ORDER BY object_id").fetchall():
+            o = store.get_object(oid, conn=conn)
+            c = o["content"]
+            rows.append([oid, o["revision"], c.get("text_sha256"), c.get("fulltext_status")])
+    return canonical_json_hash(rows)
