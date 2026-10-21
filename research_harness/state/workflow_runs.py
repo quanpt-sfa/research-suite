@@ -98,6 +98,13 @@ def insert_run(conn: Any, row: dict[str, Any], *, state_revision: int) -> str:
     return values["run_id"]
 
 
+def insert_run_tx(tx: Any, row: dict[str, Any]) -> str:
+    """Insert a run row inside an open write transaction, so a run and the objects it produced commit together or not at all
+    (I22: no SUCCEEDED run without its outputs). The row carries the state revision this transaction creates, if it changes state."""
+    require_registry(tx.conn)
+    return insert_run(tx.conn, row, state_revision=tx.revision if tx.changed else tx.base_revision)
+
+
 def append_run(store: Any, row: dict[str, Any]) -> str:
     """Insert a run row in its own short transaction (no state-revision bump, no token: derived data)."""
     conn = store.connect()

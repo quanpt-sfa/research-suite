@@ -30,8 +30,49 @@ from research_harness.core.model import (
 )
 from research_harness.graph.dependency import stale_pinned_edges
 from research_harness.provenance.events import verify_chain
+from research_harness.state import workflow_runs
 from research_harness.state.actors import registry_findings
+from research_harness.state.blob_refs import blob_digests_in
 from research_harness.state.store import StateStore, compute_state_digest, revision_digest
+
+
+def _succeeded_runs_without_outputs(store: StateStore, conn: sqlite3.Connection) -> list[dict]:
+    """I22: a SUCCEEDED run of a workflow that writes objects must have them. Reported, never repaired."""
+    findings: list[dict] = []
+    rows = conn.execute("SELECT run_id, workflow, artifact_sha256, input_revisions, status_reason, reused_from_run_id FROM workflow_runs "
+                        "WHERE execution_status='SUCCEEDED' AND (workflow LIKE 'reading_protocol:%' OR workflow IN "
+                        "('eca_adjudication','contribution_comparison'))").fetchall()
+    for run_id, workflow, artifact, inputs, reason, reused_from in rows:
+        missing: list[str] = []
+        if workflow.startswith("reading_protocol:"):
+            if not artifact or not store.artifacts.has(artifact):
+                continue                       # reported as REFERENCED_ARTIFACT_MISSING (or a run without its own result)
+            try:
+                records = json.loads(store.artifacts.get_bytes(artifact).decode("utf-8")).get("records", [])
+            except Exception:  # noqa: BLE001
+                continue
+            missing = [f"{r['passage_id']}@{r['revision']}" for r in records
+                       if not conn.execute("SELECT 1 FROM objects WHERE object_id=? AND revision=?", (r["passage_id"], r["revision"])).fetchone()]
+        elif workflow == "eca_adjudication":
+            if reused_from or reason == "reused":
+                continue
+            ins = json.loads(inputs or "[]")
+            if len(ins) < 2:
+                continue
+            found = conn.execute(
+                "SELECT 1 FROM objects WHERE object_type='Adjudication' AND json_extract(content,'$.kind')='evidence_claim' "
+                "AND json_extract(content,'$.confirms') IS NULL AND json_extract(content,'$.subject.object_id')=? "
+                "AND json_extract(content,'$.subject.revision')=? AND json_extract(content,'$.passage.object_id')=? "
+                "AND json_extract(content,'$.passage.revision')=? LIMIT 1",
+                (ins[0]["object_id"], ins[0]["revision"], ins[1]["object_id"], ins[1]["revision"])).fetchone()
+            missing = [] if found else ["adjudication record"]
+        else:
+            found = conn.execute("SELECT 1 FROM objects WHERE object_type='ContributionArgument' "
+                                 "AND json_extract(content,'$.comparison_run')=? LIMIT 1", (run_id,)).fetchone()
+            missing = [] if found else ["ContributionArgument revision naming the run"]
+        if missing:
+            findings.append({"rule": "SUCCEEDED_RUN_WITHOUT_OUTPUTS", "run_id": run_id, "workflow": workflow, "missing": missing[:20]})
+    return findings
 
 
 def verify_database_integrity(store: StateStore) -> list[dict]:
@@ -101,12 +142,8 @@ def verify_database_integrity(store: StateStore) -> list[dict]:
                         "stored": stored_cdig,
                         "actual": actual_cdig,
                     })
-                # Check for referenced physical CAS artifacts in content (do not treat text fingerprints as CAS blobs)
-                if isinstance(c_data, dict):
-                    for k in ("artifact_sha256", "blob_sha256"):
-                        val = c_data.get(k)
-                        if isinstance(val, str) and len(val) == 64:
-                            referenced_artifacts.add(val)
+                # Referenced CAS blobs at any depth of the content; text fingerprints are not blobs (state/blob_refs.py)
+                referenced_artifacts |= blob_digests_in(c_data)
             except Exception as e:
                 findings.append({"rule": "OBJECT_CONTENT_MALFORMED_JSON", "object_id": oid, "revision": rev, "error": str(e)})
 
@@ -185,6 +222,13 @@ def verify_database_integrity(store: StateStore) -> list[dict]:
         except Exception:
             pass
 
+        # Run registry: a run's result artefact must exist; prompt and context digests are only kept from being called orphans
+        known_only: set[str] = set()
+        if workflow_runs.has_registry(conn):
+            referenced_artifacts |= {r[0] for r in conn.execute("SELECT artifact_sha256 FROM workflow_runs WHERE artifact_sha256 IS NOT NULL")}
+            known_only = workflow_runs.artifact_digests(conn)
+            findings.extend(_succeeded_runs_without_outputs(store, conn))
+
         # 11. Actor registry consistency against events
         act_findings = registry_findings(conn)
         findings.extend(act_findings)
@@ -203,7 +247,7 @@ def verify_database_integrity(store: StateStore) -> list[dict]:
 
     # 9. Orphan CAS artifact identification (Advisory)
     existing_blobs = set(store.artifacts.blobs())
-    orphaned_blobs = existing_blobs - referenced_artifacts
+    orphaned_blobs = existing_blobs - referenced_artifacts - known_only
     for orphan in sorted(orphaned_blobs):
         findings.append({
             "rule": "ORPHAN_ARTIFACT_BLOB",

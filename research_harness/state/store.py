@@ -121,9 +121,16 @@ class Tx:
         return self.actor
 
     def add_revision(self, *, object_id: str, object_type: str, content: dict, origin: dict,
-                     edges: list[tuple]) -> dict:
-        """Create revision N+1 (or 1). ``edges`` = [(relation, target_id, target_revision, provenance)]."""
+                     edges: list[tuple], expected_head: Optional[int] = None) -> dict:
+        """Create revision N+1 (or 1). ``edges`` = [(relation, target_id, target_revision, provenance)].
+
+        ``expected_head`` (optimistic concurrency for engine writes): the head revision the caller read, ``0`` for "must not exist yet".
+        If the head moved in the meantime nothing is written and ``STALE_REVISION`` is raised. ``None`` keeps the unchecked behaviour."""
         head = self.head(object_id)
+        if expected_head is not None and (head["head_revision"] if head else 0) != expected_head:
+            raise HarnessError("STALE_REVISION", f"{object_id} is at revision {head['head_revision'] if head else 0}, not {expected_head}",
+                               object_id=object_id, expected_revision=expected_head,
+                               actual_revision=head["head_revision"] if head else 0)
         rev = head["head_revision"] + 1 if head else 1
         cdig = canonical_json_hash(content)
         rdig = revision_digest(cdig, [(e[0], e[1], e[2]) for e in edges])
@@ -334,14 +341,10 @@ class StateStore:
             except Exception:
                 pass
 
+            from research_harness.state.blob_refs import blob_digests_in
             for row in conn.execute("SELECT content FROM objects"):
                 try:
-                    c = json.loads(row[0])
-                    if isinstance(c, dict):
-                        for k in ("artifact_sha256", "blob_sha256"):
-                            v = c.get(k)
-                            if isinstance(v, str) and len(v) == 64:
-                                known_artifacts.add(v)
+                    known_artifacts |= blob_digests_in(json.loads(row[0]))   # at any depth (contract C1)
                 except Exception:
                     pass
 

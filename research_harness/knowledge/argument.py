@@ -26,7 +26,8 @@ from research_harness import taxonomy
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.knowledge.corpus import verify_passage
 from research_harness.knowledge.common import (
-    WRITE_ROLES, KnowledgeError, engine_origin, id_fragment, register_run, scope_id)
+    WRITE_ROLES, KnowledgeError, engine_origin, id_fragment, register_run, run_row, scope_id)
+from research_harness.state import workflow_runs
 from research_harness.state.store import StateStore
 from research_harness.workflows import eca
 from research_harness.workflows import reading_protocols as rp
@@ -225,11 +226,28 @@ def compare_contribution(store: StateStore, token: Optional[str], focus_argument
                 "substantive": "model_assessed", "generated_by": f"model:{model.get('model_id')}",
                 "assessment": apply_caps(AssessmentStatus.PROVISIONAL, generated_by=f"model:{model.get('model_id')}").value})
     result = {"focus": focus_argument_id, "review_run": review.get("run_id"), "differentiation": differentiation, "rejected": rejected}
-    run = register_run(store, workflow="contribution_comparison", fingerprint=canonical_json_hash(
+    run_fields = dict(workflow="contribution_comparison", fingerprint=canonical_json_hash(
         {"focus": focus_argument_id, "revision": arg["revision"], "review": review.get("run_id"), "model": model}),
-        executor=EXECUTOR, result=result, usage={"llm_calls": calls}, model=model,
+        executor=EXECUTOR, usage={"llm_calls": calls}, model=model,
         upstream_run_ids=[review["run_id"]] if review.get("run_id") else [],
         input_revisions=[{"object_id": focus_argument_id, "revision": arg["revision"]}])
+    # the argument revision names the run, and the run is registered in the same transaction (I22); a refused write leaves a FAILED run
+    run = workflow_runs.new_run_id()
+    row = run_row(store, result=result, run_id=run, **run_fields)
+    try:
+        _store_comparison(store, token, focus_argument_id, differentiation, run, row)
+    except Exception as exc:
+        try:
+            register_run(store, execution="FAILED", context="PARTIAL", assessment="NOT_ASSESSED",
+                         reason=f"write_refused:{getattr(exc, 'code', type(exc).__name__)}", **run_fields)
+        except Exception:  # noqa: BLE001 - the original error is the one to report
+            pass
+        raise
+    return {**result, "run_id": run, "llm_calls": calls}
+
+
+def _store_comparison(store: StateStore, token: Optional[str], focus_argument_id: str, differentiation: list[dict[str, Any]], run: str,
+                      row: dict[str, Any]) -> None:
     with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
         cur = tx.get(focus_argument_id)
         rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
@@ -240,7 +258,8 @@ def compare_contribution(store: StateStore, token: Optional[str], focus_argument
         tx.add_revision(object_id=focus_argument_id, object_type="ContributionArgument", edges=edges,
                         content={**cur["content"], "differentiation": differentiation, "comparison_run": run},
                         origin=engine_origin("compare_contribution", tx.actor_id))
-    return {**result, "run_id": run, "llm_calls": calls}
+        tx.fault("comparison_before_run")
+        workflow_runs.insert_run_tx(tx, row)
 
 
 def confirm_difference(store: StateStore, token: Optional[str], argument_id: str, index: int, *, substantive: bool, rationale: str) -> dict[str, Any]:

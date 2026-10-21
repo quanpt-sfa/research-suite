@@ -66,17 +66,23 @@ def store_of(obj: Any) -> StateStore:
     return obj
 
 
-def register_run(store: StateStore, *, workflow: str, fingerprint: str, executor: str, result: Optional[dict[str, Any]] = None,
-                 execution: str = "SUCCEEDED", context: str = "COMPLETE", assessment: str = "PROVISIONAL", reason: Optional[str] = None,
-                 usage: Optional[dict] = None, model: Optional[dict] = None, input_revisions: Optional[list] = None,
-                 upstream_run_ids: Optional[list] = None, **columns: Any) -> str:
-    """Append a run to the registry (I5), storing `result` in the content-addressed store. Returns the run id."""
+def register_run(store: StateStore, **kw: Any) -> str:
+    """Append a run to the registry (I5), storing `result` in the content-addressed store. Returns the run id.
+    A run that also writes objects uses `run_row` and `workflow_runs.insert_run_tx` inside its own transaction instead (I22)."""
     from research_harness.state import workflow_runs
+    return workflow_runs.append_run(store, run_row(store, **kw))
+
+
+def run_row(store: StateStore, *, workflow: str, fingerprint: str, executor: str, result: Optional[dict[str, Any]] = None,
+            execution: str = "SUCCEEDED", context: str = "COMPLETE", assessment: str = "PROVISIONAL", reason: Optional[str] = None,
+            usage: Optional[dict] = None, model: Optional[dict] = None, input_revisions: Optional[list] = None,
+            upstream_run_ids: Optional[list] = None, **columns: Any) -> dict[str, Any]:
+    """The registry row of a run; `result` is written to the content-addressed store first (a blob before the row that names it)."""
     import json
     artifact = store.artifacts.put_bytes(json.dumps(result, sort_keys=True, default=str).encode("utf-8")) if result is not None else None
-    return workflow_runs.append_run(store, {
+    return {
         "workflow": workflow, "input_fingerprint": fingerprint, "executor": executor, "execution_status": execution,
         "context_status": context, "assessment_status": assessment, "applicability": "APPLICABLE",
         "legacy_status": "SUCCESS" if execution == "SUCCEEDED" else "FAILED", "status_reason": reason, "usage": usage or {},
         "model_descriptor": model, "artifact_sha256": artifact, "input_revisions": input_revisions or [],
-        "upstream_run_ids": upstream_run_ids or [], **columns})
+        "upstream_run_ids": upstream_run_ids or [], **columns}

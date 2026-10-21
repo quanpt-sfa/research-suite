@@ -232,16 +232,20 @@ def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, ch
 # running a protocol
 # ---------------------------------------------------------------------------------------------------
 
-def _register(store: StateStore, *, fingerprint: str, execution: ExecutionStatus, context: ContextStatus,
-              assessment: AssessmentStatus, legacy_status: str, reason: Optional[str], usage: dict, model: Optional[dict],
-              artifact: Optional[str], source_id: str, source_revision: int, text_digest: str,
-              reused_from: Optional[str] = None, protocol: ReadingProtocol) -> str:
-    return workflow_runs.append_run(store, {
+def _run_row(*, fingerprint: str, execution: ExecutionStatus, context: ContextStatus, assessment: AssessmentStatus,
+             legacy_status: str, reason: Optional[str], usage: dict, model: Optional[dict], artifact: Optional[str], source_id: str,
+             source_revision: int, text_digest: str, reused_from: Optional[str] = None, protocol: ReadingProtocol) -> dict[str, Any]:
+    return {
         "workflow": f"reading_protocol:{protocol.id}", "input_fingerprint": fingerprint, "executor": EXECUTOR,
         "execution_status": execution.value, "context_status": context.value, "assessment_status": assessment.value,
         "applicability": Applicability.APPLICABLE.value, "legacy_status": legacy_status, "status_reason": reason,
         "usage": usage, "model_descriptor": model, "artifact_sha256": artifact, "reused_from_run_id": reused_from,
-        "input_revisions": [{"object_id": source_id, "revision": source_revision, "content_digest": text_digest}]})
+        "input_revisions": [{"object_id": source_id, "revision": source_revision, "content_digest": text_digest}]}
+
+
+def _register(store: StateStore, **kw: Any) -> str:
+    """A run that writes no objects (failed, reused) is registered on its own."""
+    return workflow_runs.append_run(store, _run_row(**kw))
 
 
 def _passage_content(protocol: ReadingProtocol, obj: dict[str, Any], rec: dict[str, Any], key: str, model: dict[str, Any],
@@ -261,29 +265,49 @@ def _passage_content(protocol: ReadingProtocol, obj: dict[str, Any], rec: dict[s
     return c
 
 
-def _store_records(store: StateStore, token: Optional[str], protocol: ReadingProtocol, obj: dict[str, Any],
-                   records: list[dict[str, Any]], key: str, model: dict[str, Any], sections: list[dict[str, Any]],
-                   ) -> list[dict[str, Any]]:
+def _write_passages(tx: Any, store: StateStore, protocol: ReadingProtocol, obj: dict[str, Any], records: list[dict[str, Any]],
+                    key: str, model: dict[str, Any], sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     stored: list[dict[str, Any]] = []
     frag = id_fragment(obj["object_id"], 28)
     proto = id_fragment(protocol.id.replace("RP_", ""), 12)
-    with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
-        for rec in records:
-            section = next((s for s in sections if s["char_start"] <= rec["char_start"] < s["char_end"]), None)
-            content = _passage_content(protocol, obj, rec, key, model, (section or {}).get("heading") or (section or {}).get("label") or "")
-            pid = scope_id(store, f"EP_{frag}_{proto}_{rec['char_start']}")
-            head = tx.head(pid)
-            if head:
-                cur = tx.get(pid)
-                if cur["content"] == content:
-                    stored.append({**rec, "passage_id": pid, "revision": cur["revision"]})
-                    continue
-            res = tx.add_revision(object_id=pid, object_type="EvidencePassage", content=content,
-                                  edges=[("derived_from", obj["object_id"], obj["revision"], {"origin": "reading_protocol"})],
-                                  origin=engine_origin("extract", tx.actor_id, protocol=protocol.pin, extraction_key=key))
-            stored.append({**rec, "passage_id": pid, "revision": res["revision"]})
-        tx.audit("extract", "RECORDED", {"protocol": protocol.pin, "source": obj["object_id"], "records": len(stored)})
+    for rec in records:
+        section = next((s for s in sections if s["char_start"] <= rec["char_start"] < s["char_end"]), None)
+        content = _passage_content(protocol, obj, rec, key, model, (section or {}).get("heading") or (section or {}).get("label") or "")
+        pid = scope_id(store, f"EP_{frag}_{proto}_{rec['char_start']}")
+        head = tx.head(pid)
+        if head:
+            cur = tx.get(pid)
+            if cur["content"] == content:
+                stored.append({**rec, "passage_id": pid, "revision": cur["revision"]})
+                continue
+        res = tx.add_revision(object_id=pid, object_type="EvidencePassage", content=content,
+                              edges=[("derived_from", obj["object_id"], obj["revision"], {"origin": "reading_protocol"})],
+                              origin=engine_origin("extract", tx.actor_id, protocol=protocol.pin, extraction_key=key))
+        stored.append({**rec, "passage_id": pid, "revision": res["revision"]})
+    tx.audit("extract", "RECORDED", {"protocol": protocol.pin, "source": obj["object_id"], "records": len(stored)})
     return stored
+
+
+def _commit_extraction(store: StateStore, token: Optional[str], protocol: ReadingProtocol, obj: dict[str, Any],
+                       records: list[dict[str, Any]], key: str, model: dict[str, Any], sections: list[dict[str, Any]],
+                       finish: Any, failed_row: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    """Passages, the result artefact and the SUCCEEDED run row in one transaction (I22). `finish(stored)` returns the result and the
+    run row without its artefact. If the write is refused (authorization, a stale revision, a crash before commit), nothing of it
+    remains; the model calls already made are then registered as a FAILED run and the error is raised."""
+    try:
+        with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
+            stored = _write_passages(tx, store, protocol, obj, records, key, model, sections)
+            result, row = finish(stored)
+            artifact = store.artifacts.put_bytes(json.dumps(result, sort_keys=True, default=str).encode("utf-8"))
+            tx.fault("extraction_before_run")
+            run_id = workflow_runs.insert_run_tx(tx, {**row, "artifact_sha256": artifact})
+    except Exception as exc:
+        try:
+            workflow_runs.append_run(store, {**failed_row, "status_reason": f"write_refused:{getattr(exc, 'code', type(exc).__name__)}"})
+        except Exception:  # noqa: BLE001 - the original error is the one to report
+            pass
+        raise
+    return stored, result, run_id
 
 
 def run_protocol(store: StateStore, token: Optional[str], source_id: str, protocol_id: str, adapter: Any, *,
@@ -389,20 +413,24 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
             continue
         kept_per_field[rec["field"]] = kept_per_field.get(rec["field"], 0) + 1
         uniq[key_] = rec
-    stored = _store_records(store, token, protocol, obj, list(uniq.values()), key, model, sections_all)
     context = ContextStatus.PARTIAL if fallback else ContextStatus.COMPLETE
-    assessment = apply_caps(AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, context=context,
-                            generated_by=f"model:{model.get('model_id')}")
-    result = {"protocol": protocol.pin, "protocol_digest": protocol.digest, "source_id": source_id,
-              "source_revision": obj["revision"], "extraction_key": key, "status": "EXTRACTED" if stored else "NO_RECORDS",
-              "records": stored, "rejected": rejected_all, "gaps": sorted(set(gaps)), "chunks": len(ranges),
-              "sections_read": [s.heading or s.label for s in chosen], "section_fallback": fallback,
-              "context_status": context.value, "assessment": assessment.value, "model": model}
-    artifact = store.artifacts.put_bytes(json.dumps(result, sort_keys=True, default=str).encode("utf-8"))
-    run_id = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, context=context,
-                       assessment=assessment, legacy_status="SUCCESS", reason=None, usage=usage, model=model,
-                       artifact=artifact, source_id=source_id, source_revision=obj["revision"], text_digest=text_digest,
-                       protocol=protocol)
+    common = dict(fingerprint=fingerprint, usage=usage, model=model, source_id=source_id, source_revision=obj["revision"],
+                  text_digest=text_digest, protocol=protocol)
+
+    def finish(stored: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+        assessment = apply_caps(AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, context=context,
+                                generated_by=f"model:{model.get('model_id')}")
+        result = {"protocol": protocol.pin, "protocol_digest": protocol.digest, "source_id": source_id,
+                  "source_revision": obj["revision"], "extraction_key": key, "status": "EXTRACTED" if stored else "NO_RECORDS",
+                  "records": stored, "rejected": rejected_all, "gaps": sorted(set(gaps)), "chunks": len(ranges),
+                  "sections_read": [s.heading or s.label for s in chosen], "section_fallback": fallback,
+                  "context_status": context.value, "assessment": assessment.value, "model": model}
+        return result, _run_row(execution=ExecutionStatus.SUCCEEDED, context=context, assessment=assessment, legacy_status="SUCCESS",
+                                reason=None, artifact=None, **common)
+
+    failed = _run_row(execution=ExecutionStatus.FAILED, context=ContextStatus.PARTIAL, assessment=AssessmentStatus.NOT_ASSESSED,
+                      legacy_status="FAILED", reason=None, artifact=None, **common)
+    _, result, run_id = _commit_extraction(store, token, protocol, obj, list(uniq.values()), key, model, sections_all, finish, failed)
     return {**result, "reused": False, "run_id": run_id}
 
 
@@ -514,14 +542,20 @@ def reconsider(store: StateStore, token: Optional[str], source_id: str, protocol
             kept.append(rec)
     model = prev.get("model") or {}
     sections_all = source_sections(store, obj, text)
-    stored = _store_records(store, token, protocol, obj, kept, key, model, sections_all)
     still = [r for r in prev["rejected"] if r.get("reason") == "quote_not_in_text_shown" and not quotes.find_quote(text, r["quote"])]
-    result = {**{k: v for k, v in prev.items() if k not in ("records", "rejected")}, "records": stored, "rejected": rejected + still,
-              "status": "EXTRACTED" if stored else "NO_RECORDS", "reconsidered_from_run_id": row["run_id"],
-              "caps": {k: v for k, v in effective.items() if v}, "gained_by_matcher": sum(1 for r in prev["rejected"] if r.get("reason") == "quote_not_in_text_shown") - len(still)}
-    artifact = store.artifacts.put_bytes(json.dumps(result, sort_keys=True, default=str).encode("utf-8"))
-    run_id = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, context=ContextStatus(prev.get("context_status", "COMPLETE")),
-                       assessment=AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, legacy_status="SUCCESS", reason="reconsidered",
-                       usage={"llm_calls": 0, "usage_source": "not_available"}, model=model, artifact=artifact, source_id=source_id,
-                       source_revision=obj["revision"], text_digest=text_digest, protocol=protocol)
+    common = dict(fingerprint=fingerprint, usage={"llm_calls": 0, "usage_source": "not_available"}, model=model, source_id=source_id,
+                  source_revision=obj["revision"], text_digest=text_digest, protocol=protocol)
+
+    def finish(stored: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+        result = {**{k: v for k, v in prev.items() if k not in ("records", "rejected")}, "records": stored, "rejected": rejected + still,
+                  "status": "EXTRACTED" if stored else "NO_RECORDS", "reconsidered_from_run_id": row["run_id"],
+                  "caps": {k: v for k, v in effective.items() if v},
+                  "gained_by_matcher": sum(1 for r in prev["rejected"] if r.get("reason") == "quote_not_in_text_shown") - len(still)}
+        return result, _run_row(execution=ExecutionStatus.SUCCEEDED, context=ContextStatus(prev.get("context_status", "COMPLETE")),
+                                assessment=AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, legacy_status="SUCCESS",
+                                reason="reconsidered", artifact=None, **common)
+
+    failed = _run_row(execution=ExecutionStatus.FAILED, context=ContextStatus.PARTIAL, assessment=AssessmentStatus.NOT_ASSESSED,
+                      legacy_status="FAILED", reason=None, artifact=None, **common)
+    stored, result, run_id = _commit_extraction(store, token, protocol, obj, kept, key, model, sections_all, finish, failed)
     return {**result, "reused": False, "run_id": run_id, "previous_records": len(prev["records"])}

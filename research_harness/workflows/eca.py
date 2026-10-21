@@ -257,7 +257,9 @@ def _next_adj_id(conn: Any, store: StateStore) -> str:
 
 
 def _write_record(store: StateStore, token: Optional[str], roles: tuple, content: dict[str, Any], statement: StatementRef,
-                  passage: dict[str, Any], operation: str) -> dict[str, Any]:
+                  passage: dict[str, Any], operation: str, *, run_row: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """Write one adjudication record; with `run_row`, the run that produced it is registered in the same transaction (I22)."""
+    run_id = None
     with store.write_tx(token=token, require_roles=roles) as tx:
         head_or_raise(tx, statement.object_id)
         sh = tx.head(statement.object_id)
@@ -287,20 +289,45 @@ def _write_record(store: StateStore, token: Optional[str], roles: tuple, content
                                            "assessment_kind": "semantic_entailment", "independence_level": "author",
                                            "adjudicator": tx.actor_id})
         tx.audit(operation, "RECORDED", {"adjudication_id": aid, "eca_verdict": verdict})
-    return {"adjudication_id": aid, "revision": 1, **{k: content[k] for k in ("eca_verdict", "equivalence")}}
+        if run_row is not None:
+            tx.fault("adjudication_before_run")
+            run_id = workflow_runs.insert_run_tx(tx, run_row)
+    out = {"adjudication_id": aid, "revision": 1, **{k: content[k] for k in ("eca_verdict", "equivalence")}}
+    return {**out, "run_id": run_id} if run_row is not None else out
 
 
-def _register(store: StateStore, *, fingerprint: str, execution: ExecutionStatus, assessment: AssessmentStatus, reason: Optional[str],
-              usage: dict, model: Optional[dict], artifact: Optional[str], statement: StatementRef, passage: dict[str, Any],
-              reused_from: Optional[str] = None) -> str:
-    return workflow_runs.append_run(store, {
+def _run_row(*, fingerprint: str, execution: ExecutionStatus, assessment: AssessmentStatus, reason: Optional[str], usage: dict,
+             model: Optional[dict], artifact: Optional[str], statement: StatementRef, passage: dict[str, Any],
+             reused_from: Optional[str] = None) -> dict[str, Any]:
+    return {
         "workflow": "eca_adjudication", "input_fingerprint": fingerprint, "executor": EXECUTOR,
         "execution_status": execution.value, "context_status": ContextStatus.COMPLETE.value,
         "assessment_status": assessment.value, "applicability": Applicability.APPLICABLE.value,
         "legacy_status": "SUCCESS" if execution is ExecutionStatus.SUCCEEDED else "FAILED", "status_reason": reason,
         "usage": usage, "model_descriptor": model, "artifact_sha256": artifact, "reused_from_run_id": reused_from,
         "input_revisions": [{"object_id": statement.object_id, "revision": statement.revision},
-                            {"object_id": passage["object_id"], "revision": passage["revision"]}]})
+                            {"object_id": passage["object_id"], "revision": passage["revision"]}]}
+
+
+def _register(store: StateStore, **kw: Any) -> str:
+    """A run that writes no record (failed, reused) is registered on its own."""
+    return workflow_runs.append_run(store, _run_row(**kw))
+
+
+def _record_with_run(store: StateStore, token: Optional[str], content: dict[str, Any], statement: StatementRef, passage: dict[str, Any],
+                     run: dict[str, Any]) -> dict[str, Any]:
+    """Record and SUCCEEDED run in one transaction. If the write is refused, the run is registered as FAILED (its model call, if any,
+    is not lost from the registry) and the error is raised; no SUCCEEDED run is left without its record."""
+    try:
+        return _write_record(store, token, WRITE_ROLES, content, statement, passage, "adjudicate",
+                             run_row=_run_row(execution=ExecutionStatus.SUCCEEDED, **run))
+    except Exception as exc:
+        try:
+            _register(store, **{**run, "execution": ExecutionStatus.FAILED, "assessment": AssessmentStatus.NOT_ASSESSED,
+                                "reason": f"write_refused:{getattr(exc, 'code', type(exc).__name__)}", "artifact": None})
+        except Exception:  # noqa: BLE001 - the original error is the one to report
+            pass
+        raise
 
 
 def adjudicate(store: StateStore, token: Optional[str], statement: StatementRef, passage_id: str, adapter: Any, *,
@@ -343,10 +370,10 @@ def adjudicate(store: StateStore, token: Optional[str], statement: StatementRef,
                    "dropped_conditions": [], "cue_handling": [], "eca_verdict": "UNRESOLVED", "required_qualification": [],
                    "verdict": "UNCLEAR", "rationale": f"The passage does not verify against the stored source text ({source_match['reason']}); "
                    "no model reading was requested.", "guard": "source_match_not_verified", "model": None}
-        run = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, assessment=AssessmentStatus.NOT_ASSESSED,
-                        reason="source_match_not_verified", usage={"llm_calls": 0}, model=None, artifact=None, statement=statement, passage=pref)
-        rec = _write_record(store, token, WRITE_ROLES, content, statement, pref, "adjudicate")
-        return {**rec, "guard": "source_match_not_verified", "reused": False, "run_id": run, "llm_calls": 0}
+        rec = _record_with_run(store, token, content, statement, pref, dict(
+            fingerprint=fingerprint, assessment=AssessmentStatus.NOT_ASSESSED, reason="source_match_not_verified", usage={"llm_calls": 0},
+            model=None, artifact=None, statement=statement, passage=pref))
+        return {**rec, "guard": "source_match_not_verified", "reused": False, "llm_calls": 0}
 
     model = adapter_identity(adapter)
     try:
@@ -372,12 +399,12 @@ def adjudicate(store: StateStore, token: Optional[str], statement: StatementRef,
                "guard": guard, "model": {**model, "proposed_verdict": parsed["verdict"]}}
     assessment = apply_caps(AssessmentStatus.PROVISIONAL, generated_by=content["generated_by"], eca_verdict=verdict)
     artifact = store.artifacts.put_bytes(json.dumps({"raw": parsed, "recorded_verdict": verdict, "guard": guard}, sort_keys=True).encode("utf-8"))
-    run = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, assessment=assessment, reason=guard,
-                    usage={"llm_calls": 1, "input_tokens": getattr(usage, "input_tokens", None),
-                           "output_tokens": getattr(usage, "output_tokens", None), "usage_source": getattr(usage, "usage_source", None)},
-                    model=model, artifact=artifact, statement=statement, passage=pref)
-    rec = _write_record(store, token, WRITE_ROLES, content, statement, pref, "adjudicate")
-    return {**rec, "guard": guard, "model_verdict": parsed["verdict"], "reused": False, "run_id": run, "llm_calls": 1}
+    rec = _record_with_run(store, token, content, statement, pref, dict(
+        fingerprint=fingerprint, assessment=assessment, reason=guard,
+        usage={"llm_calls": 1, "input_tokens": getattr(usage, "input_tokens", None),
+               "output_tokens": getattr(usage, "output_tokens", None), "usage_source": getattr(usage, "usage_source", None)},
+        model=model, artifact=artifact, statement=statement, passage=pref))
+    return {**rec, "guard": guard, "model_verdict": parsed["verdict"], "reused": False, "llm_calls": 1}
 
 
 def confirm(store: StateStore, token: Optional[str], adjudication_id: str, *, verdict: str, rationale: str,

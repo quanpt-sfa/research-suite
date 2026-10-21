@@ -16,36 +16,23 @@ check the project against the recorded digests without opening the library.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from research_harness.core.canonical import canonical_json_hash
 from research_harness.knowledge.common import WRITE_ROLES, KnowledgeError, engine_origin
 from research_harness.knowledge.library import make_pin, open_library, parse_pin, pins_in, resolve_pin
+from research_harness.state.blob_refs import blob_digests_in
 from research_harness.state.store import StateStore
 
-ARTIFACT_KEYS = frozenset({"artifact_sha256", "blob_sha256", "sections_sha256", "source_sha256", "sidecar_sha256",
-                           "file_sha256", "snapshot_sha256", "sha256"})
-_SHA = re.compile(r"^[0-9a-f]{64}$")
 MANIFEST_KIND = "library_import_manifest"
 LIBRARY_IMPORTED = "LIBRARY_IMPORTED"
 
 
 def artifact_digests_in(value: Any) -> set[str]:
-    """Digests of content-addressed blobs referenced by a content structure (whitelisted keys only: a hash of a
-    quote or of a text is not necessarily a stored blob)."""
-    out: set[str] = set()
-    if isinstance(value, dict):
-        for k, v in value.items():
-            if k in ARTIFACT_KEYS and isinstance(v, str) and _SHA.match(v):
-                out.add(v)
-            else:
-                out |= artifact_digests_in(v)
-    elif isinstance(value, list):
-        for v in value:
-            out |= artifact_digests_in(v)
-    return out
+    """Digests of content-addressed blobs referenced by a content structure (`state/blob_refs.py`: a hash of a quote, a text or a
+    JSON document is not a stored blob)."""
+    return blob_digests_in(value)
 
 
 @dataclass(frozen=True)
