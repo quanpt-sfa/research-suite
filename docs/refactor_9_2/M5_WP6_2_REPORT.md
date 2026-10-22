@@ -12,8 +12,8 @@ usable public data. WP7, WP8 and WP14 were not started or approved; no paid mode
 | Item | Value |
 |---|---|
 | Initial HEAD (`git fetch`, then compare) | `e743849` = `origin/main`; CI green |
-| Work commit | __WORK_SHA__ |
-| CI run for the work commit | __CI_RUN__ |
+| Work commit | `92f3d5a` (pushed to `refactor/9.2` and `main`) |
+| CI run for the work commit | 39867024053, green on all four jobs (3.10, 3.11, 3.12, 3.12 + tiktoken) |
 | Local tests, Python 3.12 + tiktoken | 1015 passed, 2 skipped (912 before this work, plus the 1 pin-digest test of the previous commit) |
 | Local tests, Python 3.10 (no tiktoken) | 1011 passed, 6 skipped (the tiktoken tests skip) |
 | New tests | 7 files, 96 tests (`test_claims_schema`, `_inventory`, `_relations`, `_export`, `_benchmark`, `_strategies`, `_cli_and_compat`) |
