@@ -16,6 +16,7 @@ real full texts or expert judgement). **Nothing in M5 is scientifically validate
 | WP5 internal retrieval | `3ad25bc`; review remediation `b9e152c` | 39710830016, 39719697663 green | no (benchmark is synthetic) | TECHNICALLY_ACCEPTED |
 | WP6 Landscape | `ac65f45` | 39722036277 green | no | **TECHNICALLY_ACCEPTED — REAL SCIENTIFIC VALIDATION PENDING** |
 | WP6.1 research-design-aware synthesis (scope amendment, owner 2026-10-22) | `95b49ef` | 39730603834 green | no (`REAL_CORPUS_VALIDATION_PENDING`) | implemented and tested on synthetic corpora; awaiting the owner's review (`M5_WP6_1_DESIGN.md`, `M5_WP6_1_REPORT.md`) |
+| WP6.1 remediation (owner 2026-10-22: contracts with methods and findings, recognition by inspection record, pinned inquiry, basis apart from verdict) + pilot preparation | `24517d8` | 39776983080 green | no (`REAL_CORPUS_VALIDATION_PENDING`) | IMPLEMENTED, TECHNICALLY_TESTED, RESEARCHER_REVIEW_REQUIRED; pilot set up but not run (no lawful full text, no approved model run); report `M5_WP6_1_REMEDIATION.md` |
 | WP14 precedence table | design and fixtures only | fixtures tested | expert cases not written | **waiting for the researcher's 20 expert cases and scientific approval** |
 | WP7–WP13 | not started | — | — | WP7–WP8 closed until WP14 is accepted; WP9–WP13 not approved |
 
@@ -24,7 +25,7 @@ empirical, interpretive and conceptual inquiry with the standard each kind of cl
 dimensions to interpretive and conceptual claims). The original assumption that the five capability groups form one linear pipeline for every study is not carried into the implementation.
 
 **Open decisions and limitations** (not closed by any commit): D-decisions listed in section 14 and the open items of section 21; the researcher's WP14 expert cases; the researcher's Gate K / Gate L evidence (M4 is not met);
-API key rotation; backlog `M5_BACKLOG.md` B1–B5; real-corpus validation of retrieval, landscape and relation proposals; whether the WP6.1 execution contracts match how researchers in those traditions work.
+API key rotation; backlog `M5_BACKLOG.md` B1–B6; real-corpus validation of retrieval, landscape and relation proposals; whether the WP6.1 execution contracts match how researchers in those traditions work.
 
 *Original status line (2026-10-21, historical):* plan for the owner's approval, nothing implemented. Wherever a sentence describes existing behaviour it cites a file,
 function, test or command; everything else is a proposal. Baseline then: `main` = `refactor/9.2` = `c6397de`.
