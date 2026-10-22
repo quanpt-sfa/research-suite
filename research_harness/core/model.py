@@ -69,8 +69,10 @@ OBJECT_TYPES = (
     "ResearchTask",
     # M5 WP4 (appended): a phenomenon or puzzle that is not yet a question, with several readings kept side by side
     "ResearchProblem",
+    # M5 WP5 (appended): one execution of the internal retrieval over the corpus, with its queries, hits and coverage
+    "RetrievalRun",
 )
-SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem"})  # can never be created through a proposal
+SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem", "RetrievalRun"})  # can never be created through a proposal
 
 CLAIM_TIERS = (
     "descriptive", "associational", "predictive", "mechanism_consistent", "causal",

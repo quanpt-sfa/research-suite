@@ -519,6 +519,8 @@ def register(sub: Any) -> None:
     _task_cli.register(sub)
     from research_harness.discovery import cli as _discovery_cli
     _discovery_cli.register(sub)
+    from research_harness.discovery import cli_retrieval as _retrieval_cli
+    _retrieval_cli.register(sub)
     _add_provider_options(sub)
 
 
@@ -1073,7 +1075,13 @@ def cmd_export_verify(args: argparse.Namespace) -> int:
 
     def go():
         store = _store(args)
-        outcome.update(verify_export(store, args.directory, lambda scope: build_methods_export(store, scope["playbook"], scope.get("plan"))))
+        kind = json.loads((Path(args.directory) / "manifest.json").read_text(encoding="utf-8")).get("kind") if (Path(args.directory) / "manifest.json").is_file() else "methods"
+        if kind == "retrieval":
+            from research_harness.export.retrieval import build_retrieval_export
+            rebuild = lambda scope: build_retrieval_export(store, scope["retrieval"])   # noqa: E731
+        else:
+            rebuild = lambda scope: build_methods_export(store, scope["playbook"], scope.get("plan"))   # noqa: E731
+        outcome.update(verify_export(store, args.directory, rebuild))
         return outcome
 
     def text(o):

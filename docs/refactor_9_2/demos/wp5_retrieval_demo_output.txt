@@ -1,0 +1,208 @@
+# WP5 demo: from a problem to a reading list, with coverage, over a synthetic 42-source corpus
+
+$ research corpus import-metadata --citation-key wp2025 --title "A Working Paper On Detection And Adaptation" --document-type working_paper --review-status NOT_REVIEWED --first-public-date 2025-03-10 --date-evidence "repository posting record (synthetic)" --project PRJ_DEMO --home <home> --token-file <token-file>
+SRC_WP2025 revision 1: METADATA_ONLY
+
+$ research retrieval new PROB_000001 --term "financial reporting fraud detection" --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 created (DRAFT): queries Q1; 0 proposed term(s) offered from the interpretations
+
+$ research retrieval search RET_000001 --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r2 searched on snapshot 60b802c2288e: reading list 20 full text(s), 1 possibly relevant not read, 0 citation neighbour(s)
+
+$ research retrieval expand RET_000001 --k 6 --project PRJ_DEMO --home <home> --token-file <token-file>
+PROPOSED: earnings manipulation, AAER, accounting irregularities, falsified financial statements
+
+$ research retrieval expansions RET_000001 --accept "earnings manipulation" --accept AAER --accept "accounting irregularities" --reject "falsified financial statements" --rationale "the names I know from the literature; the legal wording is another field" --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r4: accepted terms now: AAER, accounting irregularities, earnings manipulation
+
+$ research retrieval search RET_000001 --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r5 searched on snapshot 60b802c2288e: reading list 20 full text(s), 3 possibly relevant not read, 0 citation neighbour(s)
+
+$ research retrieval show RET_000001 --project PRJ_DEMO --home <home>
+RET_000001 r5 [SEARCHED] for PROB_000001  corpus: CURRENT
+  Q1 (I1): channel, cost, detection, financial, fraud, manipulation, move, raise, reporting
+  your terms: financial reporting fraud detection
+  expansion ACCEPTED earnings manipulation   (model:scripted-expander)
+  expansion ACCEPTED AAER   (model:scripted-expander)
+  expansion ACCEPTED accounting irregularities   (model:scripted-expander)
+  expansion REJECTED falsified financial statements   (model:scripted-expander)
+  coverage: 20 of 40 full texts retrieved; 3 possibly relevant not read; floor 20 on your list / 3 needed
+  reading list:
+     1  R2       SRC_C02  SRC_C02
+        R2: matched accounting (1), irregularity (1) in title and abstract; found only through the accepted expansion accounting irregularities
+     2  R1       SRC_A04  SRC_A04
+        R1: matched financial (3), fraud (3), reporting (3), cost (1), detection (1) in 1 Introduction
+     3  R1       SRC_A02  SRC_A02
+        R1: matched detection (1), financial (1), fraud (1), reporting (1) in Abstract
+     4  R1       SRC_A01  SRC_A01
+        R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction
+     5  R1       SRC_A05  SRC_A05
+        R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction
+     6  R1       SRC_B01  SRC_B01
+        R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation
+     7  R1       W_B02  SRC_B02V1 [working_paper, NOT_REVIEWED, public 2024-02-01], SRC_B02V2 [working_paper, NOT_REVIEWED, public 2025-01-15], SRC_B02J [journal_article, PUBLISHED, public 2026-06-30]
+        R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation
+     8  R2       SRC_C01  SRC_C01
+        R2: matched accounting (1), irregularity (1) in Abstract; found only through the accepted expansion accounting irregularities
+     9  R1       SRC_B03  SRC_B03
+        R1: matched manipulation (3) in 1 Introduction; it also contains the accepted expansion earnings manipulation
+    10  R1       SRC_D_REPORTING_1  SRC_D_REPORTING_1
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    11  R1       SRC_D_REPORTING_3  SRC_D_REPORTING_3
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    12  R1       SRC_D_REPORTING_5  SRC_D_REPORTING_5
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    13  R1       SRC_D_REPORTING_2  SRC_D_REPORTING_2
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    14  R1       SRC_D_REPORTING_4  SRC_D_REPORTING_4
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    15  R1       SRC_D_REPORTING_6  SRC_D_REPORTING_6
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    16  R1       SRC_A03  SRC_A03
+        R1: matched fraud (3), financial (2), reporting (2), cost (1) in 1 Introduction
+    17  R1       SRC_D_CARD_1  SRC_D_CARD_1
+        R1: matched detection (1), fraud (1) in title and abstract
+    18  R1       SRC_D_CARD_2  SRC_D_CARD_2
+        R1: matched detection (1), fraud (1) in title and abstract
+  possibly relevant, NOT READ (no full text held):
+     1  R2       SRC_B04  R2: matched earning (1) in title and abstract
+     2  R1       SRC_WP2025  R1: matched detection (1) in title and abstract
+     3  R2       SRC_C03  R2: matched irregularity (1) in title and abstract
+
+$ research corpus exclude SRC_D_CARD_1 --reason "card fraud, a different problem" --project PRJ_DEMO --home <home> --token-file <token-file>
+SRC_D_CARD_1 r2: excluded
+
+$ research retrieval show RET_000001 --project PRJ_DEMO --home <home>
+RET_000001 r5 [SEARCHED] for PROB_000001  corpus: STALE_FOR_CORPUS (+0 added, 1 revised, 0 removed since the search)
+  Q1 (I1): channel, cost, detection, financial, fraud, manipulation, move, raise, reporting
+  your terms: financial reporting fraud detection
+  expansion ACCEPTED earnings manipulation   (model:scripted-expander)
+  expansion ACCEPTED AAER   (model:scripted-expander)
+  expansion ACCEPTED accounting irregularities   (model:scripted-expander)
+  expansion REJECTED falsified financial statements   (model:scripted-expander)
+  coverage: 20 of 40 full texts retrieved; 3 possibly relevant not read; floor 20 on your list / 3 needed
+  reading list:
+     1  R2       SRC_C02  SRC_C02
+        R2: matched accounting (1), irregularity (1) in title and abstract; found only through the accepted expansion accounting irregularities
+     2  R1       SRC_A04  SRC_A04
+        R1: matched financial (3), fraud (3), reporting (3), cost (1), detection (1) in 1 Introduction
+     3  R1       SRC_A02  SRC_A02
+        R1: matched detection (1), financial (1), fraud (1), reporting (1) in Abstract
+     4  R1       SRC_A01  SRC_A01
+        R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction
+     5  R1       SRC_A05  SRC_A05
+        R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction
+     6  R1       SRC_B01  SRC_B01
+        R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation
+     7  R1       W_B02  SRC_B02V1 [working_paper, NOT_REVIEWED, public 2024-02-01], SRC_B02V2 [working_paper, NOT_REVIEWED, public 2025-01-15], SRC_B02J [journal_article, PUBLISHED, public 2026-06-30]
+        R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation
+     8  R2       SRC_C01  SRC_C01
+        R2: matched accounting (1), irregularity (1) in Abstract; found only through the accepted expansion accounting irregularities
+     9  R1       SRC_B03  SRC_B03
+        R1: matched manipulation (3) in 1 Introduction; it also contains the accepted expansion earnings manipulation
+    10  R1       SRC_D_REPORTING_1  SRC_D_REPORTING_1
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    11  R1       SRC_D_REPORTING_3  SRC_D_REPORTING_3
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    12  R1       SRC_D_REPORTING_5  SRC_D_REPORTING_5
+        R1: matched cost (1), financial (1), reporting (1) in Abstract
+    13  R1       SRC_D_REPORTING_2  SRC_D_REPORTING_2
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    14  R1       SRC_D_REPORTING_4  SRC_D_REPORTING_4
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    15  R1       SRC_D_REPORTING_6  SRC_D_REPORTING_6
+        R1: matched financial (2), reporting (2), cost (1) in 1 Introduction
+    16  R1       SRC_A03  SRC_A03
+        R1: matched fraud (3), financial (2), reporting (2), cost (1) in 1 Introduction
+    17  R1       SRC_D_CARD_1  SRC_D_CARD_1
+        R1: matched detection (1), fraud (1) in title and abstract
+    18  R1       SRC_D_CARD_2  SRC_D_CARD_2
+        R1: matched detection (1), fraud (1) in title and abstract
+  possibly relevant, NOT READ (no full text held):
+     1  R2       SRC_B04  R2: matched earning (1) in title and abstract
+     2  R1       SRC_WP2025  R1: matched detection (1) in title and abstract
+     3  R2       SRC_C03  R2: matched irregularity (1) in title and abstract
+
+$ research retrieval search RET_000001 --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r6 searched on snapshot 9137a9550319: reading list 20 full text(s), 3 possibly relevant not read, 0 citation neighbour(s)
+
+$ research retrieval review RET_000001 irrelevant --source SRC_D_REPORTING_1 --reason "about reporting quality and the cost of capital, not about fraud" --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r7: irrelevant recorded
+
+$ research retrieval review RET_000001 acquire --title "The Paper Everyone Cites On Detection And Adaptation" --reason "the main competitor I do not hold" --project PRJ_DEMO --home <home> --token-file <token-file>
+RET_000001 r8: acquire recorded
+
+$ research export retrieval RET_000001 --out <export-dir> --project PRJ_DEMO --home <home>
+exported to C:\Users\quanp\AppData\Local\Temp\tmpu2kl9ex9\export (closure cbf3e0067858): coverage_report.md, manifest.json, not_read_candidates.csv, queries_and_expansions.md, reading_list.md
+
+$ research export verify <export-dir> --project PRJ_DEMO --home <home>
+VERIFIED
+
+----- reading_list.md (first lines) -----
+<!-- research-suite export · retrieval · RET_000001@8 · closure cbf3e0067858 · corpus 9137a9550319 · exporter 1 -->
+# Reading list for PROB_000001 (RET_000001)
+
+corpus snapshot 9137a955031987197d6950dcb877f6d5c188c7579462a2c02ae685d9a55b03ec: **CURRENT**
+
+Ordered by rank within the retrieval; a rank says what to read first, not what a paper says. Only full texts are listed here.
+
+| rank | work | versions held | stage | why it is here | where | queries | class |
+|---|---|---|---|---|---|---|---|
+| 1 | SRC_C02 | SRC_C02 (?, ?, public date unknown) | R2 | R2: matched accounting (1), irregularity (1) in title and abstract; found only through the accepted expansion accounting irregularities | SRC_C02 (title and abstract) | Q1#1 | data_derived |
+| 2 | SRC_A04 | SRC_A04 (?, ?, public date unknown) | R1 | R1: matched financial (3), fraud (3), reporting (3), cost (1), detection (1) in 1 Introduction | SRC_A04 chars 157-436 | Q1#2 | data_derived |
+| 3 | SRC_A02 | SRC_A02 (?, ?, public date unknown) | R1 | R1: matched detection (1), financial (1), fraud (1), reporting (1) in Abstract | SRC_A02 chars 51-146 | Q1#3 | data_derived |
+| 4 | SRC_A01 | SRC_A01 (?, ?, public date unknown) | R1 | R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction | SRC_A01 chars 155-440 | Q1#4 | data_derived |
+| 5 | SRC_A05 | SRC_A05 (?, ?, public date unknown) | R1 | R1: matched fraud (3), financial (2), reporting (2), cost (1), detection (1) in 1 Introduction | SRC_A05 chars 145-430 | Q1#5 | data_derived |
+| 6 | SRC_B01 | SRC_B01 (?, ?, public date unknown) | R1 | R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation | SRC_B01 chars 151-395 | Q1#6 | data_derived |
+| 7 | W_B02 | SRC_B02V1 (working_paper, NOT_REVIEWED, public 2024-02-01); SRC_B02V2 (working_paper, NOT_REVIEWED, public 2025-01-15); SRC_B02J (journal_article, PUBLISHED, public 2026-06-30) | R1 | R1: matched manipulation (2) in 1 Introduction; it also contains the accepted expansion AAER, earnings manipulation | SRC_B02J chars 134-386 | Q1#7 | data_derived |
+| 8 | SRC_C01 | SRC_C01 (?, ?, public date unknown) | R2 | R2: matched accounting (1), irregularity (1) in Abstract; found only through the accepted expansion accounting irregularities | SRC_C01 chars 50-135 | Q1#10 | data_derived |
+| 9 | SRC_B03 | SRC_B03 (?, ?, public date unknown) | R1 | R1: matched manipulation (3) in 1 Introduction; it also contains the accepted expansion earnings manipulation | SRC_B03 chars 131-377 | Q1#11 | data_derived |
+| 10 | SRC_D_REPORTING_3 | SRC_D_REPORTING_3 (?, ?, public date unknown) | R1 | R1: matched cost (1), financial (1), reporting (1) in Abstract | SRC_D_REPORTING_3 chars 51-118 | Q1#13 | data_derived |
+| 11 | SRC_D_REPORTING_5 | SRC_D_REPORTING_5 (?, ?, public date unknown) | R1 | R1: matched cost (1), financial (1), reporting (1) in Abstract | SRC_D_REPORTING_5 chars 51-118 | Q1#14 | data_derived |
+| 12 | SRC_A03 | SRC_A03 (?, ?, public date unknown) | R1 | R1: matched fraud (3), financial (2), reporting (2), cost (1) in 1 Introduction | SRC_A03 chars 153-446 | Q1#15 | data_derived |
+| 13 | SRC_D_REPORTING_2 | SRC_D_REPORTING_2 (?, ?, public date unknown) | R1 | R1: matched financial (2), reporting (2), cost (1) in 1 Introduction | SRC_D_REPORTING_2 chars 140-292 | Q1#16 | data_derived |
+
+----- coverage_report.md (first lines) -----
+<!-- research-suite export · retrieval · RET_000001@8 · closure cbf3e0067858 · corpus 9137a9550319 · exporter 1 -->
+# Coverage of RET_000001
+
+corpus snapshot 9137a955031987197d6950dcb877f6d5c188c7579462a2c02ae685d9a55b03ec: **CURRENT**
+
+- queries: Q1 (I1)
+- corpus: 43 sources, of which 39 full text, 1 abstract only, 2 metadata only, 1 excluded; 40 distinct works
+- assessed (retrieved): 23 sources, 20 of the 39 full texts held. 'searched corpus' means the sources retrieved here, not every source held
+- stages: R1 19; found only through accepted expansions 4; R3a neighbours 0; expansions enabled: True
+- floor: 20 full texts retrieved (19 remain on your list after your review) against a minimum of 3: met. Being retrieved is not a judgement of relevance.
+- external sources: not used in this version; calls made: 0
+- known gaps: 3 possibly relevant papers not read; years [2018, 2023]; languages not determined (no language detection in this version); reference lists found in 39 papers, not found in 0
+- unreadable full texts: none
+
+## Excluded from the corpus
+
+| source | reason | class |
+|---|---|---|
+| SRC_D_CARD_1 | card fraud, a different problem | researcher_confirmed |
+
+## Limits
+
+
+----- not_read_candidates.csv (first lines) -----
+source_id,title,tier,stage,why,document_type,review_status,first_public_date,status
+SRC_B04,Modified Jones Models and Enforcement Outcomes,ABSTRACT_ONLY,R2,R2: matched earning (1) in title and abstract,,,,"possibly relevant, not read"
+SRC_WP2025,A Working Paper On Detection And Adaptation,METADATA_ONLY,R1,R1: matched detection (1) in title and abstract,working_paper,NOT_REVIEWED,2025-03-10,"possibly relevant, not read"
+SRC_C03,Auditors and the Discovery of Irregularities,METADATA_ONLY,R2,R2: matched irregularity (1) in title and abstract,,,,"possibly relevant, not read"
+,The Paper Everyone Cites On Detection And Adaptation,,R5,the main competitor I do not hold,,,,requested by researcher
+
+$ research retrieval evaluate --gold <gold.json> --project PRJ_DEMO --home <home>
+retrieval evaluation (k=10, tokenizer v1, BM25 {'k1': 1.2, 'b': 0.75})
+  Q1: 12 relevant full texts
+    R1     recall@k 0.4167  precision@k 0.5  first relevant rank 1
+    R1+R2  recall@k 0.8333  precision@k 1.0  first relevant rank 1  found only with expansions: 7
+    relevant but not readable: {"SRC_B04": {"tier": "ABSTRACT_ONLY", "rank": 1}, "SRC_C03": {"tier": "METADATA_ONLY", "rank": 2}}
+  Q2: 5 relevant full texts
+    R1     recall@k 1.0  precision@k 0.5  first relevant rank 1
+    R1+R2  recall@k 1.0  precision@k 0.5  first relevant rank 1  found only with expansions: 0
+    relevant but not readable: {"SRC_B04": {"tier": "ABSTRACT_ONLY", "rank": 1}}
+  mean  R1 {'recall_at_k': 0.7084, 'precision_at_k': 0.5, 'reciprocal_rank': 1.0}
+        R1+R2 {'recall_at_k': 0.9166, 'precision_at_k': 0.75, 'reciprocal_rank': 1.0}
+

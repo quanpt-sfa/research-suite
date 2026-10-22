@@ -47,6 +47,91 @@ def source_id_for(citation_key: str, prefix: str = "SRC_") -> str:
     return f"{prefix}{id_fragment(citation_key, 50)}"
 
 
+BIBLIOGRAPHIC_FIELDS = {"title", "authors", "year", "venue", "doi", "abstract", "license_note", "bibliographic_identity", "document_type", "review_status",
+                        "first_public_date", "date_evidence", "version_id", "work_id", "version_relations", "relation_to_researcher", "acquisition_note"}
+DOCUMENT_TYPES = ("journal_article", "working_paper", "preprint", "conference_paper", "dissertation", "report", "book_chapter", "other")
+REVIEW_STATUSES = ("NOT_REVIEWED", "UNDER_REVIEW", "ACCEPTED", "PUBLISHED", "UNKNOWN")
+TIERS = ("FULL_TEXT", "ABSTRACT_ONLY", "METADATA_ONLY")
+
+
+def _check_bibliographic(b: dict[str, Any]) -> None:
+    unknown = set(b) - BIBLIOGRAPHIC_FIELDS
+    if unknown:
+        raise KnowledgeError("UNKNOWN_SOURCE_FIELDS", f"unsupported Source fields: {sorted(unknown)}")
+    if b.get("document_type") not in (None, *DOCUMENT_TYPES):
+        raise KnowledgeError("DOCUMENT_TYPE_UNKNOWN", f"document_type must be one of {DOCUMENT_TYPES}")
+    if b.get("review_status") not in (None, *REVIEW_STATUSES):
+        raise KnowledgeError("REVIEW_STATUS_UNKNOWN", f"review_status must be one of {REVIEW_STATUSES}")
+    if b.get("relation_to_researcher") not in (None, "INDEPENDENT", "OWN_PRIOR_WORK"):
+        raise KnowledgeError("RELATION_UNKNOWN", "relation_to_researcher must be INDEPENDENT or OWN_PRIOR_WORK")
+    d = b.get("first_public_date")
+    if d is not None:
+        import re
+        if not re.match(r"^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$", str(d)):
+            raise KnowledgeError("DATE_INVALID", "first_public_date is YYYY, YYYY-MM or YYYY-MM-DD")
+        if not b.get("date_evidence"):
+            raise KnowledgeError("DATE_EVIDENCE_REQUIRED", "a first public date needs its evidence (the repository posting record, a DOI registration), "
+                                 "not the text of the paper itself")
+
+
+def source_tier(content: dict[str, Any]) -> str:
+    """What the suite holds of a Source: its full text, an abstract only, or metadata only. Only the first can support or challenge anything."""
+    if content.get("fulltext_status") == "AVAILABLE" or content.get("artifact_sha256"):
+        return "FULL_TEXT"
+    return "ABSTRACT_ONLY" if content.get("abstract") else "METADATA_ONLY"
+
+
+def import_metadata_only(store: StateStore, token: Optional[str], *, citation_key: str, title: str, source_id: Optional[str] = None,
+                         id_prefix: str = "SRC_", **bibliographic: Any) -> dict[str, Any]:
+    """Record a paper the suite does not hold: bibliographic metadata, and an abstract if the researcher has one. It is `MISSING` or `ABSTRACT_ONLY`
+    and has no text, so no passage can be made from it and it can never support or challenge a claim; it can be listed as possibly relevant and not read."""
+    if not title or not title.strip():
+        raise KnowledgeError("TITLE_REQUIRED", "a metadata-only source needs at least a title")
+    bibliographic["title"] = title.strip()
+    _check_bibliographic(bibliographic)
+    oid = scope_id(store, source_id or source_id_for(citation_key, id_prefix))
+    content = {"label": title.strip(), "citation_key": citation_key, "fulltext_status": "ABSTRACT_ONLY" if bibliographic.get("abstract") else "MISSING",
+               **{k: v for k, v in bibliographic.items() if v is not None}}
+    with store.write_tx(token=token, require_roles=WRITE_ROLES) as tx:
+        head = tx.head(oid)
+        if head and head["object_type"] != "Source":
+            raise KnowledgeError("OBJECT_TYPE_MISMATCH", f"{oid} exists and is a {head['object_type']}")
+        if head:
+            prev = tx.get(oid)
+            if prev["content"].get("artifact_sha256"):
+                raise KnowledgeError("SOURCE_HAS_TEXT", f"{oid} already has stored text; metadata cannot replace it")
+            if prev["content"] == content:
+                return {"object_id": oid, "revision": prev["revision"], "created": False, "tier": source_tier(content)}
+        res = tx.add_revision(object_id=oid, object_type="Source", content=content, edges=[],
+                              origin=engine_origin("corpus_import_metadata", tx.actor_id, citation_key=citation_key))
+        tx.audit("corpus_import_metadata", "RECORDED", {"object_id": oid, "revision": res["revision"]})
+    return {"object_id": oid, "revision": res["revision"], "created": True, "tier": source_tier(content)}
+
+
+def set_excluded(store: StateStore, token: Optional[str], source_id: str, reason: Optional[str]) -> dict[str, Any]:
+    """Take a source out of the corpus (with the researcher's reason), or put it back (`reason=None`). A new revision: history is kept, and the corpus
+    snapshot changes, so conclusions that rest on not finding something are marked stale."""
+    if reason is not None and not reason.strip():
+        raise KnowledgeError("REASON_REQUIRED", "say why the source is excluded")
+    with store.write_tx(token=token, require_roles=("owner", "author")) as tx:
+        head = tx.head(source_id)
+        if not head or head["object_type"] != "Source":
+            raise KnowledgeError("SOURCE_NOT_FOUND", f"{source_id} is not a Source in this store")
+        cur = tx.get(source_id)
+        c = {k: v for k, v in cur["content"].items() if k != "excluded"}
+        if reason is not None:
+            c["excluded"] = {"reason": reason.strip(), "by": tx.actor_id, "at": tx.at}
+        if (reason is None and not cur["content"].get("excluded")) or (reason is not None and (cur["content"].get("excluded") or {}).get("reason") == reason.strip()):
+            return {"object_id": source_id, "revision": cur["revision"], "changed": False, "excluded": reason is not None}
+        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
+                               (source_id, cur["revision"])).fetchall()
+        res = tx.add_revision(object_id=source_id, object_type="Source", content=c, expected_head=cur["revision"],
+                              edges=[(r[0], r[1], r[2], json.loads(r[3])) for r in rows],
+                              origin=engine_origin("corpus_exclude" if reason is not None else "corpus_include", tx.actor_id))
+        tx.audit("corpus_exclude" if reason is not None else "corpus_include", "RECORDED", {"object_id": source_id, "revision": res["revision"]})
+    return {"object_id": source_id, "revision": res["revision"], "changed": True, "excluded": reason is not None}
+
+
 def import_source(store: StateStore, token: Optional[str], *, citation_key: str, text: str,
                   source_id: Optional[str] = None, id_prefix: str = "SRC_", extraction: Optional[dict] = None,
                   **bibliographic: Any) -> dict[str, Any]:
@@ -56,10 +141,7 @@ def import_source(store: StateStore, token: Optional[str], *, citation_key: str,
     """
     if not text or not text.strip():
         raise KnowledgeError("EMPTY_TEXT", "a Source needs non-empty text")
-    allowed = {"title", "authors", "year", "venue", "doi", "abstract", "license_note", "bibliographic_identity"}
-    unknown = set(bibliographic) - allowed
-    if unknown:
-        raise KnowledgeError("UNKNOWN_SOURCE_FIELDS", f"unsupported Source fields: {sorted(unknown)}")
+    _check_bibliographic(bibliographic)
     oid = scope_id(store, source_id or source_id_for(citation_key, id_prefix))
     data = text.encode("utf-8")
     artifact = store.artifacts.put_bytes(data)

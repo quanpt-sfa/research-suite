@@ -1,0 +1,49 @@
+{
+  "about": "Retrieval benchmark baseline on the synthetic corpus of tests/retrieval_bench.py (tokenizer v1, BM25 k1=1.2 b=0.75, k=10). A change of the retrieval method may not lower any figure here; it must report the new figures next to these. Synthetic text: this shows the mechanics (other names for an idea are found only with accepted expansions), not performance on real literature.",
+  "bm25": {
+    "b": 0.75,
+    "k1": 1.2
+  },
+  "k": 10,
+  "mean": {
+    "R1": {
+      "precision_at_k": 0.5,
+      "recall_at_k": 0.7084,
+      "reciprocal_rank": 1.0
+    },
+    "R1+R2": {
+      "precision_at_k": 0.75,
+      "recall_at_k": 0.9166,
+      "reciprocal_rank": 1.0
+    }
+  },
+  "queries": {
+    "Q1": {
+      "R1": {
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.4167,
+        "reciprocal_rank": 1.0
+      },
+      "R1+R2": {
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.8333,
+        "reciprocal_rank": 1.0
+      },
+      "found_only_with_expansions": 7
+    },
+    "Q2": {
+      "R1": {
+        "precision_at_k": 0.5,
+        "recall_at_k": 1.0,
+        "reciprocal_rank": 1.0
+      },
+      "R1+R2": {
+        "precision_at_k": 0.5,
+        "recall_at_k": 1.0,
+        "reciprocal_rank": 1.0
+      },
+      "found_only_with_expansions": 0
+    }
+  },
+  "tokenizer": "v1"
+}
