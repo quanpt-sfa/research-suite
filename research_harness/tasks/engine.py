@@ -250,7 +250,7 @@ def _spent(store: StateStore, task_id: str, *, include_in_flight: bool = True) -
 
 def start_task(store: StateStore, token: Optional[str], *, goal: str, statement: str, params: Optional[dict] = None,
                max_tokens: Optional[int] = None, max_llm_calls: Optional[int] = None, unlimited: bool = False,
-               label: Optional[str] = None, research_question_id: Optional[str] = None, parent: Optional[dict] = None,
+               label: Optional[str] = None, research_question_id: Optional[str] = None, problem_id: Optional[str] = None, parent: Optional[dict] = None,
                continued_from: Optional[dict] = None, domain_workflow: Optional[str] = None) -> dict[str, Any]:
     """A new task, PLANNED. Needs no research question, manuscript, methods or results: only a goal and what it needs."""
     _require_task_support(store)
@@ -267,9 +267,15 @@ def start_task(store: StateStore, token: Optional[str], *, goal: str, statement:
             if not rq or rq["object_type"] != "ResearchQuestion":
                 raise KnowledgeError("RQ_NOT_FOUND", f"{research_question_id} is not a ResearchQuestion")
             edges.append(("depends_on", rq["object_id"], rq["revision"], {"edge_kind": "addresses"}))
+        if problem_id:
+            pr = store.get_object(problem_id, conn=conn)
+            if not pr or pr["object_type"] != "ResearchProblem":
+                raise KnowledgeError("PROBLEM_NOT_FOUND", f"{problem_id} is not a ResearchProblem")
+            edges.append(("depends_on", pr["object_id"], pr["revision"], {"edge_kind": "addresses"}))
         if parent:
             edges.append(("derived_from", parent["task_id"], parent["revision"], {"edge_kind": "continues"}))
-    stmt = {"text": statement.strip(), **({"research_question_id": research_question_id} if research_question_id else {})}
+    stmt = {"text": statement.strip(), **({"research_question_id": research_question_id} if research_question_id else {}),
+            **({"problem_id": problem_id} if problem_id else {})}
     content = {"label": label or f"{goal}: {statement.strip()[:80]}", "goal": goal, "goal_version": goals.GOAL_VERSION, "params": params,
                "statement": stmt, "parent_task": parent, "continued_from": continued_from, "domain_workflow": domain_workflow, "plan": plan,
                "budget": _budget(max_tokens, max_llm_calls, unlimited), "state": "PLANNED", "state_reason": None,

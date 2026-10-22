@@ -517,6 +517,8 @@ def register(sub: Any) -> None:
     register_export(sub)
     from research_harness.tasks import cli as _task_cli
     _task_cli.register(sub)
+    from research_harness.discovery import cli as _discovery_cli
+    _discovery_cli.register(sub)
     _add_provider_options(sub)
 
 

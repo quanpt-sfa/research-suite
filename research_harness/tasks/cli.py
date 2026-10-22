@@ -92,7 +92,7 @@ def register(sub: Any) -> None:
     q = add("start", "Create a task: PLANNED, with its steps, checkpoints and estimates; nothing runs",
             lambda st, a: T.start_task(st, tok(a), goal=a.goal, statement=a.statement, params=K._json_arg(a.params, "--params") or {},
                                        max_tokens=a.budget_tokens, max_llm_calls=a.budget_calls, unlimited=a.unlimited, label=a.label,
-                                       research_question_id=a.rq),
+                                       research_question_id=a.rq, problem_id=a.problem),
             lambda o: print(f"{o['task_id']} planned: {o['steps']} steps; checkpoints {', '.join(o['checkpoints'])}. "
                             f"Review with `research task plan {o['task_id']}`, then approve."))
     q.add_argument("--goal", required=True, choices=sorted(GOALS))
@@ -103,6 +103,7 @@ def register(sub: Any) -> None:
     q.add_argument("--unlimited", action="store_true", help="State explicitly that no budget applies")
     q.add_argument("--label")
     q.add_argument("--rq", help="A ResearchQuestion this task addresses (optional)")
+    q.add_argument("--problem", help="A ResearchProblem this task addresses (optional)")
 
     for name in ("plan", "status"):
         q = add(name, "The steps, their state, the checkpoints, what is spent and what is estimated", lambda st, a: T.task_view(st, a.task), _task_text, token=False)

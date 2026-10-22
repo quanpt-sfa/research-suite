@@ -1,0 +1,42 @@
+# WP4 demo: a problem, several readings, the researcher's choice, and a research question
+
+$ research problem new --statement "Firms that commit reporting fraud seem to change how they report after detection models become widely known." --kind phenomenon --scope "{"domain": "accounting", "population": "US listed firms"}" --exclude "non-US firms" --interpretation "Managers shift from accruals to real activities." --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+PROB_000001 created (OPEN); interpretations: I1
+
+$ research problem frame PROB_000001 --k 3 --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+PROPOSED: I2, I3 (run RUN_0ECC92E238304BB5)
+
+$ research problem add-interpretation PROB_000001 --text "Auditors, not managers, change what they flag." --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+I4 added to PROB_000001
+
+$ research problem choose PROB_000001 --interpretations I1 --rationale " " --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+Error: RATIONALE_REQUIRED - a choice needs the researcher's reason; there is no default
+(exit 1)
+
+$ research problem choose PROB_000001 --interpretations I1,I3 --rationale "I can test the channel reading and the selection reading with the same data." --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+PROB_000001 r4: FRAMED
+
+$ research problem promote-to-rq PROB_000001 --interpretation I1 --text "Do firms shift from accrual-based to real-activities manipulation once detection models spread?" --rationale "the testable reading" --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+RQ_000001 created from PROB_000001 (I1); the problem is now at r5
+
+$ research problem revise PROB_000001 --rationale "the problem is about disclosure choices, not manipulation as a whole" --statement "Firms that commit reporting fraud seem to change how they disclose after detection models become widely known." --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home --token-file C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\token
+PROB_000001 r6: OPEN; to review: RQ_000001@1
+
+$ research problem show PROB_000001 --project PRJ_DEMO --home C:\Users\quanp\AppData\Local\Temp\tmpxkol8yvl\home
+PROB_000001 r6 [OPEN] (phenomenon)
+  Firms that commit reporting fraud seem to change how they disclose after detection models become widely known.
+  scope: {"domain": "accounting", "population": "US listed firms"}   exclusions: non-US firms
+  interpretations:
+     I1  STATED     researcher                  Managers shift from accruals to real activities.
+     I2  PROPOSED   model:scripted-framer       Detection raises the cost of accrual manipulation, so reporting fraud moves to channels the models do not weight.  [causal; terms: real activities manipulation, earnings management, detection model]
+     I3  PROPOSED   model:scripted-framer       Detection changes which frauds are observed, not which are committed: the observed adaptation is a selection effect.  [descriptive; terms: detection probability, partial observability]
+     I4  STATED     researcher                  Auditors, not managers, change what they flag.
+  questions promoted from this problem:
+    RQ_000001  review status: NEEDS_REVIEW  — the problem has moved on since (1 pinned edge(s))
+  history: 6 revision(s); decisions:
+    2026-10-22T01:57:27  researcher    model_proposals
+    2026-10-22T01:57:27  researcher    add_interpretation
+    2026-10-22T01:57:27  researcher    choose — I can test the channel reading and the selection reading with the same data.
+    2026-10-22T01:57:27  researcher    promote_to_rq — the testable reading
+    2026-10-22T01:57:28  researcher    reframe — the problem is about disclosure choices, not manipulation as a whole
+
