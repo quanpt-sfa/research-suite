@@ -28,7 +28,8 @@ def _csv(rows: list[list[Any]], head: list[str]) -> bytes:
 
 
 def _versions(g: dict[str, Any]) -> str:
-    return "; ".join(f"{v['source_id']} ({v.get('document_type') or '?'}, {v.get('review_status') or '?'}, public {v.get('first_public_date') or 'date unknown'})" for v in g["versions"])
+    return "; ".join(f"{v['source_id']}@{v.get('source_revision')}" + (" (shown for the work)" if v["source_id"] == g["representative"] else "") + ("" if v.get("retrieved", True) else " (held, not retrieved)")
+                     + f" ({v.get('document_type') or '?'}, {v.get('review_status') or '?'}, public {v.get('first_public_date') or 'date unknown'})" for v in g["versions"])
 
 
 def _expansion_class(e: dict[str, Any]) -> str:
@@ -55,9 +56,11 @@ def build_retrieval_export(store: StateStore, run_id: str) -> Export:
             sources.append({"source_id": sid, "revision": o["revision"], "text_sha256": o["content"].get("text_sha256"), "fulltext_status": o["content"].get("fulltext_status")})
     header = (f"<!-- research-suite export · retrieval · {run_id}@{run['revision']} · closure {digest_of(closure)[:12]} · corpus {snapshot[:12]} "
               f"· exporter {EXPORTER_VERSION} -->")
-    cur = view["corpus_currency"]
+    cur, pc, kc = view["currency"]["corpus"], view["currency"]["problem"], view["currency"]["search_config"]
     status_line = (f"corpus snapshot {c.get('corpus_snapshot_id') or '-'}: **{cur['status']}**" + (f" (since: +{len(cur['added'])} added, {len(cur['revised'])} revised, "
-                   f"{len(cur['removed'])} removed — conclusions from the absence of a source rest on the old snapshot until the search is run again)" if cur["status"] == "STALE_FOR_CORPUS" else ""))
+                   f"{len(cur['removed'])} removed — conclusions from the absence of a source rest on the old snapshot until the search is run again)" if cur["status"] == "STALE_FOR_CORPUS" else "")
+                   + f"; problem input (r{c['problem_revision']}): **{pc['status']}**" + (f" ({', '.join(pc.get('changed') or [])} changed since — do not build a landscape from this run)" if pc["status"] == "STALE" else "")
+                   + f"; search configuration: **{kc['status']}**")
 
     rl = R.Doc(f"Reading list for {c['problem_id']} ({run_id})", header)
     cov = R.Doc(f"Coverage of {run_id}", header)

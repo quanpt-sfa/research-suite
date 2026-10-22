@@ -169,6 +169,27 @@ def _log(c: dict[str, Any], tx_like: dict[str, Any]) -> list[dict[str, Any]]:
     return [*c["edits"], tx_like]
 
 
+def _problem_inputs(pc: dict[str, Any], used: list[str], followed_choice: bool) -> dict[str, Any]:
+    by = {i["id"]: i["text"] for i in pc["interpretations"]}
+    return {"statement": pc["statement"], "scope": pc["scope"], "exclusions": pc["exclusions"], "used_interpretations": {i: by.get(i) for i in used},
+            "followed_choice": followed_choice, "chosen": list(pc["chosen_interpretations"]) if followed_choice else None}
+
+
+def problem_currency(store: StateStore, c: dict[str, Any]) -> dict[str, Any]:
+    """Do the words the queries were made from still say what the problem says now? Revisions that do not touch them (a new reading nobody chose) do not
+    make a run stale; a new statement, scope, exclusions, a changed or withdrawn chosen reading do."""
+    recorded = c.get("problem_inputs")
+    cur_obj = store.get_object(c["problem_id"])
+    if recorded is None or cur_obj is None:
+        return {"status": "NOT_RECORDED", "note": "this run recorded no problem inputs"}
+    now = _problem_inputs(cur_obj["content"], [i for i in recorded["used_interpretations"]], recorded["followed_choice"])
+    changed = sorted(k for k in now if now[k] != recorded[k])
+    base = {"recorded_revision": c["problem_revision"], "current_revision": cur_obj["revision"]}
+    if not changed:
+        return {"status": "CURRENT", **base, "note": "" if cur_obj["revision"] == c["problem_revision"] else "the problem was revised, but not in anything these queries were made from"}
+    return {"status": "STALE", **base, "changed": changed, "note": "the queries no longer reflect the problem: start a new run (retrieval new --parent)"}
+
+
 def _accepted(c: dict[str, Any]) -> list[str]:
     return sorted({e["term"] for e in c["expansions"] if e["status"] == "ACCEPTED"}, key=_norm)
 
@@ -209,7 +230,8 @@ def new_run(store: StateStore, token: Optional[str], problem_id: str, *, interpr
         rid = next_numbered_id(conn, "RET_", "RetrievalRun")
     content = {"label": label or f"Retrieval for {problem_id}", "problem_id": problem_id, "problem_revision": pr["revision"], "interpretations": ids, "queries": queries,
                "terms": researcher_terms, "expansions": expansions, "config": cfg, "state": "DRAFT", "corpus_snapshot_id": None, "corpus_members": [], "hits": [],
-               "neighbours": [], "coverage": {}, "edits": [], "parent_run": parent, "generated_by": GENERATED_BY}
+               "neighbours": [], "coverage": {}, "edits": [], "parent_run": parent, "generated_by": GENERATED_BY, "works": {},
+               "problem_inputs": _problem_inputs(pc, ids, not interpretation_ids)}
     edges = [("depends_on", problem_id, pr["revision"], {"edge_kind": "retrieved_for"})]
     if parent:
         p = load_run(store, parent)
@@ -308,6 +330,21 @@ def decide_expansions(store: StateStore, token: Optional[str], run_id: str, *, r
 
 # ------------------------------------------------------------------------------------------------ the search
 
+def merge_stages(r1: list[dict[str, Any]], r2: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The one rule that combines the R1 list and the R2 list (both best first). Every source of either list is kept: accepting an expansion can reorder the
+    ranking, but it never removes a paper that R1 found. A source is placed by the better of its two ranks; at equal rank the one R1 found comes first, then by id.
+    Each item says where it stood in each list (`r1_rank`, `r2_rank`, None if it was not in that list), so a paper the expansion pushed out of the R2 list
+    is visible as such. Each list holds at most `top_n` sources, so the union holds at most twice that."""
+    seen: dict[str, dict[str, Any]] = {}
+    for rank, h in enumerate(r1, 1):
+        seen[h["source_id"]] = {"hit": h, "r1_rank": rank, "r2_rank": None}
+    for rank, h in enumerate(r2, 1):
+        e = seen.setdefault(h["source_id"], {"hit": h, "r1_rank": None, "r2_rank": None})
+        e["r2_rank"], e["hit"] = rank, h
+    out = sorted(seen.values(), key=lambda e: (min(x for x in (e["r1_rank"], e["r2_rank"]) if x is not None), e["r1_rank"] is None, e["hit"]["source_id"]))
+    return [{**e["hit"], "r1_rank": e["r1_rank"], "r2_rank": e["r2_rank"], "rank": n} for n, e in enumerate(out, 1)]
+
+
 def _hit_record(index: Index, sid: str, tier: str, per_query: list[dict[str, Any]], accepted: list[str]) -> dict[str, Any]:
     best = min(per_query, key=lambda q: (q["rank"], -q["score"], q["query"]))
     src = index.sources[sid]
@@ -321,7 +358,7 @@ def _hit_record(index: Index, sid: str, tier: str, per_query: list[dict[str, Any
               + (f"; found only through the accepted expansion {', '.join(exp_found)}" if stage == "R2" and exp_found
                  else f"; it also contains the accepted expansion {', '.join(exp_found)}" if exp_found else ""))
     return {"source_id": sid, "source_revision": src["revision"], "work_id": src["work_id"], "tier": tier, "title": c.get("title"), "rank": 0, "score": best["score"], "stage": stage,
-            "queries": [{k: q[k] for k in ("query", "interpretation", "rank", "score", "stage")} for q in sorted(per_query, key=lambda q: q["query"])],
+            "queries": [{k: q[k] for k in ("query", "interpretation", "rank", "r1_rank", "r2_rank", "score", "stage")} for q in sorted(per_query, key=lambda q: q["query"])],
             "matched_terms": matched, "expansion_terms": exp_found, "section": best["section"], "locator": best["locator"], "reason": reason,
             "document_type": c.get("document_type"), "review_status": c.get("review_status"), "first_public_date": c.get("first_public_date")}
 
@@ -331,20 +368,26 @@ def search(store: StateStore, token: Optional[str], run_id: str) -> dict[str, An
     run = load_run(store, run_id)
     c = run["content"]
     cfg = c["config"]
+    pcur = problem_currency(store, c)
+    if pcur["status"] == "STALE":
+        raise KnowledgeError("RETRIEVAL_PROBLEM_STALE", f"{c['problem_id']} changed in {', '.join(pcur['changed'])} since this run's queries were made; "
+                             "searching would answer the old problem. Start a new run: research retrieval new <problem> --parent " + run_id, changed=pcur["changed"])
     index = Index(store, cfg)
     accepted = _accepted(c)
     exp_tokens = X.phrase_tokens(accepted)
     top_n = cfg["top_n"]
     per_source: dict[tuple, list[dict]] = {}
+    displaced: list[dict[str, Any]] = []
     for q in c["queries"]:
         for tier in TIER_ORDER:
             r1 = index.rank(tier, q["tokens"], top_n)
             r2 = index.rank(tier, sorted(set(q["tokens"]) | set(exp_tokens)), top_n) if exp_tokens else r1
-            r1_ids = {h["source_id"] for h in r1}
-            for rank, h in enumerate(r2, 1):
-                per_source.setdefault((tier, h["source_id"]), []).append({**h, "query": q["id"], "interpretation": q["interpretation"], "rank": rank,
-                                                                           "stage": "R1" if h["source_id"] in r1_ids else "R2",
+            for h in merge_stages(r1, r2):
+                per_source.setdefault((tier, h["source_id"]), []).append({**h, "query": q["id"], "interpretation": q["interpretation"],
+                                                                           "stage": "R1" if h["r1_rank"] is not None else "R2",
                                                                            "base_matched": index.bm25[tier].matched(h["unit"], q["tokens"])})
+                if exp_tokens and h["r1_rank"] is not None and h["r2_rank"] is None:
+                    displaced.append({"source_id": h["source_id"], "query": q["id"], "tier": tier, "r1_rank": h["r1_rank"]})
     hits: list[dict[str, Any]] = []
     for tier in TIER_ORDER:
         tier_hits = [_hit_record(index, sid, t, pq, accepted) for (t, sid), pq in per_source.items() if t == tier]
@@ -378,6 +421,8 @@ def search(store: StateStore, token: Optional[str], run_id: str) -> dict[str, An
         "assessed": {"retrieved_sources": len(hit_ids) + len(neighbours), "retrieved_full_text": len(full_hits) + sum(1 for e in neighbours if e["tier"] == "FULL_TEXT"),
                      "of_full_text_in_corpus": tiers.get("FULL_TEXT", 0), "note": "'searched corpus' means the sources retrieved here, not every source held"},
         "stages": {"R1": sum(1 for h in hits if h["stage"] == "R1"), "R2_only": sum(1 for h in hits if h["stage"] == "R2"), "R3a_neighbours": len(neighbours),
+                   "merge_rule": "every source found by R1 or by R2 is kept; placed by the better of its two ranks, R1-found first at equal rank",
+                   "displaced_by_expansion": sorted(displaced, key=lambda d: (d["query"], d["tier"], d["r1_rank"])),
                    "R2_enabled": bool(exp_tokens), "accepted_expansions": accepted,
                    "proposed_not_decided": sorted(e["term"] for e in c["expansions"] if e["status"] == "PROPOSED"),
                    "rejected_expansions": sorted(e["term"] for e in c["expansions"] if e["status"] == "REJECTED")},
@@ -392,10 +437,16 @@ def search(store: StateStore, token: Optional[str], run_id: str) -> dict[str, An
                   "below_floor": len(full_hits) < cfg["min_fulltext_sources"],
                   "note": "counts full texts retrieved by the query; being retrieved is not a judgement that a paper is relevant: your review decides that"},
         "limits": ["a retrieval score ranks what to read; it says nothing about what a paper claims", "a source that was not retrieved is not shown to be irrelevant",
-                   f"each query lists at most {cfg['top_n']} sources per tier: a source ranked lower is not shown",
+                   f"each of R1 and R2 lists at most {cfg['top_n']} sources per tier and query (the merged list can hold up to twice that); a source ranked lower in both is not shown",
                    "metadata-only and abstract-only sources were not read and can support or challenge nothing"]}
+    wids = {h["work_id"] for h in hits} | {n["work_id"] for n in neighbours}
+    works = {w: sorted(({"source_id": sid, "source_revision": s["revision"], "tier": s["tier"], "title": s["content"].get("title"),
+                         "document_type": s["content"].get("document_type"), "review_status": s["content"].get("review_status"),
+                         "first_public_date": s["content"].get("first_public_date"), "version_id": s["content"].get("version_id")}
+                        for sid, s in index.sources.items() if s["work_id"] == w and not s["excluded"]), key=lambda v: (v["first_public_date"] or "", v["source_id"]))
+             for w in sorted(wids)}
     snapshot = corpus.corpus_snapshot_id(store)
-    content = {**c, "state": "SEARCHED", "corpus_snapshot_id": snapshot, "corpus_members": members, "hits": hits, "neighbours": neighbours, "coverage": coverage,
+    content = {**c, "state": "SEARCHED", "works": works, "corpus_snapshot_id": snapshot, "corpus_members": members, "hits": hits, "neighbours": neighbours, "coverage": coverage,
                "config": {**cfg, "searched_with_expansions": accepted, "searched_with_terms": c["terms"]}}
     out = _put(store, token, run_id, content, "retrieval_search", expected_head=run["revision"])
     return {**out, "corpus_snapshot_id": snapshot, "reading_list": len(full_hits), "not_read_candidates": coverage["known_gaps"]["not_read_candidates"],
@@ -458,19 +509,34 @@ def corpus_currency(store: StateStore, c: dict[str, Any]) -> dict[str, Any]:
             "note": "conclusions drawn from the absence of a source rest on the old snapshot until the search is run again"}
 
 
-def _group_by_work(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _group_by_work(entries: list[dict[str, Any]], works: Optional[dict[str, list[dict[str, Any]]]] = None) -> list[dict[str, Any]]:
+    """One entry per work, for reading. The versions listed are every version the corpus held when the search ran (not only the ones retrieved), each with
+    whether it was retrieved. The representative is the latest by public date among ALL held versions; it is for display only: what a paper says is cited at
+    Source@revision (`best_hit`), never through the representative."""
+    works = works or {}
     groups: dict[str, list[dict]] = {}
     for e in entries:
         groups.setdefault(e["work_id"], []).append(e)
     out = []
     for wid, es in groups.items():
-        es = sorted(es, key=lambda e: (e.get("first_public_date") or "", e["source_id"]))
-        rep = es[-1]
+        retrieved = {e["source_id"] for e in es}
+        held = works.get(wid) or sorted(({k: e.get(k) for k in ("source_id", "source_revision", "title", "document_type", "review_status", "first_public_date", "tier")} for e in es),
+                                         key=lambda v: (v["first_public_date"] or "", v["source_id"]))
         best = min(es, key=lambda e: e["rank"] if e.get("rank") is not None else 10 ** 9)
-        out.append({"work_id": wid, "representative": rep["source_id"], "rank": best.get("rank"), "score": max((e.get("score") or 0) for e in es), "stage": best["stage"],
-                    "reason": best["reason"], "locator": best.get("locator"), "section": best.get("section"), "matched_terms": best.get("matched_terms", {}),
+        dated = [v for v in held if v.get("first_public_date")]
+        if dated:
+            rep = max(dated, key=lambda v: (v["first_public_date"], v["source_id"]))
+            basis = "latest first_public_date among all held versions" + (f" ({len(held) - len(dated)} held version(s) have no date)" if len(dated) < len(held) else "")
+        else:
+            rep = next(v for v in held if v["source_id"] == best["source_id"]) if any(v["source_id"] == best["source_id"] for v in held) else held[-1]
+            basis = "no public date recorded for any held version: the best-ranked version is shown"
+        out.append({"work_id": wid, "representative": rep["source_id"], "representative_basis": basis, "rank": best.get("rank"), "score": max((e.get("score") or 0) for e in es),
+                    "stage": best["stage"], "reason": best["reason"], "locator": best.get("locator"), "section": best.get("section"), "matched_terms": best.get("matched_terms", {}),
                     "expansion_terms": best.get("expansion_terms", []), "queries": best.get("queries", []),
-                    "versions": [{k: e.get(k) for k in ("source_id", "source_revision", "title", "document_type", "review_status", "first_public_date", "tier")} for e in es]})
+                    "best_hit": {"source_id": best["source_id"], "source_revision": best.get("source_revision")},
+                    "provenance_note": "evidence is cited at Source@revision (best_hit and each passage); the representative is for display only",
+                    "versions": [{**{k: v.get(k) for k in ("source_id", "source_revision", "title", "document_type", "review_status", "first_public_date", "tier", "version_id")},
+                                  "retrieved": v["source_id"] in retrieved} for v in held]})
     out.sort(key=lambda g: (g["rank"] if g["rank"] is not None else 10 ** 9, g["work_id"]))
     for n, g in enumerate(out, 1):
         g["position"] = n
@@ -514,10 +580,31 @@ def run_view(store: StateStore, run_id: str) -> dict[str, Any]:
                              "first_public_date": s.get("first_public_date")})
     cur = corpus_currency(store, c)
     outdated = c["state"] == "SEARCHED" and (c["config"].get("searched_with_expansions") != _accepted(c) or c["config"].get("searched_with_terms") != c["terms"])
+    prob = problem_currency(store, c)
+    cfg_status = {"status": "NOT_SEARCHED"} if c["state"] != "SEARCHED" else {"status": "STALE" if outdated else "CURRENT"}
+    currency = {"corpus": cur, "problem": prob, "search_config": cfg_status,
+                "all_current": cur["status"] == "CURRENT" and prob["status"] == "CURRENT" and cfg_status["status"] == "CURRENT"}
     after_review = len({h["source_id"] for h in full if h["stage"] in ("R1", "R2", "R5_added")})        # citation neighbours were not retrieved by the query
     return {"retrieval_id": run_id, "revision": run["revision"], "state": c["state"], "problem_id": c["problem_id"], "problem_revision": c["problem_revision"], "queries": c["queries"],
-            "terms": c["terms"], "expansions": c["expansions"], "config": c["config"], "corpus_currency": cur, "search_outdated": outdated,
-            "reading_list": _group_by_work(full), "not_read_candidates": _group_by_work(not_read), "acquisition_requests": acquire,
+            "terms": c["terms"], "expansions": c["expansions"], "config": c["config"], "corpus_currency": cur, "search_outdated": outdated, "currency": currency,
+            "reading_list": _group_by_work(full, c.get("works")), "not_read_candidates": _group_by_work(not_read, c.get("works")), "acquisition_requests": acquire,
             "set_aside": [{"source_id": s, "reason": r} for s, r in sorted(irrelevant.items())], "coverage": c["coverage"], "edits": c["edits"],
             "n_sources_in_reading_list": len(full), "floor_after_your_review": {"full_texts_on_the_list": after_review, "min_fulltext_sources": c["config"]["min_fulltext_sources"],
                                                                                  "below_floor": after_review < c["config"]["min_fulltext_sources"]}}
+
+
+def require_current(store: StateStore, run_id: str, *, allow_stale_corpus: bool = False) -> dict[str, Any]:
+    """The run's view, or an error saying which input is out of date. A step that builds on a run (the landscape) calls this, so it cannot be built from a run
+    whose problem was changed since, whose accepted terms were changed since, or (unless the researcher says so) whose corpus has changed."""
+    v = run_view(store, run_id)
+    cur = v["currency"]
+    if v["state"] != "SEARCHED":
+        raise KnowledgeError("RETRIEVAL_NOT_SEARCHED", f"{run_id} has not been searched")
+    if cur["problem"]["status"] != "CURRENT":
+        raise KnowledgeError("RETRIEVAL_PROBLEM_STALE", f"{run_id}: problem input {cur['problem']['status']} ({', '.join(cur['problem'].get('changed') or [])}); start a new run")
+    if cur["search_config"]["status"] != "CURRENT":
+        raise KnowledgeError("RETRIEVAL_CONFIG_STALE", f"{run_id}: the accepted terms changed since the search; search again")
+    if cur["corpus"]["status"] != "CURRENT" and not allow_stale_corpus:
+        raise KnowledgeError("RETRIEVAL_CORPUS_STALE", f"{run_id}: the corpus changed since the search ({len(cur['corpus'].get('added', []))} added, "
+                             f"{len(cur['corpus'].get('revised', []))} revised, {len(cur['corpus'].get('removed', []))} removed); search again, or build on the old snapshot explicitly")
+    return v

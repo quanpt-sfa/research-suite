@@ -30,6 +30,14 @@ research corpus exclude SRC_X --reason "..." ; research corpus include SRC_X
 | R3a | held papers that cite, or are cited by, a paper on the list, from the stored reference lists (DOI, or a title of at least three words). Listed apart, with where it was found | yes |
 | R5 | you set a hit aside (this run only), restore it, add a held paper you know, or record a paper you want to acquire (no source is created). Each needs a reason; each is recorded | — |
 
+### How R1 and R2 are combined
+
+R1 (your terms) and R2 (your terms plus the accepted expansions) are two separate ranked lists. The reading list is their **union**: nothing R1 found is removed
+because an expansion was accepted. Each source keeps `r1_rank` and `r2_rank` (`None` where the list did not have it) per query, and is placed by the better of the two;
+at equal rank the source R1 found comes first, then id. Because each list has at most `top_n` sources per tier and query, the union can hold up to twice that, and the
+coverage report says so. Where accepting an expansion pushed an R1 source below the R2 cut, the coverage lists it under `displaced_by_expansion` (it is still on the list).
+A paper's stage is `R1` if R1 found it, `R2` only if it was found through an expansion alone.
+
 ## Tiers
 
 Only **FULL_TEXT** sources go on the reading list. **ABSTRACT_ONLY** and **METADATA_ONLY** sources are listed apart as *possibly relevant, not read*. They have no
@@ -39,13 +47,27 @@ stored text: no passage can be made from them, so they can never support or chal
 
 A Source can carry `document_type`, `review_status`, `first_public_date` (with its evidence: a date taken from the paper's own text is not accepted), `version_id`,
 `work_id` and `version_relations`. Versions of one work are **one entry** in the reading list and one work in the coverage counts; the representative is the latest
-by public date, and every version is listed with its type, review status and date. Nothing here treats a working paper as peer-reviewed or as evidence of a result;
+by public date **among all versions the corpus holds** (not only those retrieved; without any date, the best-ranked one, and it says so), and every held version is
+listed with its type, review status, date and whether it was retrieved. The representative is for display only: what a paper says is cited at **Source@revision**
+(`best_hit` and each passage's locator), never through the representative, so a claim extracted from one version is never attributed to another. Nothing here treats a working paper as peer-reviewed or as evidence of a result;
 that is a separate judgement (see `M5_WP14_PRECEDENCE_RULES_V2.md` §9).
 
 ## Corpus snapshots (invariant I20)
 
 A search records the corpus snapshot it ran on and the members at that time. When the corpus changes (a source added, revised, excluded or included) the run is shown
-`STALE_FOR_CORPUS` with what changed, until it is searched again. The old result stays as history. `corpus exclude` keeps the source and its history (a new revision with
+`STALE_FOR_CORPUS` with what changed, until it is searched again. The old result stays as history.
+
+A run depends on three inputs and says for each whether it is still current (`research retrieval show`, and the export header):
+
+| Input | CURRENT / STALE |
+|---|---|
+| corpus | the corpus snapshot is the one the search ran on (`STALE_FOR_CORPUS` lists added, revised, removed sources) |
+| problem | the parts of the ResearchProblem the queries were made from (statement, scope, the chosen readings) are unchanged since `problem_revision`; a revision that touches none of them (for example one more interpretation that is not chosen) leaves it CURRENT |
+| search configuration | the accepted expansions and your terms are the ones the search used |
+
+`require_current` is what a later step (the landscape) calls: it refuses a run that was not searched, whose problem changed (`RETRIEVAL_PROBLEM_STALE`), whose accepted
+terms changed (`RETRIEVAL_CONFIG_STALE`) or whose corpus changed (`RETRIEVAL_CORPUS_STALE`, unless the researcher explicitly chooses to build on the old snapshot).
+`search` itself refuses to run on a changed problem: make a new run (`retrieval new --parent`) so the old one stays as history. `corpus exclude` keeps the source and its history (a new revision with
 your reason) and takes it out of the search.
 
 ## Coverage

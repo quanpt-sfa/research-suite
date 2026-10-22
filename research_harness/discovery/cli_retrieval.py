@@ -8,14 +8,20 @@ from typing import Any, Callable, Optional
 
 
 def _vers(g: dict) -> str:
-    return ", ".join(f"{v['source_id']}" + (f" [{v['document_type']}, {v['review_status']}, public {v['first_public_date'] or '?'}]" if v.get("document_type") or v.get("review_status") else "")
+    return ", ".join(f"{v['source_id']}" + ("*" if len(g["versions"]) > 1 and v["source_id"] == g["representative"] else "") + ("" if v.get("retrieved", True) else " (held, not retrieved)")
+                     + (f" [{v['document_type']}, {v['review_status']}, public {v['first_public_date'] or '?'}]" if v.get("document_type") or v.get("review_status") else "")
                      for v in g["versions"])
 
 
+def _currency_line(cur: dict) -> str:
+    c, p, k = cur["corpus"], cur["problem"], cur["search_config"]
+    return (f"corpus: {c['status']}" + (f" (+{len(c['added'])} added, {len(c['revised'])} revised, {len(c['removed'])} removed since the search)" if c["status"] == "STALE_FOR_CORPUS" else "")
+            + f"  problem: {p['status']}" + (f" ({', '.join(p.get('changed') or [])} changed: r{p['recorded_revision']} -> r{p['current_revision']})" if p["status"] == "STALE" else "")
+            + f"  search config: {k['status']}")
+
+
 def _show_text(v: dict) -> None:
-    cur = v["corpus_currency"]
-    print(f"{v['retrieval_id']} r{v['revision']} [{v['state']}] for {v['problem_id']}  corpus: {cur['status']}"
-          + (f" (+{len(cur['added'])} added, {len(cur['revised'])} revised, {len(cur['removed'])} removed since the search)" if cur["status"] == "STALE_FOR_CORPUS" else ""))
+    print(f"{v['retrieval_id']} r{v['revision']} [{v['state']}] for {v['problem_id']}  {_currency_line(v['currency'])}")
     for q in v["queries"]:
         print(f"  {q['id']} ({q['interpretation']}): {', '.join(q['tokens'])}")
     if v["terms"]:
@@ -24,6 +30,8 @@ def _show_text(v: dict) -> None:
         print(f"  expansion {e['status']:<9}{e['term']}   ({e['source']})")
     if v["search_outdated"]:
         print("  ! the accepted expansions or terms changed since the search: run it again")
+    if v["currency"]["problem"]["status"] == "STALE":
+        print("  ! the problem changed since this run was made: it cannot feed a landscape; start a new run (research retrieval new --parent <this run>)")
     if v["state"] != "SEARCHED":
         return
     k = v["coverage"]

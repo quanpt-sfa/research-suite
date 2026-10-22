@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from research_harness.discovery import text_index as X
-from research_harness.discovery.retrieval import Index
+from research_harness.discovery.retrieval import Index, merge_stages
 from research_harness.state.store import StateStore
 
 
@@ -34,8 +34,9 @@ def evaluate(store: StateStore, gold: dict[str, Any], config: Optional[dict[str,
         expanded = sorted(set(base) | set(X.phrase_tokens(q.get("accepted_expansions", []))))
         relevant = set(q["relevant"])
         row: dict[str, Any] = {"id": q["id"], "text": q["text"], "relevant": len(relevant)}
-        for name, toks in (("R1", base), ("R1+R2", expanded)):
-            ranked = [h["source_id"] for h in index.rank("FULL_TEXT", toks, top_n)]
+        r1 = index.rank("FULL_TEXT", base, top_n)
+        r2 = index.rank("FULL_TEXT", expanded, top_n)
+        for name, ranked in (("R1", [h["source_id"] for h in r1]), ("R1+R2", [h["source_id"] for h in merge_stages(r1, r2)])):       # the same merge as `search`
             row[name] = _metrics(ranked, relevant, k)
         found_by_r2_only = [s for s in row["R1+R2"]["found_in_top_k"] if s not in row["R1"]["found_in_top_k"]]
         row["found_only_with_expansions"] = found_by_r2_only

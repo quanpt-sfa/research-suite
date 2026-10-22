@@ -106,6 +106,7 @@ _TYPE_PROPS: dict[str, tuple[dict, list]] = {
                       "corpus_members": {"type": "array", "items": {"type": "array"}}, "hits": {"type": "array", "items": {"type": "object"}},
                       "neighbours": {"type": "array", "items": {"type": "object"}}, "coverage": {"type": "object"},
                       "edits": {"type": "array", "items": {"type": "object"}}, "parent_run": {"type": ["string", "null"]},
+                      "works": {"type": "object"}, "problem_inputs": {"type": "object"},
                       "generated_by": _str(120)},
                      ["problem_id", "queries", "config", "state"]),
     "Adjudication": ({"subject": SUBJECT,

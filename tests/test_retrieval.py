@@ -400,7 +400,7 @@ def test_the_export_is_readable_reproducible_and_never_contains_a_full_text(worl
     files = {p.name: p.read_bytes() for p in Path(out["out"]).iterdir()}
     assert {"reading_list.md", "coverage_report.md", "queries_and_expansions.md", "not_read_candidates.csv", "manifest.json", "export_info.json"} == set(files)
     rl = files["reading_list.md"].decode("utf-8")
-    assert "SRC_B02V1 (working_paper, NOT_REVIEWED, public 2024-02-01)" in rl and "SRC_B02J (journal_article, PUBLISHED, public 2026-06-30)" in rl and "R1: matched" in rl
+    assert "SRC_B02V1@1 (working_paper, NOT_REVIEWED, public 2024-02-01)" in rl and "SRC_B02J@1 (shown for the work) (journal_article, PUBLISHED, public 2026-06-30)" in rl and "R1: matched" in rl
     csv_text = files["not_read_candidates.csv"].decode("utf-8")
     assert csv_text.startswith("source_id,title,tier,stage,why,document_type,review_status,first_public_date,status\n") and "SRC_B04" in csv_text and "possibly relevant, not read" in csv_text
     assert "BELOW THE FLOOR" not in files["coverage_report.md"].decode("utf-8") and "external sources: not used" in files["coverage_report.md"].decode("utf-8")
