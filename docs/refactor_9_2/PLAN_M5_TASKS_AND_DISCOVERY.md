@@ -1,7 +1,33 @@
 # Research Suite 9.2 → M5: task entry points, Contribution Discovery, knowledge accumulation, readable outputs
 
-**Status: plan for the owner's approval. Nothing in this plan is implemented.** Wherever a sentence describes existing behaviour it cites a file,
-function, test or command; everything else is a proposal. Baseline: `main` = `refactor/9.2` = `c6397de` (2026-10-21).
+## Current status (updated 2026-10-23)
+
+**M5 and Gate M are not complete.** This document began as a plan for approval; the sections below are the **original design decisions (historical)** and are kept, with the amendments that
+superseded parts of them. Three levels are kept apart on purpose: *implemented* (code exists), *technically tested* (tests and CI pass), *scientifically validated* (checked against real literature,
+real full texts or expert judgement). **Nothing in M5 is scientifically validated**: every test so far uses invented papers and scripted models.
+
+| WP | Implemented | Technically tested (CI run) | Scientifically validated | State |
+|---|---|---|---|---|
+| WP0 CI repair | `abe1578` | 39656916379 green | n/a | TECHNICALLY_ACCEPTED |
+| WP1a transactions, CAS | `f529989` | 39658649667 green | n/a | TECHNICALLY_ACCEPTED |
+| WP2 Methods export | `4c76e89` | 39688587818 green | no | TECHNICALLY_ACCEPTED |
+| WP1b + WP3 ResearchTask | `97777ca`; remediation `a5bd15a` | 39692016834, 39703364453 green | no | TECHNICALLY_ACCEPTED; backlog B1, B2 open |
+| WP4 ResearchProblem | `af5ffcc` | 39709007021 green | no | TECHNICALLY_ACCEPTED |
+| WP5 internal retrieval | `3ad25bc`; review remediation `b9e152c` | 39710830016, 39719697663 green | no (benchmark is synthetic) | TECHNICALLY_ACCEPTED |
+| WP6 Landscape | `ac65f45` | 39722036277 green | no | **TECHNICALLY_ACCEPTED — REAL SCIENTIFIC VALIDATION PENDING** |
+| WP6.1 research-design-aware synthesis (scope amendment, owner 2026-10-23) | `95b49ef` | 39730603834 green | no (`REAL_CORPUS_VALIDATION_PENDING`) | implemented and tested on synthetic corpora; awaiting the owner's review (`M5_WP6_1_DESIGN.md`, `M5_WP6_1_REPORT.md`) |
+| WP14 precedence table | design and fixtures only | fixtures tested | expert cases not written | **waiting for the researcher's 20 expert cases and scientific approval** |
+| WP7–WP13 | not started | — | — | WP7–WP8 closed until WP14 is accepted; WP9–WP13 not approved |
+
+**Amendments and superseded decisions** (precedence: Amendment 2 > Amendment 1 > the original plan): `M5_DESIGN_AMENDMENT_1.md`, `M5_DESIGN_AMENDMENT_2.md`, `M5_WP14_PRECEDENCE_RULES_V2.md`, `M5_WP1_WP2_CONTRACTS.md`, and the WP6.1 scope amendment: the landscape serves
+empirical, interpretive and conceptual inquiry with the standard each kind of claim needs (`evidence_permits` of the original protocol §5.2 was already withdrawn by Amendment 1 A5; WP6.1 extends A5's three
+dimensions to interpretive and conceptual claims). The original assumption that the five capability groups form one linear pipeline for every study is not carried into the implementation.
+
+**Open decisions and limitations** (not closed by any commit): D-decisions listed in section 14 and the open items of section 21; the researcher's WP14 expert cases; the researcher's Gate K / Gate L evidence (M4 is not met);
+API key rotation; backlog `M5_BACKLOG.md` B1–B5; real-corpus validation of retrieval, landscape and relation proposals; whether the WP6.1 execution contracts match how researchers in those traditions work.
+
+*Original status line (2026-10-21, historical):* plan for the owner's approval, nothing implemented. Wherever a sentence describes existing behaviour it cites a file,
+function, test or command; everything else is a proposal. Baseline then: `main` = `refactor/9.2` = `c6397de`.
 
 **Design reviews.** First review (2026-10-21) → `M5_DESIGN_AMENDMENT_1.md`. Second review (2026-10-22): Amendment 1 accepted in direction; WP0
 approved; WP1–WP2 approved on condition that the transaction and export contracts are closed before code and that `GATEL_REAL` and every store under
@@ -9,7 +35,7 @@ approved; WP1–WP2 approved on condition that the transaction and export contra
 self-contained `M5_WP14_TRUTH_TABLE_DRAFT.md`. Precedence: Amendment 2 > Amendment 1 > this plan and the supporting documents.
 Third review (2026-10-22): WP0 start; WP1 (transaction integrity, CAS, O17) and WP2 implement with tests; WP14 complete design and expert cases;
 WP3–WP6 open by dependency after WP1; WP7–WP13 not approved for production. Response: `M5_WP14_PRECEDENCE_RULES_V2.md` (+ `wp14/fixtures_v2.json`,
-`wp14/expert_cases_form.json`) and `M5_WP1_WP2_CONTRACTS.md`. **Status:** WP0 done (`abe1578`, CI run 39656916379 green); WP1a done (`f529989`, CI run 39658649667 green); WP1b deferred to WP3; WP2 done (`4c76e89`, CI run 39688587818 green; Methods export). WP1b and WP3 done (`97777ca`, CI run 39692016834 green; `docs/TASKS.md`; schema 9.0.4). WP4 (research problems) done in `af5ffcc` (CI run 39709007021 green; `docs/PROBLEMS.md`); WP5 (internal retrieval) done in `3ad25bc` (CI run 39710830016 green; `docs/RETRIEVAL.md`); items outside their scope are in `docs/refactor_9_2/M5_BACKLOG.md`. WP5 review remediation (R1 and R2 lists merged without losing R1 hits; run currency per input; work versions judged from every held version, evidence at Source@revision) in `b9e152c`, CI run 39719697663 green. WP6 (landscape; `docs/LANDSCAPE.md`) in `ac65f45`, CI run 39722036277 green. WP7 and WP8 wait for the owner's review and for WP14 (expert cases) to be accepted. Review remediation of WP3 (spend persistence, model-aware reuse, ECA checkpoint completeness, long-step lease) in `a5bd15a`, CI run 39703364453 green. Documents committed in `0bca07f`. Next: WP4 (needs D16) and WP5, opened by the owner; WP14 expert cases (owner).
+`wp14/expert_cases_form.json`) and `M5_WP1_WP2_CONTRACTS.md`. **Status:** WP0 done (`abe1578`, CI run 39656916379 green); WP1a done (`f529989`, CI run 39658649667 green); WP1b deferred to WP3; WP2 done (`4c76e89`, CI run 39688587818 green; Methods export). WP1b and WP3 done (`97777ca`, CI run 39692016834 green; `docs/TASKS.md`; schema 9.0.4). WP4 (research problems) done in `af5ffcc` (CI run 39709007021 green; `docs/PROBLEMS.md`); WP5 (internal retrieval) done in `3ad25bc` (CI run 39710830016 green; `docs/RETRIEVAL.md`); items outside their scope are in `docs/refactor_9_2/M5_BACKLOG.md`. WP5 review remediation (R1 and R2 lists merged without losing R1 hits; run currency per input; work versions judged from every held version, evidence at Source@revision) in `b9e152c`, CI run 39719697663 green. WP6 (landscape; `docs/LANDSCAPE.md`) in `ac65f45`, CI run 39722036277 green. WP7 and WP8 wait for the owner's review and for WP14 (expert cases) to be accepted. Review remediation of WP3 (spend persistence, model-aware reuse, ECA checkpoint completeness, long-step lease) in `a5bd15a`, CI run 39703364453 green. Documents committed in `0bca07f`. (Superseded: see the current status block at the top.)
 
 Supporting documents (all proposals, same status):
 
