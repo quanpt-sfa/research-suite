@@ -669,16 +669,17 @@ def cmd_domain_next(args: argparse.Namespace) -> int:
         spec = _load_domain_spec(args.spec)
         facts = facts_from_store(_resolve_store(_resolve_project_id(args), getattr(args, "home", None)),
                                  research_question_id=getattr(args, "question", None),
-                                 study_design=getattr(args, "study_design", None))
+                                 study_design=getattr(args, "study_design", None), research_purpose=getattr(args, "research_purpose", None),
+                                 problem_id=getattr(args, "problem_id", None))
         evals, nxt = evaluate(spec, facts), next_steps(spec, facts)
     except Exception as e:
         sys.stderr.write(f"Domain workflow error: {e}\n")
         return 1
     if args.json:
-        _json_out({"workflow": spec.pin, "study_design": facts.study_design, "next_steps": nxt,
+        _json_out({"workflow": spec.pin, "study_design": facts.study_design, "research_purpose": sorted(facts.purposes()), "next_steps": nxt,
                    "steps": [e.to_dict() for e in evals]})
         return 0
-    print(f"{spec.id} v{spec.version}  study design: {facts.study_design or 'not recorded'}")
+    print(f"{spec.id} v{spec.version}  study design: {facts.study_design or 'not recorded'}  research purpose: {', '.join(sorted(facts.purposes())) or 'not recorded'}")
     print(f"Next: {', '.join(nxt) if nxt else '(nothing can run yet)'}\n")
     for e in evals:
         mark = "n/a " if e.applicability.value == "NOT_APPLICABLE" else "done" if e.done else "RUN " if e.runnable else "wait"
@@ -1107,6 +1108,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_domnext.add_argument("--spec", help="Built-in id or path to a spec JSON (default: the generic workflow)")
     p_domnext.add_argument("--question", "--question-id", dest="question")
     p_domnext.add_argument("--study-design", dest="study_design")
+    p_domnext.add_argument("--research-purpose", dest="research_purpose")
+    p_domnext.add_argument("--problem", dest="problem_id", help="A ResearchProblem whose recorded inquiry (design, purposes) fills in what the question does not say")
     p_domnext.add_argument("--home")
     p_domnext.add_argument("--json", action="store_true")
     p_domnext.set_defaults(func=cmd_domain_next)

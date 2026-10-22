@@ -1,0 +1,37 @@
+{
+  "id": "LIB_DW_CRITICAL_SYNTHESIS",
+  "version": "0.1.0",
+  "domain": "cross_domain",
+  "subfield": null,
+  "study_designs": ["conceptual", "narrative_review", "systematic_review"],
+  "research_purposes": ["critical_synthesis", "theory_development"],
+  "description": "Execution contract for a critical synthesis of theory: reconstruct the theories, their constructs, assumptions and mechanisms; compare them and their scopes; identify possible tensions; look for literature that already recognises or resolves each tension; only then propose reconceptualisations for the researcher's review. It has no data-collection or estimation stage and fixes no method content. Independent of discipline. Status EXTRACTED: nothing here is verified.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": false, "justification": "a critical synthesis collects and estimates nothing; its analytic steps (reconstruction, comparison, tension-finding, recognition search) are in the literature stage"},
+    "results": {"applicable": false, "justification": "a critical synthesis has no separate empirical results stage; what it reports is the reconstruction and the tensions, in the literature and discussion stages"},
+    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "search_recognition", "is": "SUCCEEDED"}}]}
+  },
+  "steps": [
+    {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "reconstruct_theories", "stage": "literature", "kind": "execute", "title": "Reconstruct the relevant theories from full text",
+     "evidence_requirements": [{"type": "Landscape", "where": {"kind": "landscape"}, "min": 1, "about": "a landscape built from a current reading list"}]},
+    {"id": "reconstruct_constructs_assumptions", "stage": "literature", "kind": "execute", "title": "Reconstruct constructs, stated assumptions and explanatory mechanisms",
+     "entry_conditions": [{"step_execution": {"step": "reconstruct_theories", "is": "SUCCEEDED"}}]},
+    {"id": "compare_theories_and_scopes", "stage": "literature", "kind": "review", "title": "Compare the theories and their scopes, units and levels of analysis",
+     "entry_conditions": [{"step_execution": {"step": "reconstruct_constructs_assumptions", "is": "SUCCEEDED"}}]},
+    {"id": "identify_tensions", "stage": "literature", "kind": "decide", "title": "Identify possible conceptual or theoretical tensions (proposals the researcher decides on)",
+     "entry_conditions": [{"step_execution": {"step": "compare_theories_and_scopes", "is": "SUCCEEDED"}}]},
+    {"id": "search_recognition", "stage": "literature", "kind": "execute", "title": "Search for literature that already recognises or resolves each tension",
+     "entry_conditions": [{"step_execution": {"step": "identify_tensions", "is": "SUCCEEDED"}}],
+     "on_condition": [{"when": {"diagnostic_signal": {"step": "search_recognition", "diagnostic": "tension_addressed", "is": "CONCERN_INDICATED"}}, "goto": "identify_tensions",
+                       "reason": "a reviewed paper already addresses the tension: restate it against that paper or drop it"}]},
+    {"id": "propose_reconceptualizations", "stage": "discussion", "kind": "decide", "title": "Propose possible reconceptualisations for the researcher's review",
+     "applicability": {"when": {"research_purpose_in": ["critical_synthesis", "theory_development"]}, "justification": "reconceptualisation is the purpose of a critical synthesis or of theory development"}},
+    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+  ],
+  "scope": {"study_design": "narrative_review"},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}

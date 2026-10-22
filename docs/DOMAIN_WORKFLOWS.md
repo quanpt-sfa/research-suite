@@ -42,6 +42,24 @@ workflow) decides, **before any reuse**, whether the stage runs:
 Both gate outcomes are recorded in the run registry with the spec's pin (`ID@version#digest`) and are never reused. A stage run
 of a stage with a single `assess` step completes that step (`domain_step_id`).
 
+## Purpose, and contracts for non-empirical inquiry (WP6.1)
+
+Design does not say why a study is done, and a landscape of the literature reads papers of every design for any project. A spec may therefore also list `research_purposes` (vocabulary `research_purpose`; empty = any);
+a recorded purpose outside the list makes every stage `NOT_APPLICABLE`, like a design outside `study_designs`. The predicate `research_purpose_in` joins the closed language, and `ProjectFacts` carries the purpose
+(`research_purpose` on the ResearchQuestion, `domain next --research-purpose`, or the inquiry recorded on a ResearchProblem: `domain next --problem PROB_x`; a question promoted from a problem takes the problem's recorded inquiry for the gate of `run_workflow`; a ResearchProblem may record several purposes and a spec applies if one of them is covered). A spec that does not use purposes has exactly the same dict and digest as before, so every stored pin stays valid.
+
+Three built-in contracts for logics that are not an estimation pipeline, all `cross_domain`, `EXTRACTED`, carrying order and conditions and no method content:
+
+| Spec | For | Not applicable (with the reason in the spec) | Steps |
+|---|---|---|---|
+| `LIB_DW_CRITICAL_SYNTHESIS` | critical synthesis / theory development by narrative or systematic review or conceptual work | methods, results | reconstruct theories (needs a Landscape) → constructs, assumptions, mechanisms → compare theories and scopes → identify tensions (decide) → search for literature that already recognises them (loops back to the tensions when a reviewed paper does) → propose reconceptualisations (decide) |
+| `LIB_DW_CONCEPTUAL_ARGUMENT` | a conceptual or methodological argument | methods, results | state the argument → reconstruct the inference chain → rival explanations (loops back when a rival is unanswered) → boundary conditions |
+| `LIB_DW_QUALITATIVE_INQUIRY` | qualitative, case or design-based inquiry | results | sampling rationale → data generation → coding and interpretation (loops back to data generation while interpretation is still moving) → alternative interpretations → credibility checks, including reflexivity |
+
+None of them has an estimator, an identification or a robustness step; the regression workflow is not applied to them, and `LIB_DW_ACC_FRAUD_DETECTION` still blocks a predictive project until its label,
+sample and validation evidence are recorded. `workflows/profiles/*` (accounting, finance, education) remain checklists for the quantitative traditions they name; the education profile is policy evaluation, VAM and IRT,
+not a statement of what education research requires.
+
 ## Recording steps
 
 `record_step_run(store, spec, step_id, execution=..., assessment=..., diagnostic_signals={name: signal})` registers that a step

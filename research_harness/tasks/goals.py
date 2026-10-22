@@ -68,16 +68,22 @@ def _assess_claims(p: dict) -> dict[str, Any]:
 def _build_landscape(p: dict) -> dict[str, Any]:
     _need(p, "retrieval_id")
     rid = p["retrieval_id"]
+    land = {"$step": "S02", "key": "landscape_id"}
     steps = [
         _decide("S01", "reading_list", "Confirm the reading list of the retrieval run (set aside, add, acquire: research retrieval review)", {"retrieval_id": rid}, []),
         _run("S02", "landscape_build", "Read the reading list and build the landscape (entries are quote-verified; nothing is decided)",
              {"retrieval_id": rid, "versions": p.get("versions", "retrieved"), "works": p.get("works"), "aliases": p.get("aliases"), "label": p.get("label"),
-              "allow_stale_corpus": bool(p.get("allow_stale_corpus"))}, ["S01"], model=True),
-        _decide("S03", "landscape_review", "Review the suite's inferences (contradictions, version differences, differing definitions) and any later version that was not read",
-                {"landscape": {"$step": "S02", "key": "landscape_id"}}, ["S02"]),
-        _run("S04", "export_landscape", "Write the readable landscape export", {"landscape": {"$step": "S02", "key": "landscape_id"}, "out": p.get("out")}, ["S03"]),
-    ]
-    return {"steps": steps, "mandatory_checkpoints": ["S01", "S03"]}
+              "allow_stale_corpus": bool(p.get("allow_stale_corpus"))}, ["S01"], model=True)]
+    last = "S02"
+    if p.get("propose_relations"):       # optional: a model proposes relations between studies and implied assumptions; every one stays UNCONFIRMED
+        steps.append(_run("S03", "landscape_propose", "A model proposes relations between studies and implied assumptions (proposals only, checked by a gate, all UNCONFIRMED)",
+                          {"landscape": land}, ["S02"], model=True))
+        last = "S03"
+    review = f"S0{len(steps) + 1}"
+    steps.append(_decide(review, "landscape_review", "Review the suite's inferences and proposals (contradictions, version differences, relations, implied assumptions) and any later version that was not read",
+                         {"landscape": land}, [last]))
+    steps.append(_run(f"S0{len(steps) + 1}", "export_landscape", "Write the readable landscape export", {"landscape": land, "out": p.get("out")}, [review]))
+    return {"steps": steps, "mandatory_checkpoints": ["S01", review]}
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,35 @@
+{
+  "id": "LIB_DW_QUALITATIVE_INQUIRY",
+  "version": "0.1.0",
+  "domain": "cross_domain",
+  "subfield": null,
+  "study_designs": ["qualitative_interview", "case_study", "design_based"],
+  "research_purposes": ["interpretation", "evaluation", "theory_development", "explanation", "description"],
+  "description": "Execution contract for qualitative or design-based inquiry: sampling rationale, data generation, coding and interpretation (sent back to data generation when the interpretation is still moving), alternative interpretations, credibility checks including reflexivity. No statistical results stage and no statistical inference. Independent of discipline. Status EXTRACTED: it fixes order and conditions, not method content.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": true},
+    "results": {"applicable": false, "justification": "qualitative and design-based inquiry has no separate statistical results stage; interpretation is part of the methods stage"},
+    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "credibility_checks", "is": "SUCCEEDED"}}]}
+  },
+  "steps": [
+    {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "sampling_rationale", "stage": "methods", "kind": "decide", "title": "Sampling rationale: why these participants, cases or iterations"},
+    {"id": "data_generation_protocol", "stage": "methods", "kind": "plan", "title": "Data generation protocol",
+     "entry_conditions": [{"step_assessment": {"step": "sampling_rationale", "at_least": "PROVISIONAL"}}]},
+    {"id": "coding_and_interpretation", "stage": "methods", "kind": "execute", "title": "Coding and interpretation",
+     "entry_conditions": [{"step_execution": {"step": "data_generation_protocol", "is": "SUCCEEDED"}}],
+     "on_condition": [{"when": {"diagnostic_signal": {"step": "coding_and_interpretation", "diagnostic": "interpretation_still_moving", "is": "CONCERN_INDICATED"}}, "goto": "data_generation_protocol",
+                       "reason": "interpretations were still changing as data were added: generate more data before settling them"}]},
+    {"id": "alternative_interpretations", "stage": "methods", "kind": "review", "title": "Alternative interpretations considered",
+     "entry_conditions": [{"step_execution": {"step": "coding_and_interpretation", "is": "SUCCEEDED"}}]},
+    {"id": "credibility_checks", "stage": "methods", "kind": "review", "title": "Credibility checks, including reflexivity about the researcher's role",
+     "entry_conditions": [{"step_execution": {"step": "alternative_interpretations", "is": "SUCCEEDED"}}]},
+    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+  ],
+  "scope": {},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}

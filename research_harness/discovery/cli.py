@@ -6,11 +6,39 @@ import json
 from typing import Any, Callable, Optional
 
 
+def _inquiry_args(q: argparse.ArgumentParser) -> None:
+    q.add_argument("--purpose", action="append", help="Why you are doing this (repeatable): explanation, prediction, description, interpretation, theory_development, "
+                   "critical_synthesis, evaluation, methodological_improvement")
+    q.add_argument("--design", help="How: a study design (archival, predictive_modeling, conceptual, narrative_review, qualitative_interview, design_based, ...)")
+    q.add_argument("--evidence-form", action="append", dest="evidence_form", help="On what evidence (repeatable): empirical_results, textual_evidence, conceptual_argument, "
+                   "theoretical_demonstration, qualitative_interpretation")
+    q.add_argument("--domain", help="Discipline: domain (accounting, finance, management, education, information_systems, cross_domain)")
+    q.add_argument("--subfield")
+
+
+def _inquiry(a: argparse.Namespace) -> Optional[dict]:
+    inq: dict = {}
+    if getattr(a, "purpose", None):
+        inq["research_purposes"] = list(a.purpose)
+    if getattr(a, "design", None):
+        inq["research_design"] = a.design
+    if getattr(a, "evidence_form", None):
+        inq["evidence_forms"] = list(a.evidence_form)
+    if getattr(a, "domain", None):
+        inq["discipline"] = {"domain": a.domain, "subfield": getattr(a, "subfield", None)}
+    return inq or None
+
+
 def _problem_text(v: dict) -> None:
     print(f"{v['problem_id']} r{v['revision']} [{v['status']}] ({v['kind']})")
     print(f"  {v['statement']}")
     if v["scope"]:
         print(f"  scope: {json.dumps(v['scope'], ensure_ascii=False)}   exclusions: {', '.join(v['exclusions']) or '-'}")
+    if v.get("inquiry"):
+        q = v["inquiry"]
+        d = q.get("discipline") or {}
+        print(f"  inquiry: purpose {', '.join(q.get('research_purposes') or []) or '-'}; design {q.get('research_design') or '-'}; evidence {', '.join(q.get('evidence_forms') or []) or '-'}; "
+              f"discipline {d.get('domain') or '-'}/{d.get('subfield') or '-'}")
     print("  interpretations:")
     for i in v["interpretations"]:
         mark = "*" if i["id"] in v["chosen"] else " "
@@ -49,7 +77,7 @@ def register(sub: Any) -> None:
 
     q = add("new", "State a problem in your own words (no corpus, Introduction or question needed)",
             lambda st, a: P.new_problem(st, tok(a), statement=a.statement, kind=a.kind, scope=K._json_arg(a.scope, "--scope"), exclusions=a.exclude,
-                                        interpretations=a.interpretation, label=a.label),
+                                        interpretations=a.interpretation, label=a.label, inquiry=_inquiry(a)),
             lambda o: print(f"{o['problem_id']} created (OPEN); interpretations: {', '.join(o['interpretations']) or 'none yet'}"))
     q.add_argument("--statement", required=True)
     q.add_argument("--kind", choices=list(P.KINDS), default="phenomenon")
@@ -57,6 +85,7 @@ def register(sub: Any) -> None:
     q.add_argument("--exclude", action="append", help="Something outside the problem (repeatable)")
     q.add_argument("--interpretation", action="append", help="A reading of the problem in your words (repeatable)")
     q.add_argument("--label")
+    _inquiry_args(q)
 
     q = add("add-interpretation", "Add a reading of your own", lambda st, a: P.add_interpretation(st, tok(a), a.problem, a.text),
             lambda o: print(f"{o['interpretation']} added to {o['problem_id']}"))
@@ -79,13 +108,14 @@ def register(sub: Any) -> None:
 
     q = add("revise", "Reframe the problem: a new revision; questions promoted earlier are flagged for review",
             lambda st, a: P.revise_problem(st, tok(a), a.problem, rationale=a.rationale, statement=a.statement, scope=K._json_arg(a.scope, "--scope"),
-                                           exclusions=a.exclude),
+                                           exclusions=a.exclude, inquiry=_inquiry(a)),
             lambda o: print(f"{o['problem_id']} r{o['revision']}: {o['status']}" + (f"; to review: {', '.join(o['needs_review'])}" if o["needs_review"] else "")))
     q.add_argument("problem")
     q.add_argument("--rationale", required=True)
     q.add_argument("--statement")
     q.add_argument("--scope")
     q.add_argument("--exclude", action="append")
+    _inquiry_args(q)
 
     q = add("set-aside", "Set the problem aside, with your reason", lambda st, a: P.set_aside(st, tok(a), a.problem, a.rationale),
             lambda o: print(f"{o['problem_id']} r{o['revision']}: {o['status']}"))

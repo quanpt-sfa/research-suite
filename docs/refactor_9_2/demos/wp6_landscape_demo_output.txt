@@ -33,21 +33,21 @@ LAND_000001 r1 "Landscape for PROB_000001" from RET_000001 for PROB_000001
     E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
         quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
   identifying_assumption:
-    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+    E007 SRC_PAT@1 [tested_in_source]: Parallel pre-trends, tested in an event study.
         quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage EP_SRC_PAT_LANDSCAPE_662)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
         quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
         quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
   boundary:
     E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
         quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
@@ -104,21 +104,21 @@ LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
     E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
         quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
   identifying_assumption:
-    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+    E007 SRC_PAT@1 [tested_in_source]: Parallel pre-trends, tested in an event study.
         quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
-        reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
         quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
         quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
   boundary:
     E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
         quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
@@ -161,24 +161,24 @@ LAND_000002 r1 "All versions" from RET_000001 for PROB_000001
     E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
         quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
   identifying_assumption:
-    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+    E007 SRC_PAT@1 [tested_in_source]: Parallel pre-trends, tested in an event study.
         quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
         quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
         quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E012 SRC_REN2@1 (disclosure after detection -> tone) [negative]: Disclosures become less optimistic in tone after detection models spread.
         quote: "After detection models spread, disclosures become less optimistic in tone."  at SRC_REN2 chars 220-294 (passage EP_SRC_REN2_LANDSCAPE_220)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
   boundary:
     E013 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
         quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
@@ -199,20 +199,24 @@ LAND_000002 r1 "All versions" from RET_000001 for PROB_000001
 # 6. export, and verification against the store
 
 $ research export landscape LAND_000001 --out <export-dir> --project PRJ_LAND --home <home>
-exported to <export-dir> (closure 84fdead5cebd): evidence_table.csv, manifest.json, research_landscape.md, works_and_versions.csv
+exported to <export-dir> (closure fd60eed3b8bb): evidence_table.csv, manifest.json, relations.csv, research_landscape.md, works_and_versions.csv
 
 $ research export verify <export-dir> --project PRJ_LAND --home <home>
 VERIFIED
 
 ----- research_landscape.md (first lines) -----
-<!-- research-suite export · landscape · LAND_000001@3 · closure 84fdead5cebd · corpus f1d8b53a73e7 · exporter 1 -->
+<!-- research-suite export · landscape · LAND_000001@3 · closure fd60eed3b8bb · corpus f1d8b53a73e7 · exporter 1 -->
 # Landscape LAND_000001: Landscape for PROB_000001
 
 retrieval run RET_000001: **CURRENT**; corpus snapshot f1d8b53a73e7c56c5c6c8475b6e9bf948a665102918736adfec80769f7e755a4: **CURRENT**; problem input (r1): **CURRENT**; search configuration: **CURRENT**; sources read: **CURRENT**
 
-Built from RET_000001 for PROB_000001 with RP_LANDSCAPE@1, RP_THEORY@2; versions read: retrieved. 4 of 4 works on the reading list were read (4 sources), 15 entries; 1 possibly relevant papers were **not read** (no full text).
+Built from RET_000001 for PROB_000001 with RP_LANDSCAPE@2, RP_THEORY@3; versions read: retrieved. 4 of 4 works on the reading list were read (4 sources), 15 entries; 1 possibly relevant papers were **not read** (no full text).
 
-Each entry shows the verbatim quote and where it is. A finding carries three separate dimensions — reading, inference, reproduction — and none of them says the finding is established. What the authors say is author-asserted; what the suite derives is listed under *Suite inferences*.
+Each entry shows the verbatim quote and where it is. A finding carries three separate dimensions — reading, inference, reproduction — and none of them says the finding is established. What the authors say is author-asserted; what the suite derives or proposes is listed apart, with its provenance and whether you confirmed it.
+
+## Inquiry
+
+The problem records no inquiry (purpose, design, evidence, discipline).
 
 ## Versions to know about
 
@@ -235,10 +239,6 @@ Evidence is cited at Source@revision; the work only groups papers for reading.
 |---|---|---|---|---|---|---|---|---|---|---|
 | E008 | SRC_PAT@1 | detection model use -> manipulation | negative | Detection model use reduces discretionary accruals by 0.8 percentage points of assets. | Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets. | SRC_PAT chars 662-758 | READING_CONFIRMED | METHOD_CRITICALLY_ASSESSED: LIMITED | NOT_ATTEMPTED | researcher_confirmed |
 | E009 | SRC_QUINN@1 | DETECTION MODEL USE -> MANIPULATION | positive | Detection model use raises real earnings management by 1.2 percentage points of sales. | Firms facing a detection model increase real earnings management by 1.2 percentage points of sales. | SRC_QUINN chars 353-452 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
-| E010 | SRC_SAM@1 | detection model use -> audit fees | positive | Audit fees rise by four percent after a detection model is adopted. | Audit fees rise by four percent after the regulator adopts a detection model. | SRC_SAM chars 207-284 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
-| E011 | SRC_REN1@1 | disclosure after detection -> tone | positive | Disclosures become more optimistic in tone after detection models spread. | After detection models spread, disclosures become more optimistic in tone. | SRC_REN1 chars 303-377 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
-
-## Constructs and how each paper defines them
 
 # 7. the problem is reframed: the landscape (and the run it came from) no longer describe it
 
@@ -268,21 +268,21 @@ LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
     E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
         quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
   identifying_assumption:
-    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+    E007 SRC_PAT@1 [tested_in_source]: Parallel pre-trends, tested in an event study.
         quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
-        reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
         quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
     E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
         quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
-        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
   boundary:
     E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
         quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)

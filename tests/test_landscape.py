@@ -289,7 +289,7 @@ def test_a_method_assessment_is_the_researchers_and_its_verdict_is_capped_by_the
     with pytest.raises(KnowledgeError, match="NOT_SUPPORTED_NEEDS_A_FAILED_CRITERION"):
         L.assess_method(w["store"], w["token"], w["lid"], fid, verdict="NOT_SUPPORTED", criteria=CRIT_OK, threats=[], rationale="r")
     not_a_finding = entry(L.view(w["store"], w["lid"]), "SRC_PAT", "design")["id"]
-    with pytest.raises(KnowledgeError, match="ENTRY_NOT_A_FINDING"):
+    with pytest.raises(KnowledgeError, match="ENTRY_NOT_A_CLAIM"):
         L.assess_method(w["store"], w["token"], w["lid"], not_a_finding, verdict="LIMITED", criteria=CRIT_OK, threats=[], rationale="r")
     # no methodological-literature basis: asked for SUPPORTED, stored as LIMITED with the blocker named
     weak = [{**CRIT_OK[0], "methodological_literature": False}]
@@ -368,7 +368,7 @@ def test_the_export_shows_source_revisions_dimensions_and_inferences_and_verifie
     fid = entry(L.view(w["store"], w["lid"]), "SRC_PAT", "finding")["id"]
     confirm_reading(w, fid)
     exp = build_landscape_export(w["store"], w["lid"])
-    assert exp.files.keys() == {"research_landscape.md", "evidence_table.csv", "works_and_versions.csv"} and exp.not_available == []
+    assert exp.files.keys() == {"research_landscape.md", "evidence_table.csv", "works_and_versions.csv", "relations.csv"} and exp.not_available == []
     assert build_landscape_export(w["store"], w["lid"]).files == exp.files and build_landscape_export(w["store"], w["lid"]).closure_digest == exp.closure_digest      # deterministic
     out = write_export(w["store"], exp, w["tmp"] / "land_export")
     md = (w["tmp"] / "land_export" / "research_landscape.md").read_text(encoding="utf-8")

@@ -220,7 +220,11 @@ def test_method_protocol_also_reads_sample_measurement_and_unlabeled_sections(tm
     assert out["sections_read"] == ["3 Misstatements under the PU framework", "4 Experimental setup", "Data"] and out["section_fallback"] is False
     shown = seen_text(method)
     assert "restatement dates" in shown and "complete financial data" in shown and "fiscal year end" in shown and "Average precision is low" not in shown
+    contribution = answering([])
+    out = rp.run_protocol(store, token, "SRC_UNL2026", "RP_CONTRIBUTION", contribution)
+    assert "restatement dates" not in seen_text(contribution)    # protocols that did not ask for unlabeled sections do not get them
+    # RP_THEORY asks for them since version 3 (WP6.1): conceptual papers name their sections after their ideas, so a theory protocol that skipped them would miss the theory
+    assert rp.get_protocol("RP_METHOD").include_unlabeled is True and rp.get_protocol("RP_THEORY").include_unlabeled is True and rp.get_protocol("RP_CONTRIBUTION").include_unlabeled is False
     theory = answering([])
-    out = rp.run_protocol(store, token, "SRC_UNL2026", "RP_THEORY", theory)
-    assert "restatement dates" not in seen_text(theory)          # protocols that did not ask for unlabeled sections do not get them
-    assert rp.get_protocol("RP_METHOD").include_unlabeled is True and rp.get_protocol("RP_THEORY").include_unlabeled is False
+    rp.run_protocol(store, token, "SRC_UNL2026", "RP_THEORY", theory)
+    assert "restatement dates" in seen_text(theory)

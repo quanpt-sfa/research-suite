@@ -30,6 +30,21 @@ research problem set-aside | reopen | show | history
   no longer the current one.
 * A task can address a problem: `research task start --problem PROB_000001`.
 
+## The kind of inquiry (WP6.1)
+
+A problem can record, optionally and separately, what kind of inquiry it is (`--purpose`, `--design`, `--evidence-form`, `--domain --subfield`, on `problem new` and `problem revise`):
+
+| Fact | Vocabulary | Note |
+|---|---|---|
+| why | `research_purpose`: explanation, prediction, description, interpretation, theory_development, critical_synthesis, evaluation, methodological_improvement | not a design |
+| how | a `study_design` (archival, predictive_modeling, conceptual, narrative_review, qualitative_interview, design_based, ...) | not inferred from the discipline |
+| on what evidence | `evidence_form`: empirical_results, textual_evidence, conceptual_argument, theoretical_demonstration, qualitative_interpretation | |
+| in which field | `domain` / `subfield` (accounting, finance, management, education, information_systems, cross_domain) | not inferred from the design |
+
+None is inferred from another and none is required. A problem made without an inquiry is exactly as before; recording or changing it is a revision (flags what rested on older revisions) but does **not** make a
+retrieval run stale, because the queries are made from the statement, scope, exclusions and chosen readings only. The inquiry is copied into a landscape and shown in its export; it selects nothing there, since the
+standard a claim is held to depends on the claim, not on the project (`docs/LANDSCAPE.md`).
+
 ## Limits
 
 * The suite does not judge a reading: `answer_kind` and `search_terms` are a model's labels for the researcher to read, not findings.

@@ -27,6 +27,11 @@ def _show_text(v: dict) -> None:
     print(f"  {_currency_line(v['currency'])}")
     if not v["currency"]["all_current"]:
         print("  ! this landscape no longer matches what it was built from: do not build on it; rebuild from a current run (research landscape build RUN --carry-from " + v["landscape_id"] + ")")
+    inq = v.get("inquiry")
+    if inq:
+        d = inq.get("discipline") or {}
+        print(f"  inquiry: purpose {', '.join(inq.get('research_purposes') or []) or '-'}; design {inq.get('research_design') or '-'}; evidence {', '.join(inq.get('evidence_forms') or []) or '-'}; "
+              f"discipline {d.get('domain') or '-'}/{d.get('subfield') or '-'}")
     k = v["coverage"]
     print(f"  {k['works_read']} of {k['works_on_reading_list']} works read ({k['sources_read']} sources, versions: {v['versions_policy']}); {k['entries']} entries "
           f"{k['entries_by_type']}; {k['possibly_relevant_not_read']} possibly relevant papers not read")
@@ -41,18 +46,32 @@ def _show_text(v: dict) -> None:
     for cat, es in by.items():
         print(f"  {cat}:")
         for e in es:
-            tag = f" [{e['direction']}]" if e.get("direction") else ""
+            tag = f" [{e['direction']}]" if e.get("direction") else (f" [{e['claim_type']}]" if e.get("claim_type") else (f" [{e['item_type']}]" if e.get("item_type") else ""))
             lab = f" ({e['label']})" if e.get("label") else ""
             print(f"    {e['id']} {e['source_id']}@{e['source_revision']}{lab}{tag}: {e['text']}")
             print(f"        quote: \"{e['author_claim']['quote']}\"  at {e['author_claim']['locator']} (passage {e['author_claim']['passage_id']})")
-            if e["category"] == "finding":
-                print(f"        {_ev(e)}")
-    if v["inferences"]:
+            if e.get("claim_kind"):
+                print(f"        {e['claim_kind']} claim · {_ev(e)}")
+    rule = [i for i in v["inferences"] if i["derivation"] == "rule"]
+    prop = [i for i in v["inferences"] if i["derivation"] != "rule"]
+    if rule:
         print("  suite inferences (PROVISIONAL; derived by the suite, not by a model):")
-        for i in v["inferences"]:
+        for i in rule:
             who = " vs ".join(f"{s['entry']} ({s['source_id']}@{s['source_revision']}" + (f", {s['direction']}" if s.get("direction") else "") + ")" for s in i["sides"])
             rev = f"; your decision: {i['reviews'][-1]['decision']}" if i["reviews"] else "; not reviewed by you"
-            print(f"    {i['id']} {i['kind']} ({i['subkind']}) on \"{i['relationship']}\": {who}{rev}")
+            print(f"    {i['id']} {i['kind']} ({i['subkind']}) on \"{i['relationship']}\": {who}{rev}" + (f"; NEEDS REASSESSMENT: {'; '.join(i['needs_reassessment'])}" if i["needs_reassessment"] else ""))
+    if prop:
+        print("  proposals (not derived by rule; none is established until you decide):")
+        for i in prop:
+            who = " vs ".join(f"{s['entry']} ({s['source_id']}@{s['source_revision']})" for s in i["sides"])
+            body = f"{i['text']} (reasoning: {i['reasoning']})" if i["kind"] == "implied_assumption" else f"{who}"
+            extra = ""
+            if i["recognition"]:
+                extra += f"; {i['recognition']['status']}" + (": " + ", ".join(f"{a['source_id']}@{a['source_revision']}" for a in i["recognition"]["addressed_by"]) if i["recognition"]["addressed_by"] else "")
+            if i["missing_information"]:
+                extra += f"; missing: {'; '.join(i['missing_information'])}"
+            print(f"    {i['id']} {i['kind']} on \"{i['relationship']}\" [{i['derivation']}; {i['provenance']}]: {body}; {i['confirmation']['state']}{extra}"
+                  + (f"; NEEDS REASSESSMENT: {'; '.join(i['needs_reassessment'])}" if i["needs_reassessment"] else ""))
     print(f"  {DIMENSION_NOTE}")
 
 
@@ -102,13 +121,40 @@ def register(sub: Any) -> None:
         lambda o: print("\n".join(f"{x['landscape_id']} r{x['revision']} {x['label']}: {x['entries']} entries, {x['inferences']} inference(s), {x['works_read']} works read (from {x['retrieval_id']})"
                                    for x in o["landscapes"]) or "no landscapes"), token=False)
 
-    q = add("review", "Your decision on a suite inference (contradiction, version difference, differing definitions), with your reason",
-            lambda st, a: L.review_inference(st, tok(a), a.landscape, a.inference, a.decision, a.reason),
+    q = add("propose", "A model proposes relations between studies and implied assumptions (one call); every proposal is checked by a gate and stays UNCONFIRMED until you decide",
+            lambda st, a: L.propose_relations(st, tok(a), a.landscape, K._adapter(a), kinds=a.kind or None),
+            lambda o: print(f"{o['status']}: {len(o['accepted'])} proposal(s) recorded ({', '.join(o['accepted']) or 'none'}), {len(o['rejected'])} rejected" +
+                            "".join(f"\n  rejected {r['proposal'].get('kind')} {r['proposal'].get('entries')}: {r['code']}: {r['reason']}" for r in o["rejected"])) if o["status"] == "PROPOSED"
+            else print(f"FAILED ({o['reason']}): {o['message']}"), model=True)
+    q.add_argument("landscape")
+    q.add_argument("--kind", action="append", choices=list(L.REL.PROPOSABLE_KINDS), help="Ask only for this kind (repeatable)")
+
+    q = add("add-proposal", "Record your own proposal, or one a critic made, through the same gate (JSON file): a relation between studies or an implied assumption",
+            lambda st, a: L.add_proposal(st, tok(a), a.landscape, K._json_arg(a.proposal, "--proposal"), provenance=a.provenance, critic=a.critic),
+            lambda o: print(f"{o['landscape_id']} r{o['revision']}: {o['inference']} recorded (UNCONFIRMED)"))
+    q.add_argument("landscape")
+    q.add_argument("--proposal", required=True, help="JSON file or JSON: {kind, topic, entries: [E..], shared, differences, rationale, missing_information, levels, meaning_difference, "
+                   "already_addressed_by: [{entry, how}], search_terms} or {kind: implied_assumption, topic, entries, text, reasoning}")
+    q.add_argument("--provenance", choices=list(L.REL.PROVENANCES), default="researcher_proposed")
+    q.add_argument("--critic", help="With critic_proposed: whose proposal it is")
+
+    q = add("candidates", "Held full texts that may already address a proposed relation (by words alone, no model): papers to read, not findings",
+            lambda st, a: L.tension_candidates(st, a.landscape, a.inference, limit=a.limit),
+            lambda o: print(o["note"] + "\n" + "\n".join(f"  {c['source_id']}@{c['source_revision']} score {c['score']} matched {', '.join(c['matched_terms'])}"
+                                                           f"{'  (read for this landscape)' if c['read_in_landscape'] else '  (not read for this landscape)'}  {c['title']}" for c in o["candidates"]) or "  none"),
+            token=False)
+    q.add_argument("landscape")
+    q.add_argument("inference")
+    q.add_argument("--limit", type=int, default=10)
+
+    q = add("review", "Your decision on an inference or proposal (contradiction, version difference, relation, implied assumption), with your reason",
+            lambda st, a: L.review_inference(st, tok(a), a.landscape, a.inference, a.decision, a.reason, acknowledge_missing=a.acknowledge_missing),
             lambda o: print(f"{o['landscape_id']} r{o['revision']}: {o['inference']} {o['decision']}"))
     q.add_argument("landscape")
     q.add_argument("inference")
     q.add_argument("decision", choices=["CONFIRMED", "DISMISSED", "NEEDS_SCOPE"])
     q.add_argument("--reason", required=True)
+    q.add_argument("--acknowledge-missing", action="store_true", dest="acknowledge_missing", help="Confirming a proposal that lists missing information needs you to say you read it")
 
     q = add("assess", "Your method assessment of a finding: does the design permit the inference? (criteria with basis, threats, rationale). A model never writes one",
             lambda st, a: L.assess_method(st, tok(a), a.landscape, a.entry, verdict=a.verdict, criteria=K._json_arg(a.criteria, "--criteria"),
@@ -118,8 +164,9 @@ def register(sub: Any) -> None:
     q.add_argument("landscape")
     q.add_argument("entry")
     q.add_argument("--verdict", required=True, choices=list(L.METHOD_VERDICTS))
-    q.add_argument("--criteria", required=True, help="JSON: [{criterion, basis, methodological_literature (bool), met: yes|no|unclear}]")
-    q.add_argument("--threats", help="JSON: [{threat, status: addressed|scoped_out|open}]")
+    q.add_argument("--criteria", required=True, help="JSON: [{criterion, basis, basis_kind (methodological_literature|theoretical_literature|logical_analysis|textual_evidence), "
+                   "met: yes|no|unclear}] (methodological_literature: true still works for an empirical claim)")
+    q.add_argument("--threats", help="JSON: [{threat, status: addressed|scoped_out|open}] (a rival explanation or alternative interpretation counts as a threat)")
     q.add_argument("--code-evidence", dest="code_evidence", help="JSON: [{file_sha256, lines}]")
     q.add_argument("--rationale", required=True)
 

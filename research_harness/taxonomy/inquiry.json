@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "research_purpose": ["explanation", "prediction", "description", "interpretation", "theory_development", "critical_synthesis", "evaluation", "methodological_improvement"],
+    "evidence_form": ["empirical_results", "textual_evidence", "conceptual_argument", "theoretical_demonstration", "qualitative_interpretation"],
+    "claim_kind": ["empirical", "interpretive", "conceptual"],
+    "relation_kind": ["empirical_disagreement", "version_difference", "conceptual_divergence", "theoretical_incompatibility", "explanatory_incompleteness", "boundary_tension", "complementarity"],
+    "basis_kind": ["methodological_literature", "theoretical_literature", "logical_analysis", "textual_evidence"],
+    "proposal_provenance": ["suite_proposed", "researcher_proposed", "critic_proposed"]
+  }
+}

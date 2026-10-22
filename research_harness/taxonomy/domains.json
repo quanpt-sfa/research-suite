@@ -5,6 +5,8 @@
       "accounting": ["archival_financial_reporting", "auditing", "management_accounting", "accounting_information_systems"],
       "finance": ["asset_pricing", "corporate_finance", "banking"],
       "education": ["learning_analytics", "design_based_research", "qualitative_education"],
+      "management": ["organizational_behavior", "organizational_communication"],
+      "information_systems": ["human_ai_interaction"],
       "cross_domain": ["conceptual", "provocation"]
     }
   }

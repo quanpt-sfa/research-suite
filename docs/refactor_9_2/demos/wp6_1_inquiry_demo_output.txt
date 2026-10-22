@@ -1,0 +1,451 @@
+==============================================================================================================
+# PILOT A: critical synthesis (AI-assisted communication at work). Theory papers with their own section headings, no Method or Results section.
+==============================================================================================================
+
+$ research problem new --statement "Does the increasing capacity to produce AI-assisted communication challenge how existing scholarship understands the relationship between communicative participation, collective attention, and relational engagement at work?" --kind puzzle --purpose critical_synthesis --purpose theory_development --design narrative_review --evidence-form conceptual_argument --evidence-form textual_evidence --domain management --subfield organizational_communication --project PRJ_A --home <home> --token-file <token-file>
+PROB_000001 created (OPEN); interpretations: none yet
+
+$ research problem show PROB_000001 --project PRJ_A --home <home>
+PROB_000001 r1 [OPEN] (puzzle)
+  Does the increasing capacity to produce AI-assisted communication challenge how existing scholarship understands the relationship between communicative participation, collective attention, and relational engagement at work?
+  inquiry: purpose critical_synthesis, theory_development; design narrative_review; evidence conceptual_argument, textual_evidence; discipline management/organizational_communication
+  interpretations:
+  history: 1 revision(s); decisions:
+
+# The execution contract of this inquiry is not the regression workflow: no data stage, and the steps are the logic of a critical synthesis
+
+$ research domain next --spec LIB_DW_CRITICAL_SYNTHESIS --problem PROB_000001 --project PRJ_A --home <home>
+LIB_DW_CRITICAL_SYNTHESIS v0.1.0  study design: narrative_review  research purpose: critical_synthesis, theory_development
+Next: contribution_assessment
+
+  [RUN ] contribution contribution_assessment
+  [wait] literature   reconstruct_theories
+           - needs 1 Landscape with {'kind': 'landscape'} (a landscape built from a current reading list); 0 recorded
+  [wait] literature   reconstruct_constructs_assumptions
+           - step 'reconstruct_theories' is not run, needs SUCCEEDED
+  [wait] literature   compare_theories_and_scopes
+           - step 'reconstruct_constructs_assumptions' is not run, needs SUCCEEDED
+  [wait] literature   identify_tensions
+           - step 'compare_theories_and_scopes' is not run, needs SUCCEEDED
+  [wait] literature   search_recognition
+           - step 'identify_tensions' is not run, needs SUCCEEDED
+  [wait] discussion   propose_reconceptualizations
+           - step 'search_recognition' is not run, needs SUCCEEDED
+  [wait] discussion   discussion_assessment
+           - step 'search_recognition' is not run, needs SUCCEEDED
+
+$ research domain next --spec LIB_DW_ACC_FRAUD_DETECTION --problem PROB_000001 --project PRJ_A --home <home>
+LIB_DW_ACC_FRAUD_DETECTION v0.1.0  study design: narrative_review  research purpose: critical_synthesis, theory_development
+Next: (nothing can run yet)
+
+  [n/a ] contribution contribution_assessment
+  [n/a ] literature   literature_assessment
+  [n/a ] methods      label_provenance
+  [n/a ] methods      sample_construction
+  [n/a ] methods      feature_construction
+  [n/a ] methods      temporal_validation_design
+  [n/a ] methods      imbalance_aware_evaluation
+  [n/a ] methods      model_comparison_protocol
+  [n/a ] results      leakage_check
+  [n/a ] results      sensitivity_analysis
+  [n/a ] results      results_assessment
+  [n/a ] discussion   discussion_assessment
+  [n/a ] discussion   interpretation_limits
+  [n/a ] discussion   transferability_assessment
+
+$ research retrieval new PROB_000001 --term "AI-assisted communication participation collective attention relational engagement work" --project PRJ_A --home <home> --token-file <token-file>
+RET_000001 created (DRAFT): queries Q1; 0 proposed term(s) offered from the interpretations
+
+$ research retrieval search RET_000001 --project PRJ_A --home <home> --token-file <token-file>
+RET_000001 r2 searched on snapshot 523bbeb06c56: reading list 5 full text(s), 0 possibly relevant not read, 0 citation neighbour(s)
+
+$ research landscape build RET_000001 --versions all --project PRJ_A --home <home> --token-file <token-file>
+LAND_000001 built: 21 entries from 4 works (5 sources), 10 model call(s); inferences {'contradiction': 0, 'version_difference': 0, 'definitions_differ': 1}
+
+# With a landscape recorded, the first analytic step of the contract can run
+
+$ research domain next --spec LIB_DW_CRITICAL_SYNTHESIS --problem PROB_000001 --project PRJ_A --home <home>
+LIB_DW_CRITICAL_SYNTHESIS v0.1.0  study design: narrative_review  research purpose: critical_synthesis, theory_development
+Next: contribution_assessment, reconstruct_theories
+
+  [RUN ] contribution contribution_assessment
+  [RUN ] literature   reconstruct_theories
+  [wait] literature   reconstruct_constructs_assumptions
+           - step 'reconstruct_theories' is not run, needs SUCCEEDED
+  [wait] literature   compare_theories_and_scopes
+           - step 'reconstruct_constructs_assumptions' is not run, needs SUCCEEDED
+  [wait] literature   identify_tensions
+           - step 'compare_theories_and_scopes' is not run, needs SUCCEEDED
+  [wait] literature   search_recognition
+           - step 'identify_tensions' is not run, needs SUCCEEDED
+  [wait] discussion   propose_reconceptualizations
+           - step 'search_recognition' is not run, needs SUCCEEDED
+  [wait] discussion   discussion_assessment
+           - step 'search_recognition' is not run, needs SUCCEEDED
+
+$ research landscape show LAND_000001 --project PRJ_A --home <home>
+LAND_000001 r1 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  inquiry: purpose critical_synthesis, theory_development; design narrative_review; evidence conceptual_argument, textual_evidence; discipline management/organizational_communication
+  4 of 4 works read (5 sources, versions: all); 21 entries {'boundary': 1, 'construct': 6, 'design': 1, 'finding': 1, 'mechanism': 1, 'method_limitation': 1, 'stated_assumption': 3, 'theoretical_claim': 4, 'theory': 3}; 0 possibly relevant papers not read
+  theory:
+    E001 SRC_ATT@1 (collective attention theory): Collective attention theory: a group's limited attention pool.
+        quote: "Collective attention theory holds that a group has a limited pool of attention that its members allocate to shared topics."  at SRC_ATT chars 203-325 (passage EP_SRC_ATT_THEORY_203)
+    E002 SRC_ENG1@1 (social exchange theory): Social exchange theory.
+        quote: "Relational engagement is developed here within social exchange theory."  at SRC_ENG1 chars 193-263 (passage EP_SRC_ENG1_THEORY_193)
+    E003 SRC_ENG2@1 (social exchange theory): Social exchange theory.
+        quote: "Relational engagement is developed here within social exchange theory."  at SRC_ENG2 chars 193-263 (passage EP_SRC_ENG2_THEORY_193)
+  construct:
+    E004 SRC_AI@1 (sender effort): Sender effort: perceived time and thought invested by the sender.
+        quote: "We define sender effort as the perceived time and thought invested by the sender."  at SRC_AI chars 198-279 (passage EP_SRC_AI_THEORY_198)
+    E005 SRC_AI@1 (communicative participation): Participation: sending a message in the shared channel.
+        quote: "Participation here means sending a message in the shared channel."  at SRC_AI chars 280-345 (passage EP_SRC_AI_THEORY_280)
+    E006 SRC_ATT@1 (collective attention): Collective attention: shared allocation of a group's limited attention.
+        quote: "We define collective attention as the shared allocation of a group's limited attention to a common set of topics."  at SRC_ATT chars 326-439 (passage EP_SRC_ATT_THEORY_326)
+    E007 SRC_PART@1 (communicative participation): Communicative participation: contributing a message to a shared channel, whatever the effort.
+        quote: "We define communicative participation as contributing a message to a shared channel, regardless of the effort or intent behind it."  at SRC_PART chars 212-342 (passage EP_SRC_PART_THEORY_212)
+    E008 SRC_ENG1@1 (relational engagement): Relational engagement: felt investment in particular working relationships.
+        quote: "We define relational engagement as an employee's felt investment in particular working relationships."  at SRC_ENG1 chars 264-365 (passage EP_SRC_ENG1_THEORY_264)
+    E009 SRC_ENG2@1 (relational engagement): Relational engagement: felt investment in particular working relationships.
+        quote: "We define relational engagement as an employee's felt investment in particular working relationships."  at SRC_ENG2 chars 264-365 (passage EP_SRC_ENG2_THEORY_264)
+  mechanism:
+    E010 SRC_ATT@1 (attentional dilution): Attentional dilution lowers attention per message.
+        quote: "Attentional dilution: each additional message in a shared channel lowers the attention available per message."  at SRC_ATT chars 542-651 (passage EP_SRC_ATT_THEORY_542)
+  stated_assumption:
+    E011 SRC_ATT@1 (attention scarcity) [stated]: Attention is scarce and participation draws on one shared pool.
+        quote: "We assume that attention is scarce and that participation in a shared channel draws on the same pool."  at SRC_ATT chars 440-541 (passage EP_SRC_ATT_THEORY_440)
+    E012 SRC_ENG1@1 (engagement is expressed through effortful communication) [stated]: Engagement is expressed through effortful, attributable communication.
+        quote: "We assume that engagement is expressed through effortful, personally attributable communication."  at SRC_ENG1 chars 366-462 (passage EP_SRC_ENG1_THEORY_366)
+    E013 SRC_ENG2@1 (engagement is expressed through communication) [stated]: Engagement is expressed through attributable communication.
+        quote: "We assume that engagement is expressed through personally attributable communication."  at SRC_ENG2 chars 366-451 (passage EP_SRC_ENG2_THEORY_366)
+  design:
+    E014 SRC_AI@1: A vignette experiment with 240 employees randomising machine assistance.
+        quote: "We ran a vignette experiment with 240 employees, randomising whether a message was described as machine-assisted."  at SRC_AI chars 365-478 (passage EP_SRC_AI_LANDSCAPE_365)
+  theoretical_claim:
+    E015 SRC_ATT@1 (participation -> collective attention) [proposition]: More participation in a shared channel dilutes collective attention per message.
+        quote: "Greater participation in a shared channel dilutes collective attention per message."  at SRC_ATT chars 668-751 (passage EP_SRC_ATT_LANDSCAPE_668)
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E016 SRC_PART@1 (participation vs engagement) [critique]: Participation and relational engagement are distinct: participation can occur without personal investment.
+        quote: "We argue that communicative participation and relational engagement should be distinguished, because participation can occur without personal investment."  at SRC_PART chars 343-496 (passage EP_SRC_PART_LANDSCAPE_343)
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E017 SRC_ENG1@1 (communication -> engagement) [proposition]: Effortful personal communication builds relational engagement.
+        quote: "Effortful personal communication builds relational engagement between colleagues."  at SRC_ENG1 chars 479-560 (passage EP_SRC_ENG1_LANDSCAPE_479)
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E018 SRC_ENG2@1 (communication -> engagement) [proposition]: Effortful personal communication builds relational engagement.
+        quote: "Effortful personal communication builds relational engagement between colleagues."  at SRC_ENG2 chars 468-549 (passage EP_SRC_ENG2_LANDSCAPE_468)
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+  finding:
+    E019 SRC_AI@1 (machine assistance -> perceived sender effort) [negative]: Machine-assisted messages are rated lower in sender effort.
+        quote: "Recipients rate machine-assisted messages as lower in sender effort than unassisted messages."  at SRC_AI chars 490-583 (passage EP_SRC_AI_LANDSCAPE_490)
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E020 SRC_PART@1 (participation vs engagement): The distinction matters most where producing a message is cheap.
+        quote: "This distinction matters most where the cost of producing a message is low."  at SRC_PART chars 497-572 (passage EP_SRC_PART_LANDSCAPE_497)
+  method_limitation:
+    E021 SRC_AI@1: Vignettes describe single messages, not ongoing relationships.
+        quote: "The vignettes describe single messages, not ongoing working relationships."  at SRC_AI chars 599-673 (passage EP_SRC_AI_LANDSCAPE_599)
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 definitions_differ (wording) on "communicative participation": E005 (SRC_AI@1) vs E007 (SRC_PART@1); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+# Relations are proposals. The gate refuses what the evidence does not support, and says why
+
+$ research landscape propose LAND_000001 --project PRJ_A --home <home> --token-file <token-file>
+PROPOSED: 3 proposal(s) recorded (I002, I003, I004), 3 rejected
+  rejected theoretical_incompatibility ['E015', 'E017']: LEVELS_DIFFER: the entries are at different levels of analysis, so the theories are not incompatible; they may complement each other or meet at a boundary
+  rejected conceptual_divergence ['E007', 'E005']: MEANING_DIFFERENCE_REQUIRED: conceptual_divergence needs how the meaning differs, not only the wording
+  rejected conceptual_divergence ['E012', 'E013']: SAME_WORK: the entries come from one work (versions of it): a difference between versions is a version matter, not a relation between studies
+
+$ research landscape candidates LAND_000001 I003 --project PRJ_A --home <home>
+held full texts that match these words, best first; a match is a paper to read, not a finding that it addresses the tension
+  SRC_PART@1 score 2.94666 matched engagement, participation  (read for this landscape)  Participation Is Not Engagement
+  SRC_ATT@1 score 1.316194 matched participation  (read for this landscape)  Collective Attention as a Group Resource
+  SRC_AI@1 score 1.26157 matched participation  (read for this landscape)  Machine-Assisted Messages and Perceived Effort
+  SRC_ENG2@1 score 1.250978 matched engagement  (read for this landscape)  Relational Engagement at Work
+  SRC_ENG1@1 score 1.237472 matched engagement  (read for this landscape)  Relational Engagement at Work
+
+$ research landscape review LAND_000001 I003 CONFIRMED --reason "I read both papers; neither addresses low-effort messages." --project PRJ_A --home <home> --token-file <token-file>
+Error: MISSING_INFORMATION_NOT_ACKNOWLEDGED - this proposal lists information that is missing (whether either theory addresses low-effort messages): confirm only after reading it, and say so with acknowledge_missing / --acknowledge-missing
+(exit 1: refused, as intended)
+
+$ research landscape review LAND_000001 I003 CONFIRMED --reason "I read both papers; neither addresses low-effort messages." --acknowledge-missing --project PRJ_A --home <home> --token-file <token-file>
+LAND_000001 r3: I003 CONFIRMED
+
+# A conceptual claim is assessed on conceptual terms: a methods text is not a basis for it; logical analysis with a rival considered is
+
+$ research landscape assess LAND_000001 E015 --verdict SUPPORTED_WITHIN_SCOPE --criteria <criteria.json> --threats "[{"threat": "rival: attention is not one pool", "status": "addressed"}]" --rationale "Cited a methods text for a conceptual claim." --project PRJ_A --home <home> --token-file <token-file>
+LAND_000001 r4: E015 method assessment LIMITED (capped: no criterion rests on an accepted basis for a conceptual claim (theoretical_literature, logical_analysis))
+
+$ research landscape assess LAND_000001 E015 --verdict SUPPORTED_WITHIN_SCOPE --criteria <criteria.json> --threats "[{"threat": "rival: attention is not one pool", "status": "addressed"}]" --rationale "The derivation holds within group channels." --project PRJ_A --home <home> --token-file <token-file>
+LAND_000001 r5: E015 method assessment SUPPORTED_WITHIN_SCOPE
+
+$ research landscape link-reproduction LAND_000001 E015 --kind new_data --reference x --reason x --project PRJ_A --home <home> --token-file <token-file>
+Error: REPRODUCTION_NOT_APPLICABLE - E015 is a conceptual claim: it is not reproduced from data
+(exit 1: refused, as intended)
+
+$ research landscape show LAND_000001 --project PRJ_A --home <home>
+LAND_000001 r5 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  inquiry: purpose critical_synthesis, theory_development; design narrative_review; evidence conceptual_argument, textual_evidence; discipline management/organizational_communication
+  4 of 4 works read (5 sources, versions: all); 21 entries {'boundary': 1, 'construct': 6, 'design': 1, 'finding': 1, 'mechanism': 1, 'method_limitation': 1, 'stated_assumption': 3, 'theoretical_claim': 4, 'theory': 3}; 0 possibly relevant papers not read
+  theory:
+    E001 SRC_ATT@1 (collective attention theory): Collective attention theory: a group's limited attention pool.
+    E002 SRC_ENG1@1 (social exchange theory): Social exchange theory.
+    E003 SRC_ENG2@1 (social exchange theory): Social exchange theory.
+  construct:
+    E004 SRC_AI@1 (sender effort): Sender effort: perceived time and thought invested by the sender.
+    E005 SRC_AI@1 (communicative participation): Participation: sending a message in the shared channel.
+    E006 SRC_ATT@1 (collective attention): Collective attention: shared allocation of a group's limited attention.
+    E007 SRC_PART@1 (communicative participation): Communicative participation: contributing a message to a shared channel, whatever the effort.
+    E008 SRC_ENG1@1 (relational engagement): Relational engagement: felt investment in particular working relationships.
+    E009 SRC_ENG2@1 (relational engagement): Relational engagement: felt investment in particular working relationships.
+  mechanism:
+    E010 SRC_ATT@1 (attentional dilution): Attentional dilution lowers attention per message.
+  stated_assumption:
+    E011 SRC_ATT@1 (attention scarcity) [stated]: Attention is scarce and participation draws on one shared pool.
+    E012 SRC_ENG1@1 (engagement is expressed through effortful communication) [stated]: Engagement is expressed through effortful, attributable communication.
+    E013 SRC_ENG2@1 (engagement is expressed through communication) [stated]: Engagement is expressed through attributable communication.
+  design:
+    E014 SRC_AI@1: A vignette experiment with 240 employees randomising machine assistance.
+  theoretical_claim:
+    E015 SRC_ATT@1 (participation -> collective attention) [proposition]: More participation in a shared channel dilutes collective attention per message.
+        conceptual claim · reading AUTHOR_REPORTED · inference METHOD_CRITICALLY_ASSESSED (SUPPORTED_WITHIN_SCOPE) · reproduction NOT_APPLICABLE
+    E016 SRC_PART@1 (participation vs engagement) [critique]: Participation and relational engagement are distinct: participation can occur without personal investment.
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E017 SRC_ENG1@1 (communication -> engagement) [proposition]: Effortful personal communication builds relational engagement.
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E018 SRC_ENG2@1 (communication -> engagement) [proposition]: Effortful personal communication builds relational engagement.
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+  finding:
+    E019 SRC_AI@1 (machine assistance -> perceived sender effort) [negative]: Machine-assisted messages are rated lower in sender effort.
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E020 SRC_PART@1 (participation vs engagement): The distinction matters most where producing a message is cheap.
+  method_limitation:
+    E021 SRC_AI@1: Vignettes describe single messages, not ongoing relationships.
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 definitions_differ (wording) on "communicative participation": E005 (SRC_AI@1) vs E007 (SRC_PART@1); not reviewed by you
+  proposals (not derived by rule; none is established until you decide):
+    I002 complementarity on "levels of analysis" [model_proposed; suite_proposed:model:scripted-synthesiser]: E015 (SRC_ATT@1) vs E017 (SRC_ENG1@1); UNCONFIRMED; NOT_FOUND_IN_REVIEWED_SET; missing: whether the effects interact
+    I003 conceptual_divergence on "what participation presupposes" [model_proposed; suite_proposed:model:scripted-synthesiser]: E011 (SRC_ATT@1) vs E012 (SRC_ENG1@1); CONFIRMED_BY_RESEARCHER; ADDRESSED_IN_REVIEWED_LITERATURE: SRC_PART@1; missing: whether either theory addresses low-effort messages
+    I004 implied_assumption on "observable effort" [model_proposed; suite_proposed:model:scripted-synthesiser]: Recipients can tell how much effort a message took. (reasoning: If effortful communication signals engagement, recipients must be able to perceive effort; the authors do not say so.); UNCONFIRMED
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+$ research export landscape LAND_000001 --out <export-a> --project PRJ_A --home <home>
+exported to <export-a> (closure 9aaac0516dde): evidence_table.csv, manifest.json, relations.csv, research_landscape.md, works_and_versions.csv
+
+$ research export verify <export-a> --project PRJ_A --home <home>
+VERIFIED
+
+----- research_landscape.md: relations and proposals (excerpt) -----
+## Inquiry
+
+Research purpose: critical_synthesis, theory_development; design: narrative_review; evidence: conceptual_argument, textual_evidence; discipline: management/organizational_communication. These are four separate facts; none was inferred from another.
+## Suite inferences derived by rule
+
+Derived by the suite from the entries above, by a stated rule and without a model; at most PROVISIONAL. Whether the studies overlap in population, period and estimand is not assessed: the conditions each paper states are listed so that you can judge. `definitions_differ` observes wording only and says nothing about meaning.
+
+| id | kind | derivation | provenance | relationship | sides (entry, Source@revision, direction, level) | status | confirmation | recognition in the reviewed set | conditions each side states | missing information | needs reassessment | class |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| I001 | definitions_differ (wording) | rule | rule:deterministic:landscape.contradictions@1 | communicative participation | E005 SRC_AI@1; E007 SRC_PART@1 | PROVISIONAL | UNCONFIRMED (not reviewed by you) | - | - | - | - | data_derived |
+
+
+## Proposed relations between studies (not derived by rule; not confirmed)
+
+Each is a proposal by a model, by you or by a critic, checked by a gate (the claims it concerns, what they share, how they differ, why, what is missing). It stays UNCONFIRMED until you decide, with a reason. The suite makes no claim that a tension is new: it lists the reviewed papers that address it, or says that none was found in the reviewed set.
+
+| id | kind | derivation | provenance | relationship | sides (entry, Source@revision, direction, level) | status | confirmation | recognition in the reviewed set | conditions each side states | missing information | needs reassessment | class |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+
+## Assumptions proposed by the suite or a critic (not stated by the authors)
+
+These are not entries: no author wrote them. Each rests on the entries named, with the reasoning given, and is UNCONFIRMED until you decide.
+
+| id | derivation | provenance | rests on (entry, Source@revision) | proposed assumption | reasoning | status | confirmation | needs reassessment | class |
+|---|---|---|---|---|---|---|---|---|---|
+| I004 | model_proposed | suite_proposed:model:scripted-synthesiser | E012 SRC_ENG1@1 | Recipients can tell how much effort a message took. | If effortful communication signals engagement, recipients must be able to perceive effort; the authors do not say so. | PROPOSED | UNCONFIRMED | - | model_synthesised |
+
+
+==============================================================================================================
+# PILOT B: education (agentic AI). A conceptual paper on assessment validity and a qualitative design-research paper.
+==============================================================================================================
+
+$ research problem new --statement "Students use agentic development environments to produce complete dashboards and reports, but the traces of their checking and their ability to judge the work may not correspond to the quality of the product." --kind puzzle --purpose evaluation --purpose methodological_improvement --design conceptual --evidence-form conceptual_argument --evidence-form qualitative_interpretation --domain education --subfield design_based_research --project PRJ_B --home <home> --token-file <token-file>
+PROB_000001 created (OPEN); interpretations: none yet
+
+# Two directions, two execution contracts. Neither has an estimation or identification step
+
+$ research domain next --spec LIB_DW_CONCEPTUAL_ARGUMENT --problem PROB_000001 --project PRJ_B --home <home>
+LIB_DW_CONCEPTUAL_ARGUMENT v0.1.0  study design: conceptual  research purpose: evaluation, methodological_improvement
+Next: contribution_assessment, state_argument, literature_assessment
+
+  [RUN ] contribution contribution_assessment
+  [RUN ] contribution state_argument
+  [RUN ] literature   literature_assessment
+  [wait] literature   reconstruct_inference_chain
+           - step 'state_argument' is not run, needs SUCCEEDED
+  [wait] literature   rival_explanations
+           - step 'reconstruct_inference_chain' is not run, needs SUCCEEDED
+  [wait] discussion   boundary_conditions
+           - step 'rival_explanations' is not run, needs SUCCEEDED
+  [wait] discussion   discussion_assessment
+           - step 'rival_explanations' is not run, needs SUCCEEDED
+
+$ research domain next --spec LIB_DW_QUALITATIVE_INQUIRY --study-design design_based --research-purpose interpretation --project PRJ_B --home <home>
+LIB_DW_QUALITATIVE_INQUIRY v0.1.0  study design: design_based  research purpose: interpretation
+Next: contribution_assessment, literature_assessment, sampling_rationale
+
+  [RUN ] contribution contribution_assessment
+  [RUN ] literature   literature_assessment
+  [RUN ] methods      sampling_rationale
+  [wait] methods      data_generation_protocol
+           - step 'sampling_rationale' assessment is not run, needs at least PROVISIONAL
+  [wait] methods      coding_and_interpretation
+           - step 'data_generation_protocol' is not run, needs SUCCEEDED
+  [wait] methods      alternative_interpretations
+           - step 'coding_and_interpretation' is not run, needs SUCCEEDED
+  [wait] methods      credibility_checks
+           - step 'alternative_interpretations' is not run, needs SUCCEEDED
+  [wait] discussion   discussion_assessment
+           - step 'credibility_checks' is not run, needs SUCCEEDED
+
+$ research retrieval new PROB_000001 --term "agentic AI students dashboards reports verification evaluative judgement assessment validity" --project PRJ_B --home <home> --token-file <token-file>
+RET_000001 created (DRAFT): queries Q1; 0 proposed term(s) offered from the interpretations
+
+$ research retrieval search RET_000001 --project PRJ_B --home <home> --token-file <token-file>
+RET_000001 r2 searched on snapshot f991d6078bbd: reading list 2 full text(s), 0 possibly relevant not read, 0 citation neighbour(s); BELOW THE FLOOR
+
+$ research landscape build RET_000001 --project PRJ_B --home <home> --token-file <token-file>
+LAND_000001 built: 10 entries from 2 works (2 sources), 4 model call(s); inferences {'contradiction': 0, 'version_difference': 0, 'definitions_differ': 0}
+
+$ research landscape show LAND_000001 --project PRJ_B --home <home>
+LAND_000001 r1 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  inquiry: purpose evaluation, methodological_improvement; design conceptual; evidence conceptual_argument, qualitative_interpretation; discipline education/design_based_research
+  2 of 2 works read (2 sources, versions: retrieved); 10 entries {'boundary': 2, 'construct': 1, 'design': 1, 'interpretive_finding': 2, 'method_limitation': 1, 'stated_assumption': 1, 'theoretical_claim': 2}; 0 possibly relevant papers not read
+  construct:
+    E001 SRC_VAL@1 (evaluative judgement): Evaluative judgement: the capability to decide on the quality of work.
+  stated_assumption:
+    E002 SRC_VAL@1 (validity concerns inferences about learners) [stated]: Assessment validity concerns inferences about learners, not artifacts.
+  design:
+    E003 SRC_MON@1: Design-based study, two course iterations, twelve interviews.
+  theoretical_claim:
+    E004 SRC_VAL@1 (artifact completion -> evaluative judgement) [proposition]: Artifact completion alone does not support an inference about evaluative judgement.
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E005 SRC_VAL@1 (assessment of agentic work) [proposition]: Assessing agentic work needs evidence of how learners checked and revised delegated output.
+        conceptual claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+  interpretive_finding:
+    E006 SRC_MON@1 (checking by execution): Students checked agent output by whether it ran rather than whether it was correct.
+        interpretive claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+    E007 SRC_MON@1 (specification stability): Most students rarely revised the task specification after first delegation.
+        interpretive claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+  boundary:
+    E008 SRC_MON@1 (checking by execution): Participants were second-year students in one programme at one institution.
+    E009 SRC_VAL@1 (artifact completion -> evaluative judgement): Not applicable where the tool's contribution is fixed and recorded in advance.
+  method_limitation:
+    E010 SRC_MON@1: Interview accounts may differ from what students did.
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+$ research landscape propose LAND_000001 --project PRJ_B --home <home> --token-file <token-file>
+PROPOSED: 1 proposal(s) recorded (I001), 0 rejected
+
+# An interpretive claim: credibility, alternative readings and reflexivity are considerations, not identification or robustness
+
+$ research landscape assess LAND_000001 E006 --verdict SUPPORTED_WITHIN_SCOPE --criteria <criteria.json> --threats "[{"threat": "alternative reading: checking by habit rather than by design", "status": "addressed"}]" --rationale "Transparent, with reflexivity; one institution only." --project PRJ_B --home <home> --token-file <token-file>
+LAND_000001 r3: E006 method assessment SUPPORTED_WITHIN_SCOPE
+
+# What the suite will not conclude: a completed artifact is not evidence of learning, and no proposal is established
+
+  E004 conceptual: Artifact completion alone does not support an inference about evaluative judgement.
+     reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_APPLICABLE
+  E006 interpretive: Students checked agent output by whether it ran rather than whether it was correct.
+     reading AUTHOR_REPORTED · inference METHOD_CRITICALLY_ASSESSED (SUPPORTED_WITHIN_SCOPE, interpretive route) · reproduction NOT_APPLICABLE
+  proposals: I001 complementarity UNCONFIRMED
+
+==============================================================================================================
+# PILOT C: archival / predictive modeling (financial-reporting fraud detection). The empirical gates are kept.
+==============================================================================================================
+
+$ research problem new --statement "Financial reporting fraud is hard to detect with models whose evaluation may depend on how fraud labels are dated and how the data are split in time." --purpose prediction --design predictive_modeling --evidence-form empirical_results --domain accounting --subfield archival_financial_reporting --project PRJ_C --home <home> --token-file <token-file>
+PROB_000001 created (OPEN); interpretations: none yet
+
+$ research domain next --spec LIB_DW_ACC_FRAUD_DETECTION --problem PROB_000001 --project PRJ_C --home <home>
+LIB_DW_ACC_FRAUD_DETECTION v0.1.0  study design: predictive_modeling  research purpose: prediction
+Next: contribution_assessment, literature_assessment
+
+  [RUN ] contribution contribution_assessment
+  [RUN ] literature   literature_assessment
+  [wait] methods      label_provenance
+           - no Dataset with {'data_role': 'label_source'} is recorded
+           - needs 1 EvidencePassage with {'topic': 'label_definition'} (how the fraud label is defined, dated and sourced); 0 recorded
+  [wait] methods      sample_construction
+           - step 'label_provenance' assessment is not run, needs at least PROVISIONAL
+           - needs 1 Dataset with {'data_role': 'sample'} (the sample frame); 0 recorded
+  [wait] methods      feature_construction
+           - step 'sample_construction' is not run, needs SUCCEEDED
+  [wait] methods      temporal_validation_design
+           - step 'feature_construction' assessment is not run, needs at least PROVISIONAL
+  [wait] methods      imbalance_aware_evaluation
+           - step 'temporal_validation_design' assessment is not run, needs at least PROVISIONAL
+  [wait] methods      model_comparison_protocol
+           - step 'imbalance_aware_evaluation' assessment is not run, needs at least PROVISIONAL
+  [wait] results      leakage_check
+           - step 'model_comparison_protocol' assessment is not run, needs at least PROVISIONAL
+           - step 'model_comparison_protocol' assessment is not run, needs at least PROVISIONAL
+  [wait] results      sensitivity_analysis
+           - step 'leakage_check' is not run, needs SUCCEEDED
+           - step 'model_comparison_protocol' assessment is not run, needs at least PROVISIONAL
+  [wait] results      results_assessment
+           - step 'sensitivity_analysis' is not run, needs SUCCEEDED
+           - step 'model_comparison_protocol' assessment is not run, needs at least PROVISIONAL
+  [wait] discussion   discussion_assessment
+           - step 'sensitivity_analysis' is not run, needs SUCCEEDED
+  [wait] discussion   interpretation_limits
+           - step 'sensitivity_analysis' is not run, needs SUCCEEDED
+  [wait] discussion   transferability_assessment
+           - step 'interpretation_limits' assessment is not run, needs at least PROVISIONAL
+           - step 'sensitivity_analysis' is not run, needs SUCCEEDED
+
+$ research retrieval new PROB_000001 --term "financial reporting fraud detection model evaluation labels temporal split leakage" --project PRJ_C --home <home> --token-file <token-file>
+RET_000001 created (DRAFT): queries Q1; 0 proposed term(s) offered from the interpretations
+
+$ research retrieval search RET_000001 --project PRJ_C --home <home> --token-file <token-file>
+RET_000001 r2 searched on snapshot f31eb5c799d2: reading list 3 full text(s), 0 possibly relevant not read, 0 citation neighbour(s)
+
+$ research landscape build RET_000001 --project PRJ_C --home <home> --token-file <token-file>
+LAND_000001 built: 10 entries from 3 works (3 sources), 6 model call(s); inferences {'contradiction': 3, 'version_difference': 0, 'definitions_differ': 0}
+
+$ research landscape show LAND_000001 --project PRJ_C --home <home>
+LAND_000001 r1 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  inquiry: purpose prediction; design predictive_modeling; evidence empirical_results; discipline accounting/archival_financial_reporting
+  3 of 3 works read (3 sources, versions: retrieved); 10 entries {'design': 3, 'finding': 3, 'identifying_assumption': 1, 'measurement': 1, 'method_limitation': 2}; 0 possibly relevant papers not read
+  design:
+    E001 SRC_FLAT@1: Regularised logistic model on a panel of listed firms.
+    E002 SRC_OTS@1: Gradient boosting on firm-year ratios, evaluated on later years only.
+    E003 SRC_RND@1: Stratified random splits of one firm-year panel.
+  measurement:
+    E004 SRC_OTS@1 (fraud label): Fraud label from enforcement releases, dated by release.
+  identifying_assumption:
+    E005 SRC_OTS@1 [testing_not_stated]: Firms never flagged are not fraudulent.
+  finding:
+    E006 SRC_FLAT@1 (out-of-time evaluation -> average precision) [null]: Detection accuracy does not depend on the split choice.
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E007 SRC_OTS@1 (out-of-time evaluation -> average precision) [negative]: Average precision falls from 0.31 (random splits) to 0.12 (out-of-time splits).
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E008 SRC_RND@1 (out-of-time evaluation -> average precision) [positive]: Out-of-time splits raise average precision by 0.04 relative to random splits.
+        empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  method_limitation:
+    E009 SRC_OTS@1: Only detected fraud is labelled; undetected fraud counts as non-fraud.
+    E010 SRC_RND@1: Restated-filing features contain information unavailable at the prediction date.
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 contradiction (null_vs_effect) on "out-of-time evaluation -> average precision": E006 (SRC_FLAT@1, null) vs E007 (SRC_OTS@1, negative); not reviewed by you
+    I002 contradiction (null_vs_effect) on "out-of-time evaluation -> average precision": E006 (SRC_FLAT@1, null) vs E008 (SRC_RND@1, positive); not reviewed by you
+    I003 contradiction (opposite_direction) on "out-of-time evaluation -> average precision": E007 (SRC_OTS@1, negative) vs E008 (SRC_RND@1, positive); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+# An empirical finding keeps the empirical rule: the paper's own description is not methodological literature, and an open threat caps the verdict
+
+$ research landscape assess LAND_000001 E007 --verdict SUPPORTED_WITHIN_SCOPE --criteria <criteria.json> --threats "[{"threat": "undetected fraud is labelled as non-fraud", "status": "open"}]" --rationale "Looks fine." --project PRJ_C --home <home> --token-file <token-file>
+LAND_000001 r2: E007 method assessment LIMITED (capped: no criterion rests on methodological literature (application papers alone do not show a design permits an inference); a threat is still open)
+

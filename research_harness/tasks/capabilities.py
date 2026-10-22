@@ -191,6 +191,28 @@ def _land_estimate(store: StateStore, inp: dict) -> dict:
     return _est(e["llm_calls"], e["input_tokens"], e["llm_calls"] * DEFAULT_OUTPUT_TOKENS, "heuristic: whole source text as input for each (source, protocol) not yet extracted; cached extractions cost 0")
 
 
+def _prop_run(ctx: Ctx, inp: dict) -> dict:
+    from research_harness.discovery import landscape as L
+    _need(inp, "landscape")
+    out = L.propose_relations(ctx.store, ctx.token, inp["landscape"], ctx.adapter, kinds=inp.get("kinds"))
+    if out["status"] == "FAILED":
+        raise KnowledgeError("PROPOSAL_FAILED", f"{out['reason']}: {out['message']}")
+    return {"landscape_id": inp["landscape"], "accepted": out["accepted"], "rejected": out["rejected"], "revision": out["revision"]}
+
+
+def _prop_pins(store: StateStore, inp: dict) -> list:
+    return _head_pin(store, inp.get("landscape"))
+
+
+def _prop_estimate(store: StateStore, inp: dict) -> dict:
+    from research_harness.discovery import landscape as L
+    from research_harness.discovery import relations as REL
+    if not inp.get("landscape") or not store.get_object(inp["landscape"]):
+        return _est(None, None, None, "unknown_landscape")
+    c = L.load_landscape(store, inp["landscape"])["content"]
+    return _est(1, estimate_tokens(REL.SYSTEM_PROMPT + REL.build_prompt(c, inp.get("kinds")))[0], DEFAULT_OUTPUT_TOKENS, "heuristic: the entries of the landscape as input, a typical answer as output")
+
+
 def _land_export_run(ctx: Ctx, inp: dict) -> dict:
     from pathlib import Path
     from research_harness.export.landscape import build_landscape_export
@@ -216,5 +238,6 @@ CAPABILITIES: dict[str, Capability] = {c.name: c for c in (
     Capability("export_methods", "1", False, _export_run, _export_pins, _ZERO, ("playbook",)),
     Capability("coverage_check", "1", False, _cov_run, _cov_pins, _ZERO),
     Capability("landscape_build", "1", True, _land_run, _land_pins, _land_estimate, ("retrieval_id",)),
+    Capability("landscape_propose", "1", True, _prop_run, _prop_pins, _prop_estimate, ("landscape",)),
     Capability("export_landscape", "1", False, _land_export_run, _land_export_pins, _ZERO, ("landscape",)),
 )}

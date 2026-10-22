@@ -52,3 +52,25 @@ Each item: what is wrong or untested today, where, how to show it, and what a fi
   cut in both lists is not shown. Whether a larger default `top_n` is worth the reading cost is an empirical question for a real corpus.
 * **Landscape entries join the ECA sampling pool.** Every landscape entry is a STANDARD statement sampled at the D15 rate; a large landscape therefore adds adjudication work. The
   coverage report already shows it; whether findings should default to HIGH once a candidate rests on them is decided in WP7 (`use_in_conclusion`).
+
+## B5. WP6.1: what is not validated, and what WP7 must change so that contribution generation fits each research genre (2026-10-23)
+
+Not validated (needs the researcher's materials, not more code): relation proposals, implied assumptions and the levels-of-analysis guard have only been run on invented papers and scripted models
+(`REAL_CORPUS_VALIDATION_PENDING`). A model can state levels of analysis that are wrong, or use a synonym ("team" for "group") that makes the guard disagree with the researcher; the researcher's `add-proposal` path
+does not apply the levels check for that reason. Whether the three execution contracts (`LIB_DW_CRITICAL_SYNTHESIS`, `LIB_DW_CONCEPTUAL_ARGUMENT`, `LIB_DW_QUALITATIVE_INQUIRY`) describe how a researcher in those traditions
+actually works is a question for such a researcher; they are `EXTRACTED` skeletons. The education profile (`workflows/profiles/education.py`) is still a quantitative-policy checklist.
+
+For WP7 (not started; blocked on the WP14 acceptance):
+
+1. **A candidate declares the kind of contribution it would make**, taken from the problem's inquiry and the claims it rests on: an empirical gap (a finding not yet reported for a scope), a conceptual one (a reconceptualisation
+   of a confirmed tension), an interpretive one, a methodological one. The checks that follow differ by kind (route considerations), and a candidate must say which claim kinds it rests on.
+2. **Candidates rest on confirmed relations, or say they do not.** A candidate built on a relation that is `UNCONFIRMED`, `needs_reassessment` or `ADDRESSED_IN_REVIEWED_LITERATURE` must show that state; a confirmed
+   `NOT_FOUND_IN_REVIEWED_SET` is only a statement about the reviewed set and cannot become "novel".
+3. **Pre-emption for conceptual candidates.** The WP14 precedence rules and truth table are written for empirical claims (a study that already found the result). For a conceptual candidate "pre-empted" means that a theory
+   already makes the argument; the researcher's expert cases must cover those, and the rules must be extended before WP8 (they are the researcher's to write; the suite does not fill them).
+4. **`use_in_conclusion` for landscape entries**: whether a theoretical claim or an interpretive finding that a candidate rests on becomes a HIGH ECA statement like a finding (decision for WP7).
+5. **The goal `discover_contribution` selects its execution contract from the problem's inquiry** (a spec whose `study_designs` and `research_purposes` match), and a project with no recorded inquiry is told so, not
+   defaulted to the regression workflow.
+6. **Currency propagates**: `needs_reassessment` on an inference must carry into every candidate that cites it.
+7. The ordering gap noticed in the critical-synthesis contract: redoing `identify_tensions` after a loop-back does not make `search_recognition` runnable again (the engine reopens a step only on a diagnostic signal); the
+   researcher records the step again by hand. A rule "redo downstream steps when an upstream decide step is redone" would need an engine change and is not part of WP6.1.

@@ -84,6 +84,7 @@ class DomainWorkflowSpec:
     exclusions: tuple = ()
     validation_status: str = "EXTRACTED"
     description: str = ""
+    research_purposes: tuple = ()        # the purposes the workflow covers; empty = any (not part of the dict or digest when empty)
 
     def step(self, step_id: str) -> StepSpec:
         for s in self.steps:
@@ -92,7 +93,7 @@ class DomainWorkflowSpec:
         raise KeyError(f"STEP_NOT_FOUND: {step_id}")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "id": self.id, "version": self.version, "domain": self.domain, "subfield": self.subfield,
             "study_designs": list(self.study_designs), "description": self.description,
             "stages": {n: {"applicable": s.applicable, "entry_conditions": list(s.entry_conditions),
@@ -103,6 +104,9 @@ class DomainWorkflowSpec:
                       for s in self.steps],
             "scope": self.scope, "exclusions": list(self.exclusions), "validation_status": self.validation_status,
         }
+        if self.research_purposes:       # a spec that does not use purposes keeps exactly the dict (and the digest, and every stored pin) it had
+            out["research_purposes"] = list(self.research_purposes)
+        return out
 
     def digest(self) -> str:
         return hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True).encode("utf-8")).hexdigest()
@@ -120,6 +124,7 @@ class DomainWorkflowSpec:
         of that stage depends on, so editing another stage does not invalidate it."""
         st = self.stages[stage]
         body = {"id": self.id, "version": self.version, "designs": list(self.study_designs),
+                **({"purposes": list(self.research_purposes)} if self.research_purposes else {}),
                 "stage": {"applicable": st.applicable, "entry": list(st.entry_conditions), "instructions": st.instructions},
                 "steps": [s for s in self.to_dict()["steps"] if s["stage"] == stage]}
         return hashlib.sha256(json.dumps(body, sort_keys=True).encode("utf-8")).hexdigest()
@@ -129,6 +134,7 @@ class DomainWorkflowSpec:
         try:
             taxonomy.validate_domain(data["domain"], data.get("subfield"))
             designs = tuple(taxonomy.validate_term("study_design", d) for d in data.get("study_designs", []))
+            purposes = tuple(taxonomy.validate_term("research_purpose", d) for d in data.get("research_purposes", []))
             stages: dict[str, StageSpec] = {}
             for name in STAGES:
                 raw = (data.get("stages") or {}).get(name, {})
@@ -167,7 +173,7 @@ class DomainWorkflowSpec:
                         _require(ref in ids, f"step {s.id}: predicate refers to unknown step '{ref}'")
             return cls(data["id"], data["version"], data["domain"], data.get("subfield"), designs, stages, tuple(steps),
                        dict(data.get("scope") or {}), tuple(data.get("exclusions") or ()),
-                       data.get("validation_status", "EXTRACTED"), data.get("description", ""))
+                       data.get("validation_status", "EXTRACTED"), data.get("description", ""), purposes)
         except (KeyError, taxonomy.TaxonomyError) as exc:
             raise SpecError(f"invalid domain workflow spec: {type(exc).__name__}: {exc}") from exc
 
@@ -181,7 +187,7 @@ def _require(cond: bool, message: str) -> None:
 # predicates
 # ---------------------------------------------------------------------------------------------------
 
-_PREDICATES = {"exists", "count_ge", "field_in", "study_design_in", "step_execution", "step_assessment",
+_PREDICATES = {"exists", "count_ge", "field_in", "study_design_in", "research_purpose_in", "step_execution", "step_assessment",
                "diagnostic_signal", "scope_matches", "all", "any", "not"}
 
 
@@ -199,6 +205,10 @@ def _check_predicate(p: Any) -> None:
         _require(isinstance(arg, list), "'study_design_in' needs a list")
         for d in arg:
             taxonomy.validate_term("study_design", d)
+    elif name == "research_purpose_in":
+        _require(isinstance(arg, list), "'research_purpose_in' needs a list")
+        for d in arg:
+            taxonomy.validate_term("research_purpose", d)
     elif name in {"exists", "count_ge", "field_in"}:
         _require(isinstance(arg, dict) and "type" in arg, f"'{name}' needs a 'type'")
         if name == "count_ge":
@@ -251,6 +261,11 @@ class ProjectFacts:
     study_design: Optional[str] = None
     scope: dict[str, Any] = field(default_factory=dict)
     steps: dict[str, StepState] = field(default_factory=dict)
+    research_purpose: Optional[str] = None
+    research_purposes: tuple = ()      # all the recorded purposes (a ResearchProblem may record several); `research_purpose` is one of them or the question's own
+
+    def purposes(self) -> set:
+        return set(self.research_purposes) | ({self.research_purpose} if self.research_purpose else set())
 
     def matching(self, otype: str, where: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
         out = []
@@ -263,7 +278,8 @@ class ProjectFacts:
         return out
 
 
-def facts_from_store(store: StateStore, *, research_question_id: Optional[str] = None, study_design: Optional[str] = None) -> ProjectFacts:
+def facts_from_store(store: StateStore, *, research_question_id: Optional[str] = None, study_design: Optional[str] = None,
+                     research_purpose: Optional[str] = None, problem_id: Optional[str] = None) -> ProjectFacts:
     """Snapshot the project: head objects, the research question's study design/scope, and domain step states."""
     objects, rq_content = [], {}
     with store.read() as conn:
@@ -285,8 +301,20 @@ def facts_from_store(store: StateStore, *, research_question_id: Optional[str] =
                     except ValueError:
                         diagnostics = {}
                 steps[r["domain_step_id"]] = StepState(r["execution_status"], r["assessment_status"], diagnostics, r["run_id"], seq)
-    return ProjectFacts(objects=objects, study_design=study_design or rq_content.get("study_design"),
-                        scope=dict(rq_content.get("scope") or {}), steps=steps)
+    inquiry: dict[str, Any] = {}
+    if not problem_id and research_question_id:      # a question promoted from a ResearchProblem keeps the problem's recorded inquiry
+        with store.read() as conn:
+            row = conn.execute("SELECT e.target_id FROM edges e JOIN object_heads h ON h.object_id=e.source_id AND h.head_revision=e.source_revision "
+                               "WHERE e.source_id=? AND e.relation='derived_from' AND e.provenance LIKE '%promoted_from%' ORDER BY e.rowid LIMIT 1", (research_question_id,)).fetchone()
+        problem_id = row[0] if row else None
+    if problem_id:                      # the kind of inquiry the researcher recorded on the ResearchProblem fills in what the question does not say
+        prob = store.get_object(problem_id)
+        if prob is None or prob["object_type"] != "ResearchProblem":
+            raise KeyError(f"PROBLEM_NOT_FOUND: {problem_id}")
+        inquiry = prob["content"].get("inquiry") or {}
+    return ProjectFacts(objects=objects, study_design=study_design or rq_content.get("study_design") or inquiry.get("research_design"),
+                        scope=dict(rq_content.get("scope") or {}), steps=steps, research_purpose=research_purpose or rq_content.get("research_purpose"),
+                        research_purposes=tuple(inquiry.get("research_purposes") or ()))
 
 
 @dataclass
@@ -309,6 +337,8 @@ def evaluate_predicate(p: dict, facts: ProjectFacts) -> Evaluation:
         return Evaluation(not inner.ok, f"not ({inner.reason})" if inner.ok else "")
     if name == "study_design_in":
         return Evaluation(facts.study_design in arg, f"study design is {facts.study_design or 'not recorded'}, needs one of {arg}")
+    if name == "research_purpose_in":
+        return Evaluation(bool(facts.purposes() & set(arg)), f"research purpose is {sorted(facts.purposes()) or 'not recorded'}, needs one of {arg}")
     if name == "exists":
         n = len(facts.matching(arg["type"], arg.get("where")))
         return Evaluation(n >= 1, f"no {arg['type']} with {arg.get('where') or 'any content'} is recorded")
@@ -383,6 +413,9 @@ def stage_status(spec: DomainWorkflowSpec, facts: ProjectFacts, stage: str) -> S
     if spec.study_designs and facts.study_design is not None and facts.study_design not in spec.study_designs:
         return StageEvaluation(stage, Applicability.NOT_APPLICABLE,
                                f"{spec.id} covers study designs {list(spec.study_designs)}, not '{facts.study_design}'", True, [])
+    if spec.research_purposes and facts.purposes() and not facts.purposes() & set(spec.research_purposes):
+        return StageEvaluation(stage, Applicability.NOT_APPLICABLE,
+                               f"{spec.id} covers research purposes {list(spec.research_purposes)}, not {sorted(facts.purposes())}", True, [])
     if st.applicable is False:
         return StageEvaluation(stage, Applicability.NOT_APPLICABLE, st.justification, True, [])
     if isinstance(st.applicable, dict):

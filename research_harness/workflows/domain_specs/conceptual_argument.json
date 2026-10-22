@@ -1,0 +1,32 @@
+{
+  "id": "LIB_DW_CONCEPTUAL_ARGUMENT",
+  "version": "0.1.0",
+  "domain": "cross_domain",
+  "subfield": "conceptual",
+  "study_designs": ["conceptual"],
+  "research_purposes": ["theory_development", "critical_synthesis", "evaluation", "methodological_improvement"],
+  "description": "Execution contract for a conceptual or methodological argument: state the argument, reconstruct the chain of inference it relies on, treat rival explanations, state the boundaries of applicability. It requires no dataset and applies no empirical standard to the argument; the argument is held to the standards of a conceptual claim (clarity, coherence, consistency of assumptions, rivals, boundaries). Independent of discipline. Status EXTRACTED.",
+  "stages": {
+    "contribution": {"applicable": true},
+    "literature": {"applicable": true},
+    "methods": {"applicable": false, "justification": "a conceptual argument has no data-collection or estimation stage; its analysis is the reconstruction and critique of the argument"},
+    "results": {"applicable": false, "justification": "a conceptual argument has no empirical results; what it offers is propositions, argued"},
+    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "rival_explanations", "is": "SUCCEEDED"}}]}
+  },
+  "steps": [
+    {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
+    {"id": "state_argument", "stage": "contribution", "kind": "decide", "title": "State the argument and what it concludes"},
+    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "reconstruct_inference_chain", "stage": "literature", "kind": "execute", "title": "Reconstruct the chain of inference and the assumptions it needs",
+     "entry_conditions": [{"step_execution": {"step": "state_argument", "is": "SUCCEEDED"}}]},
+    {"id": "rival_explanations", "stage": "literature", "kind": "review", "title": "Treat rival explanations and prior theory",
+     "entry_conditions": [{"step_execution": {"step": "reconstruct_inference_chain", "is": "SUCCEEDED"}}],
+     "on_condition": [{"when": {"diagnostic_signal": {"step": "rival_explanations", "diagnostic": "rival_unaddressed", "is": "CONCERN_INDICATED"}}, "goto": "reconstruct_inference_chain",
+                       "reason": "a rival explanation is not answered by the chain as reconstructed: reconstruct it again with the rival in view"}]},
+    {"id": "boundary_conditions", "stage": "discussion", "kind": "review", "title": "State the boundaries of applicability"},
+    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+  ],
+  "scope": {"study_design": "conceptual"},
+  "exclusions": [],
+  "validation_status": "EXTRACTED"
+}

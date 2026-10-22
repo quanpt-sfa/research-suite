@@ -31,6 +31,7 @@ from research_harness.workflows.status import Applicability, AssessmentStatus, C
 ROLES = ("owner", "author")
 KINDS = ("phenomenon", "puzzle", "disagreement", "unexpected_result", "practical_problem", "method_gap")
 ANSWER_KINDS = ("causal", "predictive", "descriptive", "conceptual", "measurement", "mixed")
+INQUIRY_KEYS = ("research_purposes", "research_design", "evidence_forms", "discipline")
 MAX_PROPOSALS = 8
 EXECUTOR = "problem_framing@1"
 
@@ -62,6 +63,32 @@ def load_problem(store: StateStore, problem_id: str) -> dict[str, Any]:
     if not o or o["object_type"] != "ResearchProblem":
         raise KnowledgeError("PROBLEM_NOT_FOUND", f"{problem_id} is not a ResearchProblem in this project")
     return o
+
+
+def normalize_inquiry(inquiry: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """The kind of inquiry, as four separate facts, none inferred from another: why (`research_purposes`), how (`research_design`, a study design), on what
+    evidence and with what kind of inference (`evidence_forms`), and in which field (`discipline`: domain and subfield). All optional; unknown keys and terms
+    outside the vocabularies are refused. The inquiry says nothing about which method to use and does not change what a retrieval query is made from."""
+    if inquiry is None:
+        return None
+    from research_harness import taxonomy
+    if not isinstance(inquiry, dict) or not inquiry or set(inquiry) - set(INQUIRY_KEYS):
+        raise KnowledgeError("INQUIRY_INVALID", f"an inquiry is an object with some of {INQUIRY_KEYS}")
+    out: dict[str, Any] = {}
+    try:
+        if inquiry.get("research_purposes") is not None:
+            out["research_purposes"] = [taxonomy.validate_term("research_purpose", x) for x in inquiry["research_purposes"]]
+        if inquiry.get("research_design") is not None:
+            out["research_design"] = taxonomy.validate_term("study_design", inquiry["research_design"])
+        if inquiry.get("evidence_forms") is not None:
+            out["evidence_forms"] = [taxonomy.validate_term("evidence_form", x) for x in inquiry["evidence_forms"]]
+        if inquiry.get("discipline") is not None:
+            d = inquiry["discipline"]
+            domain, sub = taxonomy.validate_domain(d["domain"], d.get("subfield"))
+            out["discipline"] = {"domain": domain, "subfield": sub}
+    except (taxonomy.TaxonomyError, KeyError, TypeError) as exc:
+        raise KnowledgeError("INQUIRY_INVALID", f"{type(exc).__name__}: {exc}") from exc
+    return out
 
 
 def _interpretation(iid: str, text: str, generated_by: str, status: str, **more: Any) -> dict[str, Any]:
@@ -103,7 +130,8 @@ def _write(store: StateStore, token: Optional[str], problem_id: str, build, oper
 # ------------------------------------------------------------------------------------------------ create and edit
 
 def new_problem(store: StateStore, token: Optional[str], *, statement: str, kind: str = "phenomenon", scope: Optional[dict[str, Any]] = None,
-                exclusions: Optional[list[str]] = None, interpretations: Optional[list[str]] = None, label: Optional[str] = None) -> dict[str, Any]:
+                exclusions: Optional[list[str]] = None, interpretations: Optional[list[str]] = None, label: Optional[str] = None,
+                inquiry: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """A problem in the researcher's words. No corpus, Introduction or question is needed; interpretations written here are the researcher's."""
     if kind not in KINDS:
         raise KnowledgeError("PROBLEM_KIND_UNKNOWN", f"kind must be one of {KINDS}")
@@ -112,11 +140,14 @@ def new_problem(store: StateStore, token: Optional[str], *, statement: str, kind
     texts = [t for t in (interpretations or []) if t and t.strip()]
     if len({_norm(t) for t in texts}) != len(texts):
         raise KnowledgeError("INTERPRETATION_DUPLICATE", "the same interpretation was given twice")
+    inq = normalize_inquiry(inquiry)
     with store.read() as conn:
         pid = next_numbered_id(conn, "PROB_", "ResearchProblem")
     content = {"label": (label or statement.strip())[:120], "kind": kind, "statement": statement.strip(), "scope": scope or {},
                "exclusions": list(exclusions or []), "interpretations": [_interpretation(f"I{i}", t, "researcher", "STATED") for i, t in enumerate(texts, 1)],
                "chosen_interpretations": [], "status": "OPEN", "promoted_to": [], "decisions": [], "generated_by": "researcher"}
+    if inq:
+        content["inquiry"] = inq
     with store.write_tx(token=token, require_roles=ROLES) as tx:
         res = tx.add_revision(object_id=pid, object_type="ResearchProblem", content=content, edges=[], expected_head=0,
                               origin=engine_origin("problem_new", tx.actor_id))
@@ -167,13 +198,14 @@ def choose(store: StateStore, token: Optional[str], problem_id: str, interpretat
 
 
 def revise_problem(store: StateStore, token: Optional[str], problem_id: str, *, rationale: str, statement: Optional[str] = None,
-                   scope: Optional[dict[str, Any]] = None, exclusions: Optional[list[str]] = None) -> dict[str, Any]:
+                   scope: Optional[dict[str, Any]] = None, exclusions: Optional[list[str]] = None, inquiry: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Reframe the problem: a new revision, never an edit in place. A new statement withdraws the choice of interpretations (what was chosen was a
     reading of the old statement); a change of scope or exclusions keeps it. Questions promoted from earlier revisions are flagged for review."""
     if not rationale or not rationale.strip():
         raise KnowledgeError("RATIONALE_REQUIRED", "say why the problem is being reframed")
-    if statement is None and scope is None and exclusions is None:
-        raise KnowledgeError("NOTHING_TO_REVISE", "give a new statement, scope or exclusions")
+    if statement is None and scope is None and exclusions is None and inquiry is None:
+        raise KnowledgeError("NOTHING_TO_REVISE", "give a new statement, scope, exclusions or inquiry")
+    inq = normalize_inquiry(inquiry)
     if statement is not None and len(statement.strip()) < 10:
         raise KnowledgeError("STATEMENT_REQUIRED", "state the problem in your own words (at least a sentence)")
     p = load_problem(store, problem_id)
@@ -192,8 +224,11 @@ def revise_problem(store: StateStore, token: Optional[str], problem_id: str, *, 
             new["scope"] = scope
         if exclusions is not None:
             new["exclusions"] = list(exclusions)
+        if inq is not None:
+            new["inquiry"] = inq
         new["decisions"] = _log(c, tx.at, tx.actor_id, "reframe", rationale.strip(), statement_changed=statement is not None and statement.strip() != c["statement"],
-                                scope_changed=scope is not None, exclusions_changed=exclusions is not None, choice_withdrawn=withdrawn)
+                                scope_changed=scope is not None, exclusions_changed=exclusions is not None, choice_withdrawn=withdrawn,
+                                **({"inquiry_changed": True} if inq is not None else {}))
         return new
 
     return _write(store, token, problem_id, build, "problem_revise", expected_head=p["revision"], invalidate=True)
@@ -348,6 +383,6 @@ def problem_view(store: StateStore, problem_id: str) -> dict[str, Any]:
         review = {rid: (conn.execute("SELECT scientific_review_status FROM object_status WHERE object_id=? AND revision=?",
                                      (rid, store.get_object(rid, conn=conn)["revision"])).fetchone() or [None])[0] for rid in c["promoted_to"]}
     return {"problem_id": problem_id, "revision": p["revision"], "kind": c["kind"], "status": c["status"], "statement": c["statement"], "scope": c["scope"],
-            "exclusions": c["exclusions"], "interpretations": c["interpretations"], "chosen": c["chosen_interpretations"], "promoted_to": c["promoted_to"],
+            "exclusions": c["exclusions"], "inquiry": c.get("inquiry"), "interpretations": c["interpretations"], "chosen": c["chosen_interpretations"], "promoted_to": c["promoted_to"],
             "questions_to_review": {rid: {"review_status": review[rid], "pinned_to_older_problem_revision": stale[rid]} for rid in c["promoted_to"]},
             "decisions": c["decisions"], "revisions": revs}

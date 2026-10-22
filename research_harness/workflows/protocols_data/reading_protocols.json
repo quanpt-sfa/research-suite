@@ -49,11 +49,11 @@
       ]
     },
     "RP_THEORY": {
-      "version": "2",
+      "version": "3",
       "label": "Theory and mechanism",
       "purpose": "Record the theory a paper invokes, the mechanism it assumes, how it defines its constructs and which assumptions it tests.",
       "dimension": "theory",
-      "instructions": "Report only what the paper states. Quote construct definitions verbatim. If the paper does not state an assumption or a mechanism, leave the field out and list it under gaps; do not infer one.",
+      "instructions": "Report only what the paper states. Quote construct definitions verbatim. If the paper does not state an assumption or a mechanism, leave the field out and list it under gaps; do not infer one. Conceptual papers name their sections after their ideas: read every section that is shown, not only the ones called theory.",
       "fields": [
         {
           "name": "theory_invoked",
@@ -85,7 +85,8 @@
           "required": false,
           "repeatable": true
         }
-      ]
+      ],
+      "include_unlabeled": true
     },
     "RP_METHOD": {
       "version": "4",
@@ -205,12 +206,13 @@
       ]
     },
     "RP_LANDSCAPE": {
-      "version": "1",
+      "version": "2",
       "label": "Landscape record",
-      "purpose": "Record what a paper reports, assumes, measures and admits, as entries of a landscape of the literature on a problem. The landscape compares papers; it never decides which of them is right.",
+      "purpose": "Record what a paper reports, argues, assumes, measures and admits, as entries of a landscape of the literature on a problem. A paper may be empirical, interpretive or conceptual: record only the kind of claim it actually makes. The landscape compares papers; it never decides which of them is right.",
       "dimension": "results",
       "extra_dimensions": [
         "introduction_argument",
+        "theory",
         "design",
         "sample_construction",
         "measurement",
@@ -219,7 +221,7 @@
         "conclusion"
       ],
       "include_unlabeled": true,
-      "instructions": "Report only what the paper states, with the words that state it. Each `value` restates only what its own `quote` says: no number, name or condition that is not in the quote. For a `finding`, put a short name for the relationship or quantity it concerns in `label` (for example \"detection model use -> manipulation\"; use the same name for the same relationship wherever it appears) and its direction in `type`: positive, negative, null (no effect found), mixed or descriptive. Do not compare the paper with other papers, do not say whether a finding is credible, and do not complete an assumption or a limitation the paper does not state; what it does not state is a gap.",
+      "instructions": "Report only what the paper states, with the words that state it. Each `value` restates only what its own `quote` says: no number, name or condition that is not in the quote. For an empirical `finding`, put a short name for the relationship or quantity it concerns in `label` (for example \"detection model use -> manipulation\"; use the same name for the same relationship wherever it appears) and its direction in `type`: positive, negative, null (no effect found), mixed or descriptive. For a `theoretical_claim` (a proposition, the conclusion of an argument, a critique of earlier work or a proposed reconceptualisation) name the idea it concerns in `label` and say which kind it is in `type`. For an `interpretive_finding` (a theme, pattern or interpretation the authors derive from qualitative material) name it in `label`. Use a field only when the paper makes that kind of claim: do not turn an argument into a finding or a finding into an argument. Do not compare the paper with other papers, do not say whether a claim is credible, and do not complete an assumption or a limitation the paper does not state; what it does not state is a gap.",
       "fields": [
         {
           "name": "finding",
@@ -234,6 +236,26 @@
             "mixed",
             "descriptive"
           ]
+        },
+        {
+          "name": "theoretical_claim",
+          "description": "a claim a conceptual or theoretical paper argues for: a proposition, the conclusion of an argument, a critique of earlier work, or a proposed reconceptualisation",
+          "required": false,
+          "repeatable": true,
+          "max_records": 8,
+          "types": [
+            "proposition",
+            "argument_conclusion",
+            "critique",
+            "reconceptualization"
+          ]
+        },
+        {
+          "name": "interpretive_finding",
+          "description": "an interpretation, theme or pattern the authors derive from qualitative material, as the sentence states it",
+          "required": false,
+          "repeatable": true,
+          "max_records": 8
         },
         {
           "name": "boundary_condition",

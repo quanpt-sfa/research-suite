@@ -87,7 +87,7 @@ def ok(pred, f):
 # ==================================================================================================
 
 def test_builtin_specs_load_and_validate():
-    assert list_builtin_specs() == ["LIB_DW_ACC_FRAUD_DETECTION", "LIB_DW_GENERIC"]
+    assert list_builtin_specs() == ["LIB_DW_ACC_FRAUD_DETECTION", "LIB_DW_CONCEPTUAL_ARGUMENT", "LIB_DW_CRITICAL_SYNTHESIS", "LIB_DW_GENERIC", "LIB_DW_QUALITATIVE_INQUIRY"]
     generic = load_builtin_spec(GENERIC_SPEC_ID)
     assert [s.id for s in generic.steps] == list(STAGES) and generic.study_designs == ()
     pilot = load_builtin_spec("LIB_DW_ACC_FRAUD_DETECTION")
@@ -467,7 +467,8 @@ def test_cli_domain_list_and_next(proj, capsys):
     add(proj, RQ, ("DS_L", "Dataset", {"data_role": "label_source"}, [("depends_on", "RQ_A", 1, {})]),
         ("EP_L", "EvidencePassage", {"topic": "label_definition", "locator": "p.1", "quote": "q"}, [("depends_on", "RQ_A", 1, {})]))
     assert cli_main(["domain", "list", "--json"]) == 0
-    assert {w["id"] for w in json.loads(capsys.readouterr().out)["domain_workflows"]} == {"LIB_DW_GENERIC", "LIB_DW_ACC_FRAUD_DETECTION"}
+    assert {w["id"] for w in json.loads(capsys.readouterr().out)["domain_workflows"]} == {
+        "LIB_DW_GENERIC", "LIB_DW_ACC_FRAUD_DETECTION", "LIB_DW_CRITICAL_SYNTHESIS", "LIB_DW_CONCEPTUAL_ARGUMENT", "LIB_DW_QUALITATIVE_INQUIRY"}
     base = ["--project", "PRJ_DOM", "--home", str(store.paths.home)]
     assert cli_main(["domain", "next", *base, "--spec", "LIB_DW_ACC_FRAUD_DETECTION", "--study-design", "predictive_modeling", "--json"]) == 0
     out = json.loads(capsys.readouterr().out)
