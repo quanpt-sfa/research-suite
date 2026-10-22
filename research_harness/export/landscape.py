@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from research_harness.discovery import inspection as INS
 from research_harness.discovery import landscape as L
 from research_harness.export import render as R
 from research_harness.export.contracts import DATA_DERIVED, EXPORTER_VERSION, MODEL_SYNTHESISED, RESEARCHER_CONFIRMED
@@ -29,7 +30,8 @@ def _dims(e: dict[str, Any]) -> tuple[str, str, str]:
     reading = ev["reading"]["value"] + (" (ECA found it not supported)" if ev["reading"]["disputed"] else "")
     if "inference" not in ev:                                                  # the other two dimensions are about findings
         return reading, "", ""
-    inf = ev["inference"]["value"] + (f": {ev['inference']['verdict']}" if ev["inference"].get("verdict") else "")
+    i = ev["inference"]
+    inf = i["value"] + (f": researcher's verdict {i['verdict']} ({i['route']}); suite's check of the basis {i['verification']['status']}" if i.get("verdict") else "")
     rep = ev["reproduction"]["value"]
     return reading, inf, rep
 
@@ -128,8 +130,9 @@ def build_landscape_export(store: StateStore, landscape_id: str) -> Export:
                  "; ".join(f"{s['entry']} {s['source_id']}@{s['source_revision']}" + (f" {s['direction']}" if s.get("direction") else "") + (f" [{i['levels'][s['entry']]}]" if i.get("levels", {}).get(s["entry"]) else "")
                            for s in i["sides"]),
                  i["status"], conf["state"] + (f" by {conf['by']}: {conf['reason']}" if conf.get("by") else " (not reviewed by you)"),
-                 (rec["status"] + ": " + "; ".join(f"{a['source_id']}@{a['source_revision']} ({a['how']}; \"{R.quote(a['quote'])}\" at {a['locator']})" for a in rec["addressed_by"]) if rec and rec["addressed_by"]
-                  else (rec["status"] if rec else "-")),
+                 ((rec["status"] + (" — " + rec["scope"] if rec.get("scope") else "") + ("; addressed by: " + "; ".join(f"{x['source_id']}@{x['source_revision']} ({R.quote(x['passages'][0]['quote']) if x['passages'] else x.get('note') or ''})" for x in rec["addressed_by"]) if rec["addressed_by"] else "")
+                   + ("; unverified model hint (nobody inspected it): " + ", ".join(h["source_id"] for h in rec["model_hints"]) if rec["status"] == "POTENTIAL_ADDRESSING_SOURCES" else "")
+                   + ("; " + " | ".join(rec["qualifications"]) if rec.get("qualifications") else "")) if rec else "-"),
                  why or "-", "; ".join(i["missing_information"]) or "-", "; ".join(i["needs_reassessment"]) or "-"])
 
     rule_inf = [i for i in infs if i["derivation"] == "rule"]
@@ -151,11 +154,26 @@ def build_landscape_export(store: StateStore, landscape_id: str) -> Export:
     doc.table(["id", "derivation", "provenance", "rests on (entry, Source@revision)", "proposed assumption", "reasoning", "status", "confirmation", "needs reassessment"],
               [(RELATION_CLASS.get(i["derivation"], MODEL_SYNTHESISED), [i["id"], i["derivation"], i["provenance"], "; ".join(f"{s['entry']} {s['source_id']}@{s['source_revision']}" for s in i["sides"]),
                                                                             i["text"], i["reasoning"], i["status"], i["confirmation"]["state"], "; ".join(i["needs_reassessment"]) or "-"]) for i in implied])
+    doc.add("## Recognition inspections", "", "An inspection is the researcher's reading of the sources that may already address a proposed tension. It supports a statement about the inspected set in its corpus "
+            "snapshot and nothing else: not the literature as a whole, and not novelty. A model's empty list of sources is not an inspection.", "")
+    for n in v["inspections"]:
+        st, quals = INS.status_of(n)
+        doc.add(f"### {n['id']} on {n['inference']}: {st}", "", f"Corpus snapshot {n['corpus_snapshot_id']}; terms: {', '.join(n['search']['terms']) or '-'}; {len(n['candidates'])} candidate(s), "
+                f"{len(n['results'])} inspected, uninspected: {', '.join(n['uninspected']) or 'none'}; cannot be inspected (no full text): {', '.join(n['unreadable']) or 'none'}. "
+                f"Decision by {n['decision']['by']} at {n['decision']['at']}: {n['decision']['rationale']}", "")
+        doc.table(["source (Source@revision)", "result", "inspected", "note", "evidence (verbatim)"],
+                  [(RESEARCHER_CONFIRMED, [f"{r['source_id']}@{r['source_revision']}", r["result"], r["inspected"], r["note"] or "-", "; ".join(f"\"{R.quote(p['quote'])}\" ({p['locator']})" for p in r["passages"]) or "-"])
+                   for r in n["results"]])
+        doc.add(*[f"- qualification: {q}" for q in quals], *[f"- limitation: {x}" for x in n["limitations"]], "")
     doc.add("## Method assessments you recorded", "", "Written by an author or owner; a model writes none. A verdict above LIMITED needs a basis of a kind the claim's route accepts "
             "(empirical: methodological literature; interpretive: methodological literature or textual evidence; conceptual: theoretical literature or logical analysis), every criterion met and "
-            "no open threat or rival.", "")
-    doc.table(["entry", "route", "verdict", "declared", "blockers", "criteria", "threats", "by", "rationale"],
+            "no open threat or rival. **The verdict is the researcher's judgement (RESEARCHER_ASSESSED, INFERENCE_JUDGMENT). The suite's check of the cited basis is shown apart: "
+            "BASIS_NOT_TRACEABLE (a sentence only; every assessment recorded before basis checking existed is shown so), BASIS_TRACEABLE, BASIS_CHECKED (deterministic checks passed; not a finding that the basis supports "
+            "the conclusion), BASIS_CHECK_FAILED, BASIS_STALE.**", "")
+    ver_by_entry = {e["id"]: e["layers"]["evidence"]["inference"] for e in v["entries"] if "inference" in e["layers"]["evidence"]}
+    doc.table(["entry", "route", "researcher's verdict", "declared", "blockers", "suite's check of the basis", "criteria (with each basis check)", "threats", "by", "rationale"],
               [(RESEARCHER_CONFIRMED, [a["entry"], a.get("route", "empirical"), a["verdict"], a["declared_verdict"], "; ".join(a["blockers"]) or "-",
+                                       (ver_by_entry[a["entry"]]["verification"]["status"] if ver_by_entry.get(a["entry"], {}).get("verdict") == a["verdict"] else "see the latest assessment of this entry"),
                                        "; ".join(f"{x['criterion']} [{x['met']}; basis: {x['basis']}" + (f", {x['basis_kind']}" if x.get("basis_kind") else "") + "]" for x in a["criteria"]),
                                        "; ".join(f"{t['threat']} [{t['status']}]" for t in a["threats"]) or "none checked", a["by"], a["rationale"]]) for a in c["assessments"]])
     doc.add("## Reproduction links you recorded", "")

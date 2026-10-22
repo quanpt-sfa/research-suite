@@ -109,7 +109,7 @@ LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
-        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (researcher's verdict LIMITED, empirical route; suite's check of the basis: NO_ACCEPTED_BASIS) · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
         empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
@@ -199,13 +199,13 @@ LAND_000002 r1 "All versions" from RET_000001 for PROB_000001
 # 6. export, and verification against the store
 
 $ research export landscape LAND_000001 --out <export-dir> --project PRJ_LAND --home <home>
-exported to <export-dir> (closure fd60eed3b8bb): evidence_table.csv, manifest.json, relations.csv, research_landscape.md, works_and_versions.csv
+exported to <export-dir> (closure fe69fbe91afb): evidence_table.csv, manifest.json, relations.csv, research_landscape.md, works_and_versions.csv
 
 $ research export verify <export-dir> --project PRJ_LAND --home <home>
 VERIFIED
 
 ----- research_landscape.md (first lines) -----
-<!-- research-suite export · landscape · LAND_000001@3 · closure fd60eed3b8bb · corpus f1d8b53a73e7 · exporter 1 -->
+<!-- research-suite export · landscape · LAND_000001@3 · closure fe69fbe91afb · corpus f1d8b53a73e7 · exporter 1 -->
 # Landscape LAND_000001: Landscape for PROB_000001
 
 retrieval run RET_000001: **CURRENT**; corpus snapshot f1d8b53a73e7c56c5c6c8475b6e9bf948a665102918736adfec80769f7e755a4: **CURRENT**; problem input (r1): **CURRENT**; search configuration: **CURRENT**; sources read: **CURRENT**
@@ -237,7 +237,7 @@ Evidence is cited at Source@revision; the work only groups papers for reading.
 
 | entry | paper (Source@revision) | relationship | direction | what it says | quote | where | reading | inference | reproduction | class |
 |---|---|---|---|---|---|---|---|---|---|---|
-| E008 | SRC_PAT@1 | detection model use -> manipulation | negative | Detection model use reduces discretionary accruals by 0.8 percentage points of assets. | Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets. | SRC_PAT chars 662-758 | READING_CONFIRMED | METHOD_CRITICALLY_ASSESSED: LIMITED | NOT_ATTEMPTED | researcher_confirmed |
+| E008 | SRC_PAT@1 | detection model use -> manipulation | negative | Detection model use reduces discretionary accruals by 0.8 percentage points of assets. | Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets. | SRC_PAT chars 662-758 | READING_CONFIRMED | METHOD_CRITICALLY_ASSESSED: researcher's verdict LIMITED (empirical); suite's check of the basis NO_ACCEPTED_BASIS | NOT_ATTEMPTED | researcher_confirmed |
 | E009 | SRC_QUINN@1 | DETECTION MODEL USE -> MANIPULATION | positive | Detection model use raises real earnings management by 1.2 percentage points of sales. | Firms facing a detection model increase real earnings management by 1.2 percentage points of sales. | SRC_QUINN chars 353-452 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
 
 # 7. the problem is reframed: the landscape (and the run it came from) no longer describe it
@@ -273,7 +273,7 @@ LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
   finding:
     E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
         quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
-        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+        empirical claim · reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (researcher's verdict LIMITED, empirical route; suite's check of the basis: NO_ACCEPTED_BASIS) · reproduction NOT_ATTEMPTED
     E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
         quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
         empirical claim · reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED

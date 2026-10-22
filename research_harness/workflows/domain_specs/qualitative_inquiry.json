@@ -1,21 +1,25 @@
 {
   "id": "LIB_DW_QUALITATIVE_INQUIRY",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "domain": "cross_domain",
   "subfield": null,
   "study_designs": ["qualitative_interview", "case_study", "design_based"],
   "research_purposes": ["interpretation", "evaluation", "theory_development", "explanation", "description"],
-  "description": "Execution contract for qualitative or design-based inquiry: sampling rationale, data generation, coding and interpretation (sent back to data generation when the interpretation is still moving), alternative interpretations, credibility checks including reflexivity. No statistical results stage and no statistical inference. Independent of discipline. Status EXTRACTED: it fixes order and conditions, not method content.",
+  "description": "Execution contract for qualitative, case-study and design-based inquiry. Its method is sampling, data generation, coding and interpretation, with alternative interpretations and credibility checks including reflexivity. Its findings are themes, patterns, interpretations, explanations or (for design-based research) design principles, each traceable to the material it rests on. It uses no statistical significance, regression robustness or causal identification as a default standard. A manuscript may present findings as a section of any name. Independent of discipline. Status EXTRACTED: order and conditions only.",
   "stages": {
-    "contribution": {"applicable": true},
-    "literature": {"applicable": true},
-    "methods": {"applicable": true},
-    "results": {"applicable": false, "justification": "qualitative and design-based inquiry has no separate statistical results stage; interpretation is part of the methods stage"},
-    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "credibility_checks", "is": "SUCCEEDED"}}]}
+    "contribution": {"applicable": true, "activity": "stating what the inquiry could add"},
+    "literature": {"applicable": true, "assessed_by": "steps", "activity": "positioning the inquiry in prior work", "manuscript": "background, or woven into the findings"},
+    "methods": {"applicable": true, "assessed_by": "steps", "activity": "sampling, data generation, coding and interpretation, and the checks of credibility", "manuscript": "a method section, or a methodological account within the study"},
+    "results": {"applicable": true, "assessed_by": "steps", "activity": "the findings: themes, patterns, interpretations, explanations or design principles, each traceable to the material it rests on",
+                "manuscript": "findings, analysis or case sections, in prose and excerpts; no coefficients are implied"},
+    "discussion": {"applicable": true, "assessed_by": "steps", "activity": "interpretation, transferability and the researcher's role in the findings",
+                   "entry_conditions": [{"step_execution": {"step": "findings", "is": "SUCCEEDED"}}]}
   },
   "steps": [
     {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
-    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
+    {"id": "positioning_in_prior_work", "stage": "literature", "kind": "review", "title": "Position the inquiry in prior work (a landscape of it, or the researcher's recorded account)",
+     "completed_by": {"when": {"exists": {"type": "Landscape"}}, "kind": "EXECUTED_BY_CAPABILITY"}},
+
     {"id": "sampling_rationale", "stage": "methods", "kind": "decide", "title": "Sampling rationale: why these participants, cases or iterations"},
     {"id": "data_generation_protocol", "stage": "methods", "kind": "plan", "title": "Data generation protocol",
      "entry_conditions": [{"step_assessment": {"step": "sampling_rationale", "at_least": "PROVISIONAL"}}]},
@@ -27,7 +31,21 @@
      "entry_conditions": [{"step_execution": {"step": "coding_and_interpretation", "is": "SUCCEEDED"}}]},
     {"id": "credibility_checks", "stage": "methods", "kind": "review", "title": "Credibility checks, including reflexivity about the researcher's role",
      "entry_conditions": [{"step_execution": {"step": "alternative_interpretations", "is": "SUCCEEDED"}}]},
-    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+
+    {"id": "findings", "stage": "results", "kind": "decide", "title": "Set out the findings: themes, patterns, interpretations or explanations (the research product)",
+     "entry_conditions": [{"step_execution": {"step": "coding_and_interpretation", "is": "SUCCEEDED"}}],
+     "completed_by": {"when": {"any": [{"exists": {"type": "Result", "where": {"attributes.result_kind": "theme"}}}, {"exists": {"type": "Result", "where": {"attributes.result_kind": "pattern"}}},
+                                       {"exists": {"type": "Result", "where": {"attributes.result_kind": "interpretation"}}}, {"exists": {"type": "Result", "where": {"attributes.result_kind": "explanation"}}}]},
+                      "kind": "DECLARED_IN_RECORD"}},
+    {"id": "findings_trace", "stage": "results", "kind": "review", "title": "Check that each finding can be traced to the material it rests on",
+     "entry_conditions": [{"step_execution": {"step": "findings", "is": "SUCCEEDED"}}],
+     "evidence_requirements": [{"type": "EvidencePassage", "min": 1, "about": "excerpts or other material the findings rest on"}]},
+    {"id": "design_principles", "stage": "results", "kind": "decide", "title": "State the design principles the iterations support (design-based research)",
+     "applicability": {"when": {"study_design_in": ["design_based"]}, "justification": "only design-based research states design principles"},
+     "entry_conditions": [{"step_execution": {"step": "findings", "is": "SUCCEEDED"}}],
+     "completed_by": {"when": {"exists": {"type": "Result", "where": {"attributes.result_kind": "design_principle"}}}, "kind": "DECLARED_IN_RECORD"}},
+
+    {"id": "transferability_and_role", "stage": "discussion", "kind": "review", "title": "Transferability of the findings and the researcher's role in them (recorded)"}
   ],
   "scope": {},
   "exclusions": [],

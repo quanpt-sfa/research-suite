@@ -28,15 +28,17 @@ from jsonschema import Draft202012Validator
 
 from research_harness import taxonomy
 from research_harness.core.canonical import canonical_json_hash
+from research_harness.discovery import basis as BAS
+from research_harness.discovery import inspection as INS
 from research_harness.discovery import relations as REL
 from research_harness.discovery import retrieval as RT
 from research_harness.discovery import text_index as X
 from research_harness.discovery.relations import PROPOSED_ONLY_KINDS  # noqa: F401  (re-exported)
 from research_harness.knowledge import corpus
-from research_harness.knowledge.common import KnowledgeError, engine_origin, next_numbered_id
+from research_harness.knowledge.common import KnowledgeError, engine_origin, id_fragment, next_numbered_id
 from research_harness.state import workflow_runs
 from research_harness.state.store import StateStore
-from research_harness.workflows import eca
+from research_harness.workflows import eca, quotes
 from research_harness.workflows import reading_protocols as rp
 from research_harness.workflows.adapters import ModelError, adapter_identity
 from research_harness.workflows.model_io import parse_model_output
@@ -85,8 +87,17 @@ def load_landscape(store: StateStore, landscape_id: str) -> dict[str, Any]:
     return o
 
 
+def _with_summary(c: dict[str, Any]) -> dict[str, Any]:
+    """Flat facts a workflow contract can ask about (`exists Landscape where ...`) without reading inside lists of records. Derived, rewritten on every revision."""
+    infs, insp = c.get("inferences") or [], c.get("inspections") or []
+    return {**c, "entry_categories": sorted({e["category"] for e in c["elements"]}), "has_proposals": any(i.get("derivation", "rule") != "rule" for i in infs),
+            "has_reviewed_inference": any(i.get("reviews") for i in infs), "has_inspection": bool(insp),
+            "has_completed_inspection": any(INS.status_of(x)[0] in ("ADDRESSED_IN_INSPECTED_SET", "NOT_FOUND_IN_INSPECTED_SET") for x in insp)}
+
+
 def _put(store: StateStore, token: Optional[str], landscape_id: str, content: dict[str, Any], operation: str, *, expected_head: int,
          edges: Optional[list] = None, run_row: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    content = _with_summary(content)
     with store.write_tx(token=token, require_roles=ROLES) as tx:
         if edges is None:
             head = tx.head(landscape_id)
@@ -109,6 +120,7 @@ def _write_with(store: StateStore, token: Optional[str], landscape_id: str, buil
         if content == cur["content"]:                  # nothing to record (for example every proposal was rejected): no new revision, but the run is still registered
             rid = workflow_runs.insert_run_tx(tx, run_row) if run_row is not None else None
             return {"landscape_id": landscape_id, "revision": cur["revision"], "run_id": rid}
+        content = _with_summary(content)
         rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?", (landscape_id, head["head_revision"])).fetchall()
         res = tx.add_revision(object_id=landscape_id, object_type="Landscape", content=content, expected_head=head["head_revision"],
                               edges=[(r[0], r[1], r[2], json.loads(r[3])) for r in rows], origin=engine_origin(operation, tx.actor_id))
@@ -390,7 +402,7 @@ def build(store: StateStore, token: Optional[str], retrieval_id: str, adapter: A
     content = {"label": label or f"Landscape for {rc['problem_id']}", "kind": "landscape", "state": "BUILT", "retrieval_id": retrieval_id, "retrieval_revision": run["revision"],
                "problem_id": rc["problem_id"], "problem_revision": rc["problem_revision"], "corpus_snapshot_id": rc.get("corpus_snapshot_id"), "versions_policy": versions,
                "protocols": [rp.get_protocol(p).pin for p in PROTOCOLS], "sources_read": sources_read, "works": works_info, "elements": elements, "inferences": inferences,
-               "construct_aliases": aliases or [], "assessments": carried["assessments"], "reproduction_links": carried["reproduction_links"], "carried_from": carry_from,
+               "construct_aliases": aliases or [], "assessments": carried["assessments"], "reproduction_links": carried["reproduction_links"], "carried_from": carry_from, "inspections": [],
                "inquiry": (problem_obj["content"].get("inquiry") if problem_obj else None),
                "coverage": coverage, "limits": limits, "edits": [], "generated_by": GENERATED_BY}
     edges = [("depends_on", retrieval_id, run["revision"], {"edge_kind": "landscape_from"})]
@@ -444,32 +456,25 @@ def _need_text(value: Optional[str], what: str) -> str:
 
 
 def review_inference(store: StateStore, token: Optional[str], landscape_id: str, inference_id: str, decision: str, reason: str, *, acknowledge_missing: bool = False) -> dict[str, Any]:
-    """The researcher's decision on a suite inference: CONFIRMED (the studies do conflict on overlapping scope), DISMISSED (they do not), or NEEDS_SCOPE. Recorded with
-    who and when; the inference itself stays PROVISIONAL and generated by the suite."""
+    """The researcher's decision on an inference or proposal: CONFIRMED (the studies do conflict on overlapping scope; the assumption is needed; the relation holds), DISMISSED,
+    or NEEDS_SCOPE. Recorded with who and when. The inference keeps what it is (rule-derived, or proposed by whom): confirming it does not change its provenance."""
     if decision not in ("CONFIRMED", "DISMISSED", "NEEDS_SCOPE"):
         raise KnowledgeError("DECISION_UNKNOWN", "decision must be CONFIRMED, DISMISSED or NEEDS_SCOPE")
     reason = _need_text(reason, "your reason")
-    cur = load_landscape(store, landscape_id)
-    c = cur["content"]
-    inf = next((i for i in c["inferences"] if i["id"] == inference_id), None)
-    if inf is None:
-        raise KnowledgeError("INFERENCE_UNKNOWN", f"{landscape_id} has no inference {inference_id}")
-    proposed = inf.get("derivation", "rule") != "rule"
-    if decision == "CONFIRMED" and proposed and inf.get("missing_information") and not acknowledge_missing:
-        raise KnowledgeError("MISSING_INFORMATION_NOT_ACKNOWLEDGED", "this proposal lists information that is missing (" + "; ".join(inf["missing_information"])
-                             + "): confirm only after reading it, and say so with acknowledge_missing / --acknowledge-missing")
-    with store.write_tx(token=token, require_roles=ROLES) as tx:
-        head = tx.get(landscape_id)
-        if head["revision"] != cur["revision"]:
-            raise KnowledgeError("STALE_REVISION", "the landscape changed while you were deciding")
+
+    def build(c: dict[str, Any], tx: Any) -> dict[str, Any]:
+        inf = next((i for i in c["inferences"] if i["id"] == inference_id), None)
+        if inf is None:
+            raise KnowledgeError("INFERENCE_UNKNOWN", f"{landscape_id} has no inference {inference_id}")
+        proposed = inf.get("derivation", "rule") != "rule"
+        if decision == "CONFIRMED" and proposed and inf.get("missing_information") and not acknowledge_missing:
+            raise KnowledgeError("MISSING_INFORMATION_NOT_ACKNOWLEDGED", "this proposal lists information that is missing (" + "; ".join(inf["missing_information"])
+                                 + "): confirm only after reading it, and say so with acknowledge_missing / --acknowledge-missing")
         rec = {"at": tx.at, "by": tx.actor_id, "decision": decision, "reason": reason, **({"acknowledged_missing": True} if acknowledge_missing and proposed else {})}
-        new = [{**i, "reviews": [*i["reviews"], rec]} if i["id"] == inference_id else i for i in c["inferences"]]
-        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
-                               (landscape_id, head["revision"])).fetchall()
-        res = tx.add_revision(object_id=landscape_id, object_type="Landscape", content={**c, "inferences": new}, expected_head=cur["revision"],
-                              edges=[(r[0], r[1], r[2], json.loads(r[3])) for r in rows], origin=engine_origin("landscape_review_inference", tx.actor_id))
-        tx.audit("landscape_review_inference", "RECORDED", {"landscape_id": landscape_id, "inference": inference_id, "decision": decision})
-    return {"landscape_id": landscape_id, "revision": res["revision"], "inference": inference_id, "decision": decision}
+        return {**c, "inferences": [{**i, "reviews": [*i["reviews"], rec]} if i["id"] == inference_id else i for i in c["inferences"]]}
+
+    out = _write_with(store, token, landscape_id, build, "landscape_review_inference")
+    return {"landscape_id": landscape_id, "revision": out["revision"], "inference": inference_id, "decision": decision}
 
 
 def _claim(c: dict[str, Any], entry_id: str) -> dict[str, Any]:
@@ -482,31 +487,27 @@ def _claim(c: dict[str, Any], entry_id: str) -> dict[str, Any]:
 
 
 def _append(store: StateStore, token: Optional[str], landscape_id: str, key: str, record: dict[str, Any], operation: str) -> dict[str, Any]:
-    cur = load_landscape(store, landscape_id)
-    c = cur["content"]
-    with store.write_tx(token=token, require_roles=ROLES) as tx:
-        head = tx.get(landscape_id)
-        if head["revision"] != cur["revision"]:
-            raise KnowledgeError("STALE_REVISION", "the landscape changed while you were writing")
-        rec = {**record, "at": tx.at, "by": tx.actor_id}
-        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?",
-                               (landscape_id, head["revision"])).fetchall()
-        res = tx.add_revision(object_id=landscape_id, object_type="Landscape", content={**c, key: [*c[key], rec]}, expected_head=cur["revision"],
-                              edges=[(r[0], r[1], r[2], json.loads(r[3])) for r in rows], origin=engine_origin(operation, tx.actor_id))
-        tx.audit(operation, "RECORDED", {"landscape_id": landscape_id, "entry": record["entry"]})
-    return {"landscape_id": landscape_id, "revision": res["revision"], "entry": record["entry"], "record": rec}
+    made: dict[str, Any] = {}
+
+    def build(c: dict[str, Any], tx: Any) -> dict[str, Any]:
+        made["rec"] = {**record, "at": tx.at, "by": tx.actor_id}
+        return {**c, key: [*c.get(key, []), made["rec"]]}
+
+    out = _write_with(store, token, landscape_id, build, operation)
+    return {"landscape_id": landscape_id, "revision": out["revision"], "entry": record.get("entry"), "record": made["rec"]}
 
 
 def _basis_kind(c: dict[str, Any]) -> Optional[str]:
     return c.get("basis_kind") or ("methodological_literature" if c.get("methodological_literature") else None)
 
 
-def method_verdict(declared: str, criteria: list[dict[str, Any]], threats: list[dict[str, Any]], route: str = "empirical") -> tuple[str, list[str]]:
+def method_verdict(declared: str, criteria: list[dict[str, Any]], threats: list[dict[str, Any]], route: str = "empirical", failed: Optional[dict[int, str]] = None) -> tuple[str, list[str]]:
     """The verdict an assessment may carry. `SUPPORTED_WITHIN_SCOPE` needs a criterion on a kind of basis the claim's route accepts (an empirical claim: methodological
     literature, as for `assess_validity`; a conceptual claim: theoretical literature or logical analysis; an interpretive claim: methodological literature or the textual
     evidence), every criterion met, at least one threat (for a conceptual or interpretive claim: rival explanation or alternative interpretation) checked and none open;
     otherwise it is stored as LIMITED with the blockers named. NOT_SUPPORTED needs a criterion marked met=no."""
     blockers: list[str] = []
+    failed = failed or {}
     if declared == "NOT_SUPPORTED":
         failing = [c for c in criteria if c["met"] == "no"]
         if not failing:
@@ -514,7 +515,9 @@ def method_verdict(declared: str, criteria: list[dict[str, Any]], threats: list[
         return "NOT_SUPPORTED", []
     if declared == "SUPPORTED_WITHIN_SCOPE":
         accepted = ROUTE_BASIS[route]
-        if not any(_basis_kind(c) in accepted for c in criteria):
+        if failed:
+            blockers.append("a cited basis failed its checks (" + "; ".join(failed.values()) + "): it does not count")
+        if not any(_basis_kind(c) in accepted and n not in failed for n, c in enumerate(criteria)):
             blockers.append("no criterion rests on methodological literature (application papers alone do not show a design permits an inference)" if route == "empirical" else
                             f"no criterion rests on an accepted basis for a {route} claim ({', '.join(accepted)})")
         if any(c["met"] != "yes" for c in criteria):
@@ -530,9 +533,13 @@ def method_verdict(declared: str, criteria: list[dict[str, Any]], threats: list[
 
 def assess_method(store: StateStore, token: Optional[str], landscape_id: str, entry_id: str, *, verdict: str, criteria: list[dict[str, Any]], threats: list[dict[str, Any]],
                   rationale: str, code_evidence: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
-    """The researcher's method assessment of one finding (A5 `inference`): does the paper's design permit the inference its finding draws? Criteria each name their
-    basis; threats each say whether addressed, scoped out or open. Written only by an author or owner; a model never writes one. The verdict stored is capped by
-    `method_verdict`."""
+    """The researcher's assessment of one claim (A5 `inference`): does the design, argument or interpretation permit what the claim draws from it? Criteria each name their
+    basis, in words and (optionally) as `basis_refs` ([{kind: source|passage, ref, revision, excerpt, supports_only}]) or an `argument` record ({premises, steps, conclusion,
+    rival_assumptions}); threats each say whether addressed, scoped out or open. Written only by an author or owner; a model never writes one.
+
+    Two things are kept apart. The **verdict** is the researcher's judgement (`RESEARCHER_ASSESSED`, `INFERENCE_JUDGMENT`), capped by `method_verdict`. The **verification** of the
+    cited basis is the suite's (`basis.py`) and is recomputed whenever the assessment is shown. A basis that failed its checks does not count toward `SUPPORTED_WITHIN_SCOPE`; a
+    basis that is only a sentence still counts, as before, and is shown as `BASIS_NOT_TRACEABLE`."""
     if verdict not in METHOD_VERDICTS:
         raise KnowledgeError("VERDICT_UNKNOWN", f"verdict must be one of {METHOD_VERDICTS}")
     rationale = _need_text(rationale, "your rationale")
@@ -545,6 +552,9 @@ def assess_method(store: StateStore, token: Optional[str], landscape_id: str, en
             raise KnowledgeError("CRITERION_MET_INVALID", "met is yes, no or unclear")
         if c.get("basis_kind") is not None and c["basis_kind"] not in taxonomy.vocabulary("basis_kind"):
             raise KnowledgeError("CRITERION_BASIS_KIND_INVALID", f"basis_kind must be one of {taxonomy.vocabulary('basis_kind')}")
+        bad = BAS.check_shape(c)
+        if bad:
+            raise KnowledgeError("BASIS_REFERENCE_INVALID", "; ".join(bad))
     for t in threats:
         if not (t.get("threat") or "").strip() or t.get("status") not in ("addressed", "scoped_out", "open"):
             raise KnowledgeError("THREAT_INVALID", "a threat has its wording and a status of addressed, scoped_out or open")
@@ -554,11 +564,13 @@ def assess_method(store: StateStore, token: Optional[str], landscape_id: str, en
     cur = load_landscape(store, landscape_id)
     entry = _claim(cur["content"], entry_id)
     route = CLAIM_KIND_OF[entry["category"]]
-    capped, blockers = method_verdict(verdict, criteria, threats, route)
+    per = BAS.verify_assessment(store, criteria, ROUTE_BASIS[route])["criteria"]
+    failed = {n: "; ".join(p["problems"]) for n, p in enumerate(per) if p["status"] == "BASIS_CHECK_FAILED"}
+    capped, blockers = method_verdict(verdict, criteria, threats, route, failed)
     rec = {"entry": entry_id, "route": route, "passage": [entry["author_claim"]["passage_id"], entry["author_claim"]["passage_revision"]], "declared_verdict": verdict, "verdict": capped,
            "blockers": blockers, "criteria": criteria, "threats": threats, "code_evidence": code_evidence or [], "rationale": rationale, "generated_by": "researcher"}
     out = _append(store, token, landscape_id, "assessments", rec, "landscape_assess_method")
-    return {**out, "verdict": capped, "blockers": blockers, "route": route}
+    return {**out, "verdict": capped, "blockers": blockers, "route": route, "verification": BAS.verify_assessment(store, criteria, ROUTE_BASIS[route])}
 
 
 def link_reproduction(store: StateStore, token: Optional[str], landscape_id: str, entry_id: str, *, kind: str, reason: str, package_id: Optional[str] = None,
@@ -632,12 +644,17 @@ def _reproduction(store: StateStore, links: list[dict[str, Any]]) -> dict[str, A
             "note": "" if value != "NOT_ATTEMPTED" else "the linked outputs were not all computed against the paper's value"}
 
 
-def _inference_dimension(assessments: list[dict[str, Any]], entry: dict[str, Any]) -> dict[str, Any]:
+def _inference_dimension(store: StateStore, assessments: list[dict[str, Any]], entry: dict[str, Any]) -> dict[str, Any]:
     mine = [a for a in assessments if a["entry"] == entry["id"] and a["passage"] == [entry["author_claim"]["passage_id"], entry["author_claim"]["passage_revision"]]]
     if not mine:
         return {"value": "NOT_ASSESSED"}
     a = mine[-1]
-    return {"value": "METHOD_CRITICALLY_ASSESSED", "route": a.get("route", "empirical"), "verdict": a["verdict"], "blockers": a["blockers"], "by": a["by"], "at": a["at"], "rationale": a["rationale"]}
+    route = a.get("route", "empirical")
+    ver = BAS.verify_assessment(store, a["criteria"], ROUTE_BASIS[route])
+    legacy = not any(c.get("basis_refs") or c.get("argument") for c in a["criteria"])
+    return {"value": "METHOD_CRITICALLY_ASSESSED", "route": route, "verdict": a["verdict"], "blockers": a["blockers"], "by": a["by"], "at": a["at"], "rationale": a["rationale"],
+            "assessed_by": "RESEARCHER_ASSESSED", "judgment": "INFERENCE_JUDGMENT", "verification": ver,
+            "verification_note": ("recorded without a traceable basis: shown as not traceable, not upgraded" if legacy else ver["meaning"])}
 
 
 def _reading_dimension(store: StateStore, landscape_id: str, entry_id: str) -> dict[str, Any]:
@@ -651,12 +668,17 @@ def _next_inference_id(inferences: list[dict[str, Any]]) -> str:
     return f"I{max((int(i['id'][1:]) for i in inferences), default=0) + 1:03d}"
 
 
-def _enrich_inference(store: StateStore, i: dict[str, Any], works_read: int, snapshot_now: str) -> dict[str, Any]:
-    i = {"derivation": "rule", "relation": i["kind"], "provenance": "rule:" + CONTRADICTIONS_BY, "missing_information": [], "levels": {}, "addressed_by": [], "text": None, "reasoning": None, **i}
-    deps, why = REL.dependencies(store, i, snapshot_now)
-    return {**i, "confirmation": REL.confirmation(i), "recognition": REL.recognition(i, works_read), "dependencies": {"sources": deps,
-            "corpus_snapshot": i.get("corpus_snapshot_at_proposal") if REL.recognition(i, 0) and REL.recognition(i, 0)["status"] == "NOT_FOUND_IN_REVIEWED_SET" else None},
-            "needs_reassessment": why}
+def _enrich_inference(store: StateStore, i: dict[str, Any], inspections: list[dict[str, Any]], snapshot_now: str) -> dict[str, Any]:
+    i = {"derivation": "rule", "relation": i["kind"], "provenance": "rule:" + CONTRADICTIONS_BY, "missing_information": [], "levels": {}, "addressed_by": [], "text": None, "reasoning": None,
+         "premises": [], "alternative_interpretations": [], **i}
+
+    def head(sid: str) -> Optional[int]:
+        o = store.get_object(sid)
+        return o["revision"] if o else None
+
+    rec = INS.recognition_view(i, inspections, snapshot_now, head)
+    deps, why = INS.dependencies(store, i, rec)
+    return {**i, "confirmation": REL.confirmation(i), "recognition": rec, "dependencies": {"sources": deps}, "needs_reassessment": why}
 
 
 def view(store: StateStore, landscape_id: str) -> dict[str, Any]:
@@ -667,18 +689,18 @@ def view(store: StateStore, landscape_id: str) -> dict[str, Any]:
         e = {"claim_kind": CLAIM_KIND_OF.get(e["category"]), "provenance": "author_stated", **e}
         evid: dict[str, Any] = {"reading": _reading_dimension(store, landscape_id, e["id"])}
         if e["category"] in CLAIM_KIND_OF:
-            evid["inference"] = _inference_dimension(c["assessments"], e)
+            evid["inference"] = _inference_dimension(store, c["assessments"], e)
             evid["reproduction"] = (_reproduction(store, [x for x in c["reproduction_links"] if x["entry"] == e["id"]]) if e["category"] == "finding"
                                     else {"value": "NOT_APPLICABLE", "note": f"a {e['claim_kind']} claim is not reproduced from data"})
         inf = [i["id"] for i in c["inferences"] if any(s["entry"] == e["id"] for s in i["sides"])]
         entries.append({**e, "layers": {"author_claim": e["author_claim"], "evidence": evid, "suite_inference": inf}})
-    works_read = sum(1 for w in c["works"].values() if w["read"])
+    inspections = c.get("inspections") or []
     snapshot_now = corpus.corpus_snapshot_id(store)
     return {"landscape_id": landscape_id, "revision": land["revision"], "label": c["label"], "retrieval_id": c["retrieval_id"], "problem_id": c["problem_id"],
             "problem_revision": c["problem_revision"], "corpus_snapshot_id": c["corpus_snapshot_id"], "versions_policy": c["versions_policy"], "protocols": c["protocols"],
             "inquiry": c.get("inquiry"), "considerations": CONSIDERATIONS,
             "currency": landscape_currency(store, c), "works": c["works"], "entries": entries, "construct_aliases": c["construct_aliases"],
-            "inferences": [_enrich_inference(store, i, works_read, snapshot_now) for i in c["inferences"]],
+            "inferences": [_enrich_inference(store, i, inspections, snapshot_now) for i in c["inferences"]], "inspections": inspections,
             "sources_read": c["sources_read"], "coverage": c["coverage"], "limits": c["limits"], "carried_from": c["carried_from"]}
 
 
@@ -768,21 +790,131 @@ def add_proposal(store: StateStore, token: Optional[str], landscape_id: str, pro
     return {**out, "inference": made["id"]}
 
 
-def tension_candidates(store: StateStore, landscape_id: str, inference_id: str, *, limit: int = 10) -> dict[str, Any]:
-    """Held full texts that may already address a proposed relation, found by words alone (BM25 over the stored sections, no model): the search terms of the proposal and its
-    topic. Each says whether it was read for this landscape. A match is a paper to read, not a finding that it addresses the tension."""
+def tension_candidates(store: StateStore, landscape_id: str, inference_id: str, *, limit: int = 10, terms: Optional[list[str]] = None) -> dict[str, Any]:
+    """Held sources that may already address a proposed relation, found by words alone (BM25 over the stored sections of full texts, and over title and abstract of the
+    others; no model): the proposal's search terms and topic, or the `terms` given. Each says whether it can be read at all, whether it was read for this landscape, and whether
+    a model hinted at it. **A match is a paper to read, not evidence that it addresses the tension, and a search that finds nothing is not evidence that nothing does.**"""
     c = load_landscape(store, landscape_id)["content"]
     i = next((x for x in c["inferences"] if x["id"] == inference_id), None)
     if i is None:
         raise KnowledgeError("INFERENCE_UNKNOWN", f"{landscape_id} has no inference {inference_id}")
-    terms = list(i.get("search_terms") or []) + ([i["relationship"]] if i.get("relationship") else [])
-    tokens = sorted(set(X.phrase_tokens(terms)))
+    use_terms = list(terms) if terms else list(i.get("search_terms") or []) + ([i["relationship"]] if i.get("relationship") else [])
+    tokens = sorted(set(X.phrase_tokens(use_terms)))
     index = RT.Index(store)
-    hits = index.rank("FULL_TEXT", tokens, max(1, int(limit)))
     read = {s["source_id"] for s in c["sources_read"]}
-    return {"inference": inference_id, "terms": terms, "tokens": tokens, "note": "held full texts that match these words, best first; a match is a paper to read, not a finding that it addresses the tension",
-            "candidates": [{"source_id": h["source_id"], "source_revision": index.sources[h["source_id"]]["revision"], "title": index.sources[h["source_id"]]["content"].get("title"),
-                            "score": h["score"], "matched_terms": h["matched"], "locator": h["locator"], "read_in_landscape": h["source_id"] in read} for h in hits]}
+    hinted = {a["source_id"] for a in i.get("addressed_by") or []}
+    cands: list[dict[str, Any]] = []
+    n = max(1, int(limit))
+    for tier in ("FULL_TEXT", "ABSTRACT_ONLY", "METADATA_ONLY"):
+        for rank, h in enumerate(index.rank(tier, tokens, n), 1):
+            src = index.sources[h["source_id"]]
+            cands.append({"source_id": h["source_id"], "source_revision": src["revision"], "title": src["content"].get("title"), "tier": tier, "readable": tier == "FULL_TEXT",
+                          "rank": rank, "score": h["score"], "matched_terms": h["matched"], "locator": h["locator"], "work_id": src["work_id"], "version_id": src["content"].get("version_id"),
+                          "read_in_landscape": h["source_id"] in read, "model_hint": h["source_id"] in hinted, "origin": "bm25"})
+    seen = {x["source_id"] for x in cands}
+    for sid in sorted(hinted - seen):                       # a source a model named that the words did not find is still a candidate to inspect
+        src = index.sources.get(sid)
+        if src and not src["excluded"]:
+            cands.append({"source_id": sid, "source_revision": src["revision"], "title": src["content"].get("title"), "tier": src["tier"], "readable": src["tier"] == "FULL_TEXT",
+                          "rank": None, "score": 0, "matched_terms": [], "locator": None, "work_id": src["work_id"], "version_id": src["content"].get("version_id"),
+                          "read_in_landscape": sid in read, "model_hint": True, "origin": "model_hint"})
+    return {"inference": inference_id, "terms": use_terms, "tokens": tokens, "corpus_snapshot_id": corpus.corpus_snapshot_id(store),
+            "note": "held sources that match these words, best first, then weaker tiers; a match is a paper to read, not evidence that it addresses the tension, and finding none is not evidence that none does",
+            "candidates": cands}
+
+
+def inspect_tension(store: StateStore, token: Optional[str], landscape_id: str, inference_id: str, *, results: list[dict[str, Any]], rationale: str,
+                    terms: Optional[list[str]] = None, extra_candidates: Optional[list[str]] = None, candidate_limit: int = 10, limitations: Optional[list[str]] = None) -> dict[str, Any]:
+    """Record an inspection of the sources that may already address a proposed tension (author or owner). `results` is the researcher's reading, one entry per source:
+    `{source_id, result: ADDRESSES|MENTIONS_PHENOMENON_ONLY|DOES_NOT_ADDRESS, inspected: "whole text" or the sections read, note, quotes: [...]}`. A result of ADDRESSES or
+    MENTIONS_PHENOMENON_ONLY needs verbatim quotes, each of which becomes a quote-verified EvidencePassage; a source held only as abstract or metadata cannot be inspected and
+    is recorded as NOT_READABLE. The candidate set is generated by `tension_candidates` (and model hints and `extra_candidates`) and recorded with the corpus snapshot; a candidate
+    without a result makes the inspection incomplete. The status that follows is stated by `inspection.status_of`: a statement about this inspected set only."""
+    reason = _need_text(rationale, "your rationale")
+    if not results:
+        raise KnowledgeError("INSPECTION_RESULTS_REQUIRED", "record what you found in at least one source")
+    cur = load_landscape(store, landscape_id)
+    c = cur["content"]
+    inf = next((x for x in c["inferences"] if x["id"] == inference_id), None)
+    if inf is None:
+        raise KnowledgeError("INFERENCE_UNKNOWN", f"{landscape_id} has no inference {inference_id}")
+    if inf.get("derivation", "rule") == "rule" or inf["kind"] == "implied_assumption":
+        raise KnowledgeError("INSPECTION_NOT_APPLICABLE", "recognition is inspected for a proposed relation between studies, not for a rule-derived inference or an implied assumption")
+    cand = tension_candidates(store, landscape_id, inference_id, limit=candidate_limit, terms=terms)
+    by_id = {x["source_id"]: x for x in cand["candidates"]}
+    for sid in extra_candidates or []:
+        if sid in by_id:
+            continue
+        o = store.get_object(sid)
+        if not o or o["object_type"] != "Source":
+            raise KnowledgeError("SOURCE_NOT_HELD", f"{sid} is not a Source in this project")
+        from research_harness.knowledge.corpus import source_tier
+        t = source_tier(o["content"])
+        by_id[sid] = {"source_id": sid, "source_revision": o["revision"], "title": o["content"].get("title"), "tier": t, "readable": t == "FULL_TEXT", "rank": None, "score": 0,
+                      "matched_terms": [], "locator": None, "work_id": o["content"].get("work_id") or sid, "version_id": o["content"].get("version_id"), "read_in_landscape": False,
+                      "model_hint": False, "origin": "researcher_added"}
+    recorded: list[dict[str, Any]] = []
+    seen_src: set[str] = set()
+    for r in results:
+        sid = r.get("source_id")
+        if sid in seen_src:
+            raise KnowledgeError("INSPECTION_DUPLICATE_SOURCE", f"{sid} has two results")
+        seen_src.add(sid)
+        o = store.get_object(sid or "")
+        if not o or o["object_type"] != "Source":
+            raise KnowledgeError("SOURCE_NOT_HELD", f"{sid} is not a Source in this project")
+        from research_harness.knowledge.corpus import source_tier
+        tier = source_tier(o["content"])
+        res = r.get("result")
+        if res not in INS.RESULTS:
+            raise KnowledgeError("INSPECTION_RESULT_UNKNOWN", f"result must be one of {INS.RESULTS}")
+        if tier != "FULL_TEXT":
+            if res != "NOT_READABLE":
+                raise KnowledgeError("SOURCE_NOT_READABLE", f"{sid} is held as {tier}: no text was inspected, so the only honest result is NOT_READABLE")
+        elif res == "NOT_READABLE":
+            raise KnowledgeError("SOURCE_IS_READABLE", f"{sid} has a full text; inspect it")
+        scope_text = r.get("inspected") if isinstance(r.get("inspected"), str) else ", ".join(r.get("inspected") or [])
+        if res != "NOT_READABLE" and not (scope_text or "").strip():
+            raise KnowledgeError("INSPECTED_SCOPE_REQUIRED", f"say what you inspected in {sid} (the whole text, or which sections)")
+        passages = []
+        if res in ("ADDRESSES", "MENTIONS_PHENOMENON_ONLY"):
+            if not r.get("quotes"):
+                raise KnowledgeError("EVIDENCE_REQUIRED", f"{res} for {sid} needs the verbatim words that show it")
+            _, text = corpus.source_text(store, sid)
+            for q in r["quotes"]:
+                found = quotes.find_quote(text, q)
+                if not found:
+                    raise KnowledgeError("QUOTE_NOT_IN_SOURCE", f"the quote is not in the stored text of {sid}: {q[:80]!r}")
+                pid = f"EP_INSP_{id_fragment(sid, 26)}_{found[0]}"
+                existing = store.get_object(pid)
+                if existing is None:
+                    corpus.add_passage(store, token, source_id=sid, quote=q, passage_id=pid, topic="tension_inspection", inference=inference_id)
+                    existing = store.get_object(pid)
+                passages.append({"passage_id": pid, "passage_revision": existing["revision"], "quote": existing["content"]["quote"], "locator": existing["content"]["locator"]})
+        recorded.append({"source_id": sid, "source_revision": o["revision"], "tier": tier, "work_id": o["content"].get("work_id") or sid, "version_id": o["content"].get("version_id"),
+                         "result": res, "inspected": r.get("inspected") if res != "NOT_READABLE" else "nothing: no text is held", "note": (r.get("note") or "").strip(), "passages": passages})
+    by_id_src = {x["source_id"] for x in recorded}
+    for x in recorded:
+        by_id.setdefault(x["source_id"], {"source_id": x["source_id"], "source_revision": x["source_revision"], "title": None, "tier": x["tier"], "readable": x["tier"] == "FULL_TEXT",
+                                          "rank": None, "score": 0, "matched_terms": [], "locator": None, "work_id": x["work_id"], "version_id": x["version_id"], "read_in_landscape": False,
+                                          "model_hint": False, "origin": "researcher_added"})
+    uninspected = sorted(sid for sid, x in by_id.items() if sid not in by_id_src and x["readable"])
+    unreadable = sorted(sid for sid, x in by_id.items() if not x["readable"])
+    insp = {"inference": inference_id, "tension_digest": INS.tension_digest(inf), "landscape_revision": cur["revision"], "corpus_snapshot_id": cand["corpus_snapshot_id"],
+            "search": {"terms": cand["terms"], "tokens": cand["tokens"], "method": "BM25 over stored sections (full texts) and title and abstract (other tiers); model hints and researcher-added sources",
+                       "limit": candidate_limit}, "candidates": list(by_id.values()), "results": recorded, "uninspected": uninspected, "unreadable": unreadable,
+            "limitations": [*INS.STANDARD_LIMITATIONS, *[str(x) for x in limitations or []]]}
+    insp["status_at_record"], insp["qualifications_at_record"] = INS.status_of(insp)
+
+    def build(content: dict[str, Any], tx: Any) -> dict[str, Any]:
+        olds = content.get("inspections") or []
+        rec = {**insp, "id": f"N{len(olds) + 1:03d}", "decision": {"by": tx.actor_id, "at": tx.at, "rationale": reason}}
+        return {**content, "inspections": [*olds, rec]}
+
+    out = _write_with(store, token, landscape_id, build, "landscape_inspect_tension")
+    return {"landscape_id": landscape_id, "revision": out["revision"], "inspection": f"N{len(c.get('inspections') or []) + 1:03d}", "inference": inference_id,
+            "status": insp["status_at_record"], "qualifications": insp["qualifications_at_record"], "candidates": len(insp["candidates"]), "inspected": len(recorded),
+            "uninspected": uninspected, "unreadable": unreadable}
 
 
 def require_current(store: StateStore, landscape_id: str, *, allow_stale_corpus: bool = False) -> dict[str, Any]:

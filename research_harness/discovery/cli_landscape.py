@@ -18,7 +18,8 @@ def _ev(e: dict) -> str:
     ev = e["layers"]["evidence"]
     if "inference" not in ev:
         return f"reading {ev['reading']['value']}"
-    inf = ev["inference"]["value"] + (f" ({ev['inference']['verdict']})" if ev["inference"].get("verdict") else "")
+    i = ev["inference"]
+    inf = i["value"] + (f" (researcher's verdict {i['verdict']}, {i['route']} route; suite's check of the basis: {i['verification']['status']})" if i.get("verdict") else "")
     return f"reading {ev['reading']['value']} · inference {inf} · reproduction {ev['reproduction']['value']}"
 
 
@@ -67,7 +68,9 @@ def _show_text(v: dict) -> None:
             body = f"{i['text']} (reasoning: {i['reasoning']})" if i["kind"] == "implied_assumption" else f"{who}"
             extra = ""
             if i["recognition"]:
-                extra += f"; {i['recognition']['status']}" + (": " + ", ".join(f"{a['source_id']}@{a['source_revision']}" for a in i["recognition"]["addressed_by"]) if i["recognition"]["addressed_by"] else "")
+                rc = i["recognition"]
+                extra += f"; recognition {rc['status']}" + (": " + ", ".join(f"{a['source_id']}@{a['source_revision']}" for a in rc["addressed_by"]) if rc["addressed_by"] else "") \
+                    + (f" (unverified model hint: {', '.join(h['source_id'] for h in rc['model_hints'])})" if rc["model_hints"] and rc["status"] == "POTENTIAL_ADDRESSING_SOURCES" else "")
             if i["missing_information"]:
                 extra += f"; missing: {'; '.join(i['missing_information'])}"
             print(f"    {i['id']} {i['kind']} on \"{i['relationship']}\" [{i['derivation']}; {i['provenance']}]: {body}; {i['confirmation']['state']}{extra}"
@@ -138,13 +141,28 @@ def register(sub: Any) -> None:
     q.add_argument("--provenance", choices=list(L.REL.PROVENANCES), default="researcher_proposed")
     q.add_argument("--critic", help="With critic_proposed: whose proposal it is")
 
-    q = add("candidates", "Held full texts that may already address a proposed relation (by words alone, no model): papers to read, not findings",
-            lambda st, a: L.tension_candidates(st, a.landscape, a.inference, limit=a.limit),
-            lambda o: print(o["note"] + "\n" + "\n".join(f"  {c['source_id']}@{c['source_revision']} score {c['score']} matched {', '.join(c['matched_terms'])}"
-                                                           f"{'  (read for this landscape)' if c['read_in_landscape'] else '  (not read for this landscape)'}  {c['title']}" for c in o["candidates"]) or "  none"),
+    q = add("candidates", "Held sources that may already address a proposed relation (by words alone, no model): papers to read, not evidence",
+            lambda st, a: L.tension_candidates(st, a.landscape, a.inference, limit=a.limit, terms=a.term or None),
+            lambda o: print(o["note"] + "\n" + "\n".join(f"  {c['source_id']}@{c['source_revision']} [{c['tier']}{'' if c['readable'] else ', cannot be inspected'}] score {c['score']} matched {', '.join(c['matched_terms'])}"
+                                                           f"{'  (read for this landscape)' if c['read_in_landscape'] else '  (not read for this landscape)'}{'  (model hint)' if c['model_hint'] else ''}  {c['title']}"
+                                                           for c in o["candidates"]) or "  none"),
             token=False)
     q.add_argument("landscape")
     q.add_argument("inference")
+    q.add_argument("--limit", type=int, default=10)
+    q.add_argument("--term", action="append", help="Search terms of your own instead of the proposal's (repeatable)")
+
+    q = add("inspect", "Record your inspection of the sources that may already address a proposed tension (JSON of results). The status that follows is about the inspected set only",
+            lambda st, a: L.inspect_tension(st, tok(a), a.landscape, a.inference, results=K._json_arg(a.results, "--results"), rationale=a.rationale, terms=a.term or None,
+                                            extra_candidates=a.extra_candidate or None, candidate_limit=a.limit),
+            lambda o: print(f"{o['landscape_id']} r{o['revision']}: {o['inspection']} on {o['inference']}: {o['status']} ({o['inspected']} of {o['candidates']} candidate(s) inspected)"
+                            + "".join(f"\n  ! {q}" for q in o["qualifications"])))
+    q.add_argument("landscape")
+    q.add_argument("inference")
+    q.add_argument("--results", required=True, help="JSON file or JSON: [{source_id, result: ADDRESSES|MENTIONS_PHENOMENON_ONLY|DOES_NOT_ADDRESS|NOT_READABLE, inspected, note, quotes: [...]}]")
+    q.add_argument("--rationale", required=True)
+    q.add_argument("--term", action="append")
+    q.add_argument("--extra-candidate", action="append", dest="extra_candidate", help="A held source to add to the candidates (repeatable)")
     q.add_argument("--limit", type=int, default=10)
 
     q = add("review", "Your decision on an inference or proposal (contradiction, version difference, relation, implied assumption), with your reason",

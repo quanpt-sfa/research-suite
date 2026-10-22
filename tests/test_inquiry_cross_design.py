@@ -26,7 +26,7 @@ from research_harness.validation.integrity import audit_project_integrity
 from research_harness.workflows import eca
 from research_harness.workflows.adapters import ScriptedModelAdapter
 from research_harness.workflows.dispatcher import run_workflow
-from research_harness.workflows.domain_engine import (DomainWorkflowSpec, ProjectFacts, SpecError, evaluate_predicate, facts_from_store, list_builtin_specs, load_builtin_spec,
+from research_harness.workflows.domain_engine import (DomainWorkflowSpec, ProjectFacts, SpecError, evaluate, evaluate_predicate, facts_from_store, list_builtin_specs, load_builtin_spec,
                                                        next_steps, record_step_run, stage_status)
 from research_harness.workflows.status import Applicability
 from tests import inquiry_fixtures as F
@@ -146,31 +146,30 @@ def test_research_purpose_predicate_and_filter():
     assert stage_status(spec, f, "literature").applicability is Applicability.APPLICABLE
 
 
-def test_a_conceptual_critical_review_is_not_blocked_by_the_absence_of_data(wa):
+def test_a_critical_review_has_a_method_and_findings_without_any_estimation(wa):
+    """Not estimating anything is not the same as having no method or no findings: both stages apply, and their steps are the review's own."""
     spec = load_builtin_spec("LIB_DW_CRITICAL_SYNTHESIS")
     add_rq(wa, study_design="narrative_review", research_purpose="critical_synthesis")
     facts = facts_from_store(wa["store"], research_question_id="RQ_X")
     assert facts.study_design == "narrative_review" and facts.research_purpose == "critical_synthesis"
     for stage in ("methods", "results"):
-        assert stage_status(spec, facts, stage).applicability is Applicability.NOT_APPLICABLE
+        assert stage_status(spec, facts, stage).applicability is Applicability.APPLICABLE
         out = run_workflow(stage, wa["store"], research_question_id="RQ_X", domain_workflow=spec, reuse_cached=False)
-        assert out.status == "NOT_APPLICABLE" and "critical synthesis" in out.result["justification"] and out.status != "BLOCKED"
-    assert {"contribution_assessment", "reconstruct_theories"} <= set(next_steps(spec, facts))              # the landscape exists, so the theories can be reconstructed
-    empty = ProjectFacts(study_design="narrative_review")
-    empty.research_purpose = "critical_synthesis"
-    assert "reconstruct_theories" not in next_steps(spec, empty)                                           # without a landscape there is nothing to reconstruct them from
-    # the steps are the logic of the inquiry, in order, with a loop-back when the tension turns out to be addressed already
+        assert out.status == "INSUFFICIENT_EVIDENCE" and out.result["pending"] and out.status not in ("NOT_APPLICABLE", "BLOCKED")        # steps pending, not 'no results'
+    # without a recorded plan the method steps are not done; with a landscape the reconstruction (a capability's work) is
+    ev = {e.step_id: e for e in evaluate(spec, facts)}
+    assert ev["search_strategy"].done is False                                                                                          # no review protocol is recorded
+    assert ev["reconstruct_theories"].done and ev["reconstruct_theories"].completion == "EXECUTED_BY_CAPABILITY" and ev["reconstruct_theories"].out_of_order   # the landscape exists, built before any method was declared
     record_step_run(wa["store"], spec, "contribution_assessment")
-    facts = facts_from_store(wa["store"], research_question_id="RQ_X")
-    assert "reconstruct_theories" in next_steps(spec, facts)
-    for step in ("reconstruct_theories", "reconstruct_constructs_assumptions", "compare_theories_and_scopes", "identify_tensions"):
+    for step in ("compare_theories_and_scopes",):
         record_step_run(wa["store"], spec, step)
-    record_step_run(wa["store"], spec, "search_recognition", diagnostic_signals={"tension_addressed": "CONCERN_INDICATED"})
     facts = facts_from_store(wa["store"], research_question_id="RQ_X")
-    assert next_steps(spec, facts)[0] == "identify_tensions"                                              # sent back: a reviewed paper already addresses it
-    record_step_run(wa["store"], spec, "identify_tensions")
+    ev = {e.step_id: e for e in evaluate(spec, facts)}
+    assert ev["compare_theories_and_scopes"].done and ev["compare_theories_and_scopes"].completion == "RECORDED_BY_RESEARCHER"
+    # the loop-back when a reviewed paper turns out to address the tension
+    record_step_run(wa["store"], spec, "inspect_recognition", diagnostic_signals={"tension_addressed": "CONCERN_INDICATED"})
     facts = facts_from_store(wa["store"], research_question_id="RQ_X")
-    assert "identify_tensions" not in next_steps(spec, facts)                                              # the loop is closed once the step was redone
+    assert {e.step_id: e for e in evaluate(spec, facts)}["identify_tensions"].reopened_by["by"] == "inspect_recognition"
 
 
 def test_the_regression_workflow_is_not_applied_to_a_critical_review_and_its_gates_hold_for_archival_work(wa, wc):
@@ -192,14 +191,15 @@ def test_education_has_two_different_contracts_and_neither_borrows_regression_lo
     qual = load_builtin_spec("LIB_DW_QUALITATIVE_INQUIRY")
     add_rq(wb, study_design="conceptual", research_purpose="methodological_improvement")
     fc = facts_from_store(wb["store"], research_question_id="RQ_X")
-    assert stage_status(conceptual, fc, "results").applicability is Applicability.NOT_APPLICABLE
-    assert stage_status(qual, fc, "methods").applicability is Applicability.NOT_APPLICABLE and "study designs" in stage_status(qual, fc, "methods").justification
+    assert stage_status(conceptual, fc, "results").applicability is Applicability.APPLICABLE and stage_status(conceptual, fc, "methods").applicability is Applicability.APPLICABLE
+    assert stage_status(qual, fc, "methods").applicability is Applicability.NOT_APPLICABLE and "study designs" in stage_status(qual, fc, "methods").justification      # a design the contract does not cover
     fq = ProjectFacts(study_design="design_based")
     fq.research_purpose = "interpretation"
-    assert stage_status(qual, fq, "methods").applicability is Applicability.APPLICABLE and stage_status(qual, fq, "results").applicability is Applicability.NOT_APPLICABLE
+    assert all(stage_status(qual, fq, st).applicability is Applicability.APPLICABLE for st in ("methods", "results", "discussion"))
     steps_c = {s.id for s in conceptual.steps}
     steps_q = {s.id for s in qual.steps}
-    assert {"state_argument", "rival_explanations", "boundary_conditions"} <= steps_c and {"coding_and_interpretation", "credibility_checks", "alternative_interpretations"} <= steps_q
+    assert {"state_argument", "rival_explanations", "boundary_conditions", "propositions_and_framework"} <= steps_c
+    assert {"coding_and_interpretation", "credibility_checks", "alternative_interpretations", "findings", "findings_trace"} <= steps_q
     assert not any("estimat" in s or "identif" in s or "robust" in s or "regress" in s for s in steps_c | steps_q)
     assert steps_c.isdisjoint({"coding_and_interpretation"}) and steps_q.isdisjoint({"rival_explanations"})        # different logics, not renamed copies
 
@@ -280,7 +280,7 @@ def test_two_theories_at_different_levels_are_not_called_incompatible(wa):
     assert len(ok["accepted"]) == 1 and inf(L.view(wa["store"], wa["lid"]), ok["accepted"][0])["kind"] == "complementarity"
 
 
-def test_a_tension_the_literature_already_addresses_is_never_called_unrecognised(wa):
+def test_a_models_hint_is_not_an_inspection_and_the_export_never_calls_a_tension_unrecognised(wa):
     v = wa["v"]
     addressing = ent(v, "SRC_PART", "theoretical_claim")["id"]
     p = {**prop_div(v), "already_addressed_by": [{"entry": addressing, "how": "it separates participation from relational engagement"}]}
@@ -292,22 +292,26 @@ def test_a_tension_the_literature_already_addresses_is_never_called_unrecognised
     assert len(out["accepted"]) == 2
     v2 = L.view(wa["store"], wa["lid"])
     a, b = (inf(v2, i) for i in out["accepted"])
-    assert a["recognition"]["status"] == "ADDRESSED_IN_REVIEWED_LITERATURE" and a["recognition"]["addressed_by"][0]["source_id"] == "SRC_PART"
-    assert b["recognition"]["status"] == "NOT_FOUND_IN_REVIEWED_SET" and "not a statement that the idea is new" in b["recognition"]["note"]
+    assert a["recognition"]["status"] == "POTENTIAL_ADDRESSING_SOURCES" and a["recognition"]["model_hints"][0]["verified"] is False and a["recognition"]["addressed_by"] == []
+    assert b["recognition"]["status"] == "RECOGNITION_NOT_ASSESSED" and "not a finding that none exists" in b["recognition"]["note"]
     with pytest.raises(KnowledgeError, match="ADDRESSED_BY_UNKNOWN"):
         L.add_proposal(wa["store"], wa["token"], wa["lid"], {**p, "already_addressed_by": [{"entry": "E999", "how": "x"}]})
     md = build_landscape_export(wa["store"], wa["lid"]).files["research_landscape.md"].decode("utf-8").lower()
-    assert "addressed_in_reviewed_literature" in md and "not_found_in_reviewed_set" in md and "separates participation from relational engagement" in md
-    assert "unrecognised" not in md and "unrecognized" not in md and "not been recognised" not in md and "novel" not in md
+    assert "potential_addressing_sources" in md and "recognition_not_assessed" in md
+    assert "unrecognised" not in md and "unrecognized" not in md and "not been recognised" not in md
+    assert "novel" not in md.replace("not a statement about novelty", "").replace("and not novelty", "")                    # novelty appears only to be disclaimed
     cands = L.tension_candidates(wa["store"], wa["lid"], a["id"])
-    assert "SRC_PART" in [c["source_id"] for c in cands["candidates"]] and next(c for c in cands["candidates"] if c["source_id"] == "SRC_PART")["read_in_landscape"] is True
-    assert "participation" in cands["terms"] and cands["note"].startswith("held full texts that match")
+    part = next(c for c in cands["candidates"] if c["source_id"] == "SRC_PART")
+    assert part["read_in_landscape"] is True and part["model_hint"] is True and part["readable"] is True
+    assert "participation" in cands["terms"] and "not evidence that it addresses the tension" in cands["note"]
 
 
 def test_a_model_interpretation_is_never_an_established_theoretical_fact(wa):
     v = wa["v"]
     implied = {"kind": "implied_assumption", "topic": "observable effort", "entries": [ent(v, "SRC_ENG1", "stated_assumption")["id"]],
-               "text": "Recipients can tell how much effort a message took.", "reasoning": "If effortful communication signals engagement, recipients must be able to perceive effort."}
+               "text": "Recipients can tell how much effort a message took.", "reasoning": "If effortful communication signals engagement, recipients must be able to perceive effort.",
+               "premises": ["Engagement is expressed through effortful communication"], "missing_information": ["whether the paper says recipients perceive effort"],
+               "alternative_interpretations": ["effort may signal engagement to the sender only"]}
     out = L.propose_relations(wa["store"], wa["token"], wa["lid"], synth([prop_div(v), implied]))
     assert len(out["accepted"]) == 2
     v2 = L.view(wa["store"], wa["lid"])
@@ -315,6 +319,7 @@ def test_a_model_interpretation_is_never_an_established_theoretical_fact(wa):
     i_div, i_imp = (inf(v2, x) for x in out["accepted"])
     assert i_imp["provenance"] == "suite_proposed:model:scripted-synthesiser" and i_imp["status"] == "PROPOSED" and i_imp["text"].startswith("Recipients")
     assert i_imp["confirmation"]["state"] == "UNCONFIRMED" and i_imp["reasoning"] and i_imp["sides"][0]["entry"] == implied["entries"][0]
+    assert i_imp["premises"] and i_imp["alternative_interpretations"] and i_imp["missing_information"] == ["whether the paper says recipients perceive effort"]
     with pytest.raises(KnowledgeError, match="REASON_REQUIRED"):
         L.review_inference(wa["store"], wa["token"], wa["lid"], i_div["id"], "CONFIRMED", " ")
     with pytest.raises(KnowledgeError, match="MISSING_INFORMATION_NOT_ACKNOWLEDGED"):
@@ -332,10 +337,12 @@ def test_a_model_interpretation_is_never_an_established_theoretical_fact(wa):
 def test_researcher_and_critic_proposals_are_marked_as_theirs_and_follow_the_same_gate(wa):
     v = wa["v"]
     implied = {"kind": "implied_assumption", "topic": "attributability", "entries": [ent(v, "SRC_ENG1", "stated_assumption")["id"]], "text": "Messages are attributed to a single sender.",
-               "reasoning": "A critic reading the paper notes that personal attribution presupposes a single identifiable sender."}
+               "reasoning": "A critic reading the paper notes that personal attribution presupposes a single identifiable sender.", "missing_information": []}
     out = L.add_proposal(wa["store"], wa["token"], wa["lid"], implied, provenance="critic_proposed", critic="Reviewer 2")
     i = inf(L.view(wa["store"], wa["lid"]), out["inference"])
     assert i["provenance"] == "critic_proposed:Reviewer 2" and i["derivation"] == "researcher_proposed" and i["confirmation"]["state"] == "UNCONFIRMED"
+    with pytest.raises(KnowledgeError, match="FIELD_REQUIRED"):                                    # an implied assumption does not get an empty list of what is missing by default
+        L.add_proposal(wa["store"], wa["token"], wa["lid"], {k: x for k, x in implied.items() if k != "missing_information"})
     with pytest.raises(KnowledgeError, match="PROPOSAL_KIND_NOT_ALLOWED"):
         L.add_proposal(wa["store"], wa["token"], wa["lid"], {**prop_div(v), "kind": "version_difference"})
     with pytest.raises(KnowledgeError, match="TOO_FEW_ENTRIES"):
@@ -365,26 +372,23 @@ def test_a_malformed_proposer_answer_is_a_failed_run_and_writes_nothing(wa):
 
 def test_a_changed_corpus_marks_the_conclusions_that_rested_on_it_for_reassessment(wa):
     v = wa["v"]
-    addressing = ent(v, "SRC_PART", "theoretical_claim")["id"]
-    p_found = {**prop_div(v), "already_addressed_by": [{"entry": addressing, "how": "it separates the two ideas"}]}
-    p_absent = {"kind": "explanatory_incompleteness", "topic": "perceived effort", "entries": [ent(v, "SRC_ATT", "assumed_mechanism")["id"], ent(v, "SRC_AI", "finding")["id"]],
-                "shared": "Both concern cheap messages.", "differences": "Dilution does not cover recipients' inferences.", "rationale": "No mechanism links the two.",
-                "missing_information": [], "levels": {}, "already_addressed_by": [], "search_terms": ["effort"]}
-    out = L.propose_relations(wa["store"], wa["token"], wa["lid"], synth([p_found, p_absent]))
-    found, absent = out["accepted"]
-    L.review_inference(wa["store"], wa["token"], wa["lid"], absent, "CONFIRMED", "No reviewed paper covers it.")
-    v1 = L.view(wa["store"], wa["lid"])
-    assert all(i["needs_reassessment"] == [] for i in v1["inferences"])
-    corpus.import_source(wa["store"], wa["token"], citation_key="late", title="A Late Paper On Perceived Effort", text="A Late Paper\n\nAbstract\nEffort.\n\n1 Introduction\nPerceived effort of messages.\n")
+    out = L.propose_relations(wa["store"], wa["token"], wa["lid"], synth([prop_div(v)]))
+    iid = out["accepted"][0]
+    assert inf(L.view(wa["store"], wa["lid"]), iid)["needs_reassessment"] == []
+    L.inspect_tension(wa["store"], wa["token"], wa["lid"], iid, rationale="I read the candidates.", candidate_limit=3, results=[
+        {"source_id": "SRC_PART", "result": "DOES_NOT_ADDRESS", "inspected": "whole text", "note": "defines participation but does not take up the assumption"},
+        {"source_id": "SRC_AI", "result": "DOES_NOT_ADDRESS", "inspected": "whole text"}, {"source_id": "SRC_ATT", "result": "DOES_NOT_ADDRESS", "inspected": "whole text"},
+        {"source_id": "SRC_ENG1", "result": "DOES_NOT_ADDRESS", "inspected": "whole text"}, {"source_id": "SRC_ENG2", "result": "DOES_NOT_ADDRESS", "inspected": "whole text"}])
+    r1 = inf(L.view(wa["store"], wa["lid"]), iid)
+    assert r1["recognition"]["status"] == "NOT_FOUND_IN_INSPECTED_SET" and r1["needs_reassessment"] == []
+    corpus.import_source(wa["store"], wa["token"], citation_key="late", title="A Late Paper On Participation", text="A Late Paper\n\nAbstract\nParticipation.\n\n1 Introduction\nParticipation and engagement.\n")
     v2 = L.view(wa["store"], wa["lid"])
     assert v2["currency"]["corpus"]["status"] == "STALE_FOR_CORPUS"
-    assert any("corpus" in r for r in inf(v2, absent)["needs_reassessment"]) and inf(v2, absent)["confirmation"]["state"] == "CONFIRMED_BY_RESEARCHER"
-    assert inf(v2, found)["needs_reassessment"] == []                                                                # it rests on named sources, which did not change
+    assert any("corpus changed since this inspection" in r for r in inf(v2, iid)["needs_reassessment"])
     corpus.set_excluded(wa["store"], wa["token"], "SRC_PART", "withdrawn")
-    v3 = L.view(wa["store"], wa["lid"])
-    assert any("SRC_PART" in r for r in inf(v3, found)["needs_reassessment"])
+    assert any("SRC_PART" in r for r in inf(L.view(wa["store"], wa["lid"]), iid)["needs_reassessment"])
     md = build_landscape_export(wa["store"], wa["lid"]).files["research_landscape.md"].decode("utf-8")
-    assert "inference(s) need reassessment" in md and "the corpus changed since this absence statement was made" in md
+    assert "inference(s) need reassessment" in md
 
 
 # ================================================================================================ inference routes by claim kind
@@ -562,7 +566,7 @@ def test_cli_proposals_candidates_and_acknowledgement(wa, monkeypatch, capsys, t
     assert j("landscape", "review", wa["lid"], iid, "CONFIRMED", "--reason", "checked", "--acknowledge-missing", *auth)["decision"] == "CONFIRMED"
     pf = tmp_path / "proposal.json"
     pf.write_text(json.dumps({"kind": "implied_assumption", "topic": "t", "entries": [ent(v, "SRC_ENG1", "stated_assumption")["id"]], "text": "Messages have one sender.",
-                              "reasoning": "A reviewer's note."}), encoding="utf-8")
+                              "reasoning": "A reviewer's note.", "missing_information": []}), encoding="utf-8")
     added = j("landscape", "add-proposal", wa["lid"], "--proposal", str(pf), "--provenance", "critic_proposed", "--critic", "Reviewer 2", *auth)
     assert added["inference"].startswith("I")
     out_dir = tmp_path / "exp"
@@ -590,8 +594,9 @@ def test_a_promoted_question_and_a_problem_give_the_engine_the_recorded_inquiry(
     rq_id = rq["research_question"]
     q = facts_from_store(wa["store"], research_question_id=rq_id)
     assert q.study_design == "narrative_review" and q.purposes() == {"critical_synthesis", "theory_development"}             # the promoted question carries the problem's inquiry
-    out = run_workflow("results", wa["store"], research_question_id=rq_id, domain_workflow=spec, reuse_cached=False)
-    assert out.status == "NOT_APPLICABLE"
+    assert q.inquiry_source == {"problem_id": wa["pid"], "revision": rq["problem_revision"], "pinned": True}
+    out = run_workflow("methods", wa["store"], research_question_id=rq_id, domain_workflow=spec, reuse_cached=False)
+    assert out.status == "INSUFFICIENT_EVIDENCE"                                                                              # the contract applies; its method steps are pending
 
 
 def test_a_rebuild_carries_proposals_and_decisions_only_where_the_claims_they_concern_are_unchanged(wa):

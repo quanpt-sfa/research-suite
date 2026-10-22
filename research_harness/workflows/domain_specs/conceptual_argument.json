@@ -1,30 +1,45 @@
 {
   "id": "LIB_DW_CONCEPTUAL_ARGUMENT",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "domain": "cross_domain",
   "subfield": "conceptual",
   "study_designs": ["conceptual"],
   "research_purposes": ["theory_development", "critical_synthesis", "evaluation", "methodological_improvement"],
-  "description": "Execution contract for a conceptual or methodological argument: state the argument, reconstruct the chain of inference it relies on, treat rival explanations, state the boundaries of applicability. It requires no dataset and applies no empirical standard to the argument; the argument is held to the standards of a conceptual claim (clarity, coherence, consistency of assumptions, rivals, boundaries). Independent of discipline. Status EXTRACTED.",
+  "description": "Execution contract for a conceptual or methodological argument. Its method is constructing, reconstructing and testing the argument (the chain of inference, rival explanations); its products are conceptual propositions, argument conclusions and a framework, which are research outputs in their own right. It requires no dataset, no estimator and no separate empirical results section, and does not read the absence of them as missing evidence; a manuscript need not have Methods and Results headings. The argument is held to the standards of a conceptual claim (clarity, coherence, consistency of assumptions, rivals, boundaries). Independent of discipline. Status EXTRACTED.",
   "stages": {
-    "contribution": {"applicable": true},
-    "literature": {"applicable": true},
-    "methods": {"applicable": false, "justification": "a conceptual argument has no data-collection or estimation stage; its analysis is the reconstruction and critique of the argument"},
-    "results": {"applicable": false, "justification": "a conceptual argument has no empirical results; what it offers is propositions, argued"},
-    "discussion": {"applicable": true, "entry_conditions": [{"step_execution": {"step": "rival_explanations", "is": "SUCCEEDED"}}]}
+    "contribution": {"applicable": true, "activity": "stating the argument and what it claims to add"},
+    "literature": {"applicable": true, "assessed_by": "steps", "activity": "the prior theory and argument the new argument responds to", "manuscript": "theoretical background, or woven into the argument"},
+    "methods": {"applicable": true, "assessed_by": "steps", "activity": "the method of constructing, reconstructing and testing the argument",
+                "manuscript": "the argument's structure and approach, which a conceptual paper may merge with its main text"},
+    "results": {"applicable": true, "assessed_by": "steps", "activity": "the conceptual products: propositions, argument conclusions, the framework",
+                "manuscript": "the argument's main sections; no empirical Results section is implied"},
+    "discussion": {"applicable": true, "assessed_by": "steps", "activity": "implications and limits of the argument", "entry_conditions": [{"step_execution": {"step": "boundary_conditions", "is": "SUCCEEDED"}}]}
   },
   "steps": [
     {"id": "contribution_assessment", "stage": "contribution", "kind": "assess", "title": "Contribution assessment"},
-    {"id": "state_argument", "stage": "contribution", "kind": "decide", "title": "State the argument and what it concludes"},
-    {"id": "literature_assessment", "stage": "literature", "kind": "assess", "title": "Literature assessment"},
-    {"id": "reconstruct_inference_chain", "stage": "literature", "kind": "execute", "title": "Reconstruct the chain of inference and the assumptions it needs",
-     "entry_conditions": [{"step_execution": {"step": "state_argument", "is": "SUCCEEDED"}}]},
-    {"id": "rival_explanations", "stage": "literature", "kind": "review", "title": "Treat rival explanations and prior theory",
+    {"id": "state_argument", "stage": "contribution", "kind": "decide", "title": "State the argument and what it concludes (a conceptual Claim)",
+     "completed_by": {"when": {"exists": {"type": "Claim", "where": {"claim_tier": "conceptual"}}}, "kind": "DECLARED_IN_RECORD"}},
+
+    {"id": "prior_theory_account", "stage": "literature", "kind": "review", "title": "Account for the prior theory the argument responds to (a landscape of it, or the researcher's recorded account)",
+     "completed_by": {"when": {"exists": {"type": "Landscape"}}, "kind": "EXECUTED_BY_CAPABILITY"}},
+
+    {"id": "reconstruct_inference_chain", "stage": "methods", "kind": "execute", "title": "Reconstruct the chain of inference and the assumptions it needs",
+     "entry_conditions": [{"step_execution": {"step": "state_argument", "is": "SUCCEEDED"}}],
+     "completed_by": {"when": {"exists": {"type": "Result", "where": {"attributes.result_kind": "inference_chain"}}}, "kind": "DECLARED_IN_RECORD"}},
+    {"id": "rival_explanations", "stage": "methods", "kind": "review", "title": "Treat rival explanations and prior theory (the researcher's reading; recorded)",
      "entry_conditions": [{"step_execution": {"step": "reconstruct_inference_chain", "is": "SUCCEEDED"}}],
      "on_condition": [{"when": {"diagnostic_signal": {"step": "rival_explanations", "diagnostic": "rival_unaddressed", "is": "CONCERN_INDICATED"}}, "goto": "reconstruct_inference_chain",
                        "reason": "a rival explanation is not answered by the chain as reconstructed: reconstruct it again with the rival in view"}]},
-    {"id": "boundary_conditions", "stage": "discussion", "kind": "review", "title": "State the boundaries of applicability"},
-    {"id": "discussion_assessment", "stage": "discussion", "kind": "assess", "title": "Discussion assessment"}
+
+    {"id": "propositions_and_framework", "stage": "results", "kind": "decide", "title": "Set out the propositions, argument conclusions and framework (the research product)",
+     "entry_conditions": [{"step_execution": {"step": "rival_explanations", "is": "SUCCEEDED"}}],
+     "completed_by": {"when": {"any": [{"count_ge": {"type": "Claim", "where": {"claim_tier": "conceptual"}, "n": 2}}, {"exists": {"type": "Result", "where": {"attributes.result_kind": "proposition"}}},
+                                       {"exists": {"type": "Result", "where": {"attributes.result_kind": "framework"}}}, {"exists": {"type": "Result", "where": {"attributes.result_kind": "argument_conclusion"}}}]},
+                      "kind": "DECLARED_IN_RECORD"}},
+    {"id": "boundary_conditions", "stage": "results", "kind": "review", "title": "State the boundaries of applicability (recorded)",
+     "entry_conditions": [{"step_execution": {"step": "propositions_and_framework", "is": "SUCCEEDED"}}]},
+
+    {"id": "implications_and_limits", "stage": "discussion", "kind": "review", "title": "Implications of the argument and what it does not show (recorded)"}
   ],
   "scope": {"study_design": "conceptual"},
   "exclusions": [],

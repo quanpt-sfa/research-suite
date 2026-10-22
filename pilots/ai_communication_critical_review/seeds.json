@@ -1,0 +1,43 @@
+{
+  "about": "Candidate seed studies proposed by the assistant for the critical-review pilot, from its own knowledge. They are NOT the result of a systematic search and NOT a screening decision. Each title, author and year below is what the assistant believes; none counts as a bibliographic fact until scripts/pilot/verify_seeds.py has matched it to a Crossref record. The researcher decides what to screen in.",
+  "streams": {
+    "S1": "Collective attention and the attention-based view",
+    "S2": "Communicative participation: visibility, voice, silence",
+    "S3": "Relational engagement: engagement at work, social exchange, high-quality relationships",
+    "S4": "AI-mediated communication",
+    "S5": "Information and communication overload; media and richness"
+  },
+  "seeds": [
+    {"key": "ocasio1997", "first_author": "Ocasio", "year": 1997, "stream": "S1", "kind": "journal_article", "title": "Towards an attention-based view of the firm", "role": "foundational attention-based view of organisations"},
+    {"key": "ocasio2018", "first_author": "Ocasio", "year": 2018, "stream": "S1", "kind": "journal_article", "title": "Communication and attention dynamics: An attention-based view of strategic change", "role": "links communication to organisational attention"},
+    {"key": "wu2007", "first_author": "Wu", "year": 2007, "stream": "S1", "kind": "journal_article", "title": "Novelty and collective attention", "role": "collective attention as a finite resource (non-organisational setting)"},
+    {"key": "lorenz2019", "first_author": "Lorenz-Spreen", "year": 2019, "stream": "S1", "kind": "journal_article", "title": "Accelerating dynamics of collective attention", "role": "collective attention dynamics (non-organisational setting)"},
+    {"key": "weng2012", "first_author": "Weng", "year": 2012, "stream": "S1", "kind": "journal_article", "title": "Competition among memes in a world with limited attention", "role": "limited attention as a mechanism in a population of messages"},
+    {"key": "simon1971", "first_author": "Simon", "year": 1971, "stream": "S1", "kind": "book_chapter", "title": "Designing organizations for an information-rich world", "role": "origin of the attention-scarcity argument; a book chapter, probably without a DOI"},
+
+    {"key": "leonardi2014", "first_author": "Leonardi", "year": 2014, "stream": "S2", "kind": "journal_article", "title": "Social media, knowledge sharing, and innovation: Toward a theory of communication visibility", "role": "communication visibility"},
+    {"key": "treem2013", "first_author": "Treem", "year": 2013, "stream": "S2", "kind": "book_chapter", "title": "Social media use in organizations: Exploring the affordances of visibility, editability, persistence, and association", "role": "affordances of visibility; a book chapter"},
+    {"key": "morrison2000", "first_author": "Morrison", "year": 2000, "stream": "S2", "kind": "journal_article", "title": "Organizational silence: A barrier to change and development in a pluralistic world", "role": "participation withheld"},
+    {"key": "detert2007", "first_author": "Detert", "year": 2007, "stream": "S2", "kind": "journal_article", "title": "Leadership behavior and employee voice: Is the door really open?", "role": "employee voice"},
+    {"key": "ellison2015", "first_author": "Ellison", "year": 2015, "stream": "S2", "kind": "journal_article", "title": "The use of enterprise social network sites for knowledge sharing in distributed organizations: The role of organizational affordances", "role": "enterprise social networks and participation"},
+
+    {"key": "kahn1990", "first_author": "Kahn", "year": 1990, "stream": "S3", "kind": "journal_article", "title": "Psychological conditions of personal engagement and disengagement at work", "role": "personal engagement as investment of the self"},
+    {"key": "saks2006", "first_author": "Saks", "year": 2006, "stream": "S3", "kind": "journal_article", "title": "Antecedents and consequences of employee engagement", "role": "engagement through social exchange"},
+    {"key": "cropanzano2005", "first_author": "Cropanzano", "year": 2005, "stream": "S3", "kind": "journal_article", "title": "Social exchange theory: An interdisciplinary review", "role": "social exchange theory"},
+    {"key": "schaufeli2002", "first_author": "Schaufeli", "year": 2002, "stream": "S3", "kind": "journal_article", "title": "The measurement of engagement and burnout: A two sample confirmatory factor analytic approach", "role": "engagement as a work-related state of mind"},
+    {"key": "quinn2005", "first_author": "Quinn", "year": 2005, "stream": "S3", "kind": "journal_article", "title": "Coordination as energy-in-conversation", "role": "relational energy in conversation"},
+    {"key": "gittell2002", "first_author": "Gittell", "year": 2002, "stream": "S3", "kind": "journal_article", "title": "Coordinating mechanisms in care provider groups: Relational coordination as a mediator and input uncertainty as a moderator of performance effects", "role": "relational coordination"},
+    {"key": "carmeli2009", "first_author": "Carmeli", "year": 2009, "stream": "S3", "kind": "journal_article", "title": "Learning behaviours in the workplace: The role of high-quality interpersonal relationships and psychological safety", "role": "high-quality relationships"},
+
+    {"key": "hancock2020", "first_author": "Hancock", "year": 2020, "stream": "S4", "kind": "journal_article", "title": "AI-Mediated Communication: Definition, Research Agenda, and Ethical Considerations", "role": "defines AI-mediated communication"},
+    {"key": "jakesch2019", "first_author": "Jakesch", "year": 2019, "stream": "S4", "kind": "conference_paper", "title": "AI-Mediated Communication: How the Perception that Profile Text was Written by AI Affects Trustworthiness", "role": "perceived AI authorship and trust (empirical)"},
+    {"key": "hohenstein2020", "first_author": "Hohenstein", "year": 2020, "stream": "S4", "kind": "journal_article", "title": "AI as a moral crumple zone: The effects of AI-mediated communication on attribution and trust", "role": "attribution of responsibility (empirical)"},
+    {"key": "hohenstein2023", "first_author": "Hohenstein", "year": 2023, "stream": "S4", "kind": "journal_article", "title": "Artificial intelligence in communication impacts language and social relationships", "role": "relational effects of AI-mediated communication (empirical)"},
+    {"key": "mieczkowski2021", "first_author": "Mieczkowski", "year": 2021, "stream": "S4", "kind": "journal_article", "title": "AI-Mediated Communication: Language Use and Interpersonal Effects in a Referential Communication Task", "role": "language use and interpersonal effects (empirical)"},
+
+    {"key": "eppler2004", "first_author": "Eppler", "year": 2004, "stream": "S5", "kind": "journal_article", "title": "The concept of information overload: A review of literature from organization science, accounting, marketing, MIS, and related disciplines", "role": "information overload as a concept"},
+    {"key": "karr2010", "first_author": "Karr-Wisniewski", "year": 2010, "stream": "S5", "kind": "journal_article", "title": "When more is too much: Operationalizing technology overload and exploring its impact on knowledge worker productivity", "role": "technology overload (empirical)"},
+    {"key": "walther1996", "first_author": "Walther", "year": 1996, "stream": "S5", "kind": "journal_article", "title": "Computer-mediated communication: Impersonal, interpersonal, and hyperpersonal interaction", "role": "interpersonal effects of mediated communication"},
+    {"key": "daft1986", "first_author": "Daft", "year": 1986, "stream": "S5", "kind": "journal_article", "title": "Organizational information requirements, media richness and structural design", "role": "media richness"}
+  ]
+}

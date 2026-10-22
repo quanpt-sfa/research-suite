@@ -1,6 +1,8 @@
 # WP6.1 — Research-design-aware scientific synthesis: audit report
 
-Scope amendment to M5 approved by the Research Owner on 2026-10-23. **This report does not declare M5 or Gate M complete. WP7–WP8 are not started.** WP6.1 is `TECHNICALLY_ACCEPTED`
+> **Amended by the remediation of 2026-10-22 (`M5_WP6_1_REMEDIATION.md`).** Where this report describes `NOT_APPLICABLE` methods/results, the `*_REVIEWED_*` recognition statuses, or an assessment without a separate basis check, the remediation supersedes it. Kept as the record of what was reported then.
+
+Scope amendment to M5 approved by the Research Owner on 2026-10-22 (first written as 2026-10-23 in error: the instruction was received and `95b49ef` and `b631b64` were committed on 2026-10-22). **This report does not declare M5 or Gate M complete. WP7–WP8 are not started.** WP6.1 is `TECHNICALLY_ACCEPTED`
 only in the sense of §3 (synthetic acceptance); every scientific question in §8 is open.
 
 ## 1. Baselines

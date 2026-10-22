@@ -523,6 +523,8 @@ def register(sub: Any) -> None:
     _retrieval_cli.register(sub)
     from research_harness.discovery import cli_landscape as _landscape_cli
     _landscape_cli.register(sub)
+    from research_harness.discovery import cli_review as _review_cli
+    _review_cli.register(sub)
     _add_provider_options(sub)
 
 
@@ -1081,6 +1083,9 @@ def cmd_export_verify(args: argparse.Namespace) -> int:
         if kind == "retrieval":
             from research_harness.export.retrieval import build_retrieval_export
             rebuild = lambda scope: build_retrieval_export(store, scope["retrieval"])   # noqa: E731
+        elif kind == "review":
+            from research_harness.export.review import build_review_export
+            rebuild = lambda scope: build_review_export(store, scope["problem"])   # noqa: E731
         elif kind == "landscape":
             from research_harness.export.landscape import build_landscape_export
             rebuild = lambda scope: build_landscape_export(store, scope["landscape"])   # noqa: E731

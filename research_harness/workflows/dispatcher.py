@@ -49,6 +49,7 @@ from research_harness.workflows.model_io import (
     validate_model_output,
 )
 from research_harness.workflows.registry import get_registry
+from research_harness.workflows.skills.contract_stage import execute_contract_stage
 from research_harness.workflows.skills.contribution import execute_contribution_workflow
 from research_harness.workflows.skills.discussion import execute_discussion_workflow
 from research_harness.workflows.skills.literature import execute_literature_workflow
@@ -590,6 +591,16 @@ def run_workflow(
         _persist_output(state_store, output)
         _register_run(state_store, output, context, fingerprint, executor=f"domain_gate@{spec.id}", model_descriptor=None,
                       upstream_run_ids=upstream_ids, domain_pin=spec.pin)
+        tracker.record_task(output.usage)
+        return output
+
+    # 0b. A stage whose contract is assessed by its steps reports where the steps stand; no empirical skill is applied. It depends on facts the context does not capture,
+    # so it is computed each time and never served from the registry.
+    if spec.stages[canonical_wf].assessed_by == "steps" and adapter is None:
+        output = execute_contract_stage(context, spec=spec, facts=facts_from_store(state_store, research_question_id=research_question_id), stage=canonical_wf, task_id=task_id)
+        output.input_fingerprint = fingerprint
+        _persist_output(state_store, output)
+        _register_run(state_store, output, context, fingerprint, executor=f"contract_stage@{spec.id}", model_descriptor=None, upstream_run_ids=upstream_ids, domain_pin=spec.pin)
         tracker.record_task(output.usage)
         return output
 

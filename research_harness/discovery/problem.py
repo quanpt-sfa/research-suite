@@ -368,6 +368,43 @@ def promote_to_rq(store: StateStore, token: Optional[str], problem_id: str, inte
             "interpretation": interpretation_id}
 
 
+def update_question_inquiry(store: StateStore, token: Optional[str], rq_id: str, rationale: str) -> dict[str, Any]:
+    """The explicit act that brings a promoted question up to the problem as it is now. A question keeps the problem revision it was promoted from, and with it the inquiry
+    (purpose, design, evidence forms, discipline) recorded then: reframing the problem later does not change what the question is for. This act writes a new revision of the
+    question whose `derived_from` edge points at the problem's current revision, records who did it, when, why and from which revision to which, and flags what rested on the
+    question's earlier revisions for review."""
+    if not rationale or not rationale.strip():
+        raise KnowledgeError("RATIONALE_REQUIRED", "say why the question follows the problem's current inquiry")
+    with store.write_tx(token=token, require_roles=ROLES) as tx:
+        head = tx.head(rq_id)
+        if not head:
+            raise KnowledgeError("RQ_NOT_FOUND", f"{rq_id} does not exist")
+        rq = tx.get(rq_id)
+        if rq["object_type"] != "ResearchQuestion":
+            raise KnowledgeError("RQ_NOT_FOUND", f"{rq_id} is not a ResearchQuestion")
+        rows = tx.conn.execute("SELECT relation,target_id,target_revision,provenance FROM edges WHERE source_id=? AND source_revision=?", (rq_id, head["head_revision"])).fetchall()
+        edges = [(r[0], r[1], r[2], json.loads(r[3])) for r in rows]
+        prom = next((e for e in edges if e[0] == "derived_from" and e[3].get("edge_kind") == "promoted_from"), None)
+        if prom is None:
+            raise KnowledgeError("RQ_NOT_PROMOTED", f"{rq_id} was not promoted from a ResearchProblem: there is no problem inquiry to follow")
+        ph = tx.head(prom[1])
+        if ph["head_revision"] == prom[2]:
+            raise KnowledgeError("NOTHING_TO_UPDATE", f"{rq_id} already follows {prom[1]} revision {prom[2]}, the problem's current revision")
+        old_inq = (tx.get(prom[1], prom[2])["content"].get("inquiry"))
+        new_inq = tx.get(prom[1])["content"].get("inquiry")
+        attrs = dict(rq["content"].get("attributes") or {})
+        attrs["promoted_from"] = {**(attrs.get("promoted_from") or {}), "problem": prom[1], "revision": ph["head_revision"]}
+        attrs["inquiry_updates"] = [*(attrs.get("inquiry_updates") or []), {"at": tx.at, "by": tx.actor_id, "rationale": rationale.strip(), "from_problem_revision": prom[2],
+                                                                            "to_problem_revision": ph["head_revision"], "inquiry_before": old_inq, "inquiry_after": new_inq}]
+        new_edges = [(e[0], e[1], ph["head_revision"], e[3]) if e is prom else e for e in edges]
+        res = tx.add_revision(object_id=rq_id, object_type="ResearchQuestion", content={**rq["content"], "attributes": attrs}, expected_head=head["head_revision"], edges=new_edges,
+                              origin=engine_origin("question_inquiry_update", tx.actor_id))
+        flagged = invalidate_dependents(tx, rq_id, res["revision"])
+        tx.audit("question_inquiry_update", "RECORDED", {"research_question": rq_id, "revision": res["revision"], "problem": prom[1], "from": prom[2], "to": ph["head_revision"]})
+    return {"research_question": rq_id, "revision": res["revision"], "problem_id": prom[1], "from_problem_revision": prom[2], "to_problem_revision": ph["head_revision"],
+            "inquiry_before": old_inq, "inquiry_after": new_inq, "needs_review": [f"{x['object_id']}@{x['revision']}" for x in flagged]}
+
+
 # ------------------------------------------------------------------------------------------------ reading
 
 def problem_view(store: StateStore, problem_id: str) -> dict[str, Any]:

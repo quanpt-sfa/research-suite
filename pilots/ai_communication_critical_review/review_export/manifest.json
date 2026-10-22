@@ -1,0 +1,41 @@
+{
+  "closure_digest": "33b66a257cb7cb26b17a08679f6381bd4d7aebfd7e5bcd27e53533e2bf865b2b",
+  "corpus_snapshot_id": "b50d36c7da6ae6b519ef61c4ea0b34a784d00b66652811832191c8342242c991",
+  "exporter_version": "1",
+  "files": [
+    {
+      "bytes": 5321,
+      "path": "corpus_inventory.csv",
+      "sha256": "839741ad599b7f691e37204397f607ff547e36ff022b44988a10e70d0bb92cae"
+    },
+    {
+      "bytes": 42,
+      "path": "screening_log.csv",
+      "sha256": "c5c140df8404954bbc0ad8360a4cf8838d734bc0f4ffa260a3d950accfe77238"
+    },
+    {
+      "bytes": 7069,
+      "path": "search_protocol.md",
+      "sha256": "3d07763d9120b29f3f6c86de0a8ad8e026fa606d1fc25bb1f4dfb67559593a5e"
+    }
+  ],
+  "kind": "review",
+  "not_available": [],
+  "provenance_counts": {
+    "corpus_inventory.csv": {
+      "data_derived": 26
+    },
+    "screening_log.csv": {
+      "researcher_confirmed": 0
+    },
+    "search_protocol.md": {
+      "data_derived": 5,
+      "model_synthesised": 8
+    }
+  },
+  "runs": [],
+  "scope": {
+    "problem": "PROB_000001"
+  },
+  "sources": []
+}

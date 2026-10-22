@@ -45,6 +45,17 @@ None is inferred from another and none is required. A problem made without an in
 retrieval run stale, because the queries are made from the statement, scope, exclusions and chosen readings only. The inquiry is copied into a landscape and shown in its export; it selects nothing there, since the
 standard a claim is held to depends on the claim, not on the project (`docs/LANDSCAPE.md`).
 
+## Questions keep the inquiry they were promoted with (remediation, 2026-10-22)
+
+A question promoted from a problem is pinned to the problem revision that records the promotion (the `derived_from` edge). The workflow engine reads the question's inquiry (purpose, design) from that revision, not from the
+problem's head: reframing the problem later flags what rests on the question, but does not change what the question is for. `research problem update-question RQ_x --rationale "..."` is the explicit act that writes a new revision
+of the question pinned to the problem's current revision, with who, when, why and from/to which revision and inquiry; what rests on the question's earlier revisions is flagged for review.
+
+## The review protocol
+
+A problem may also record the method of a literature review (`review_protocol`; `docs/REVIEW_PROTOCOL.md`). It is a record of how the literature is to be and was searched, screened, appraised, extracted and synthesised, not
+an input of the queries: recording or changing it does not make a retrieval run stale and does not flag the problem's questions.
+
 ## Limits
 
 * The suite does not judge a reading: `answer_kind` and `search_terms` are a model's labels for the researcher to read, not findings.

@@ -663,6 +663,25 @@ def cmd_domain_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_domain_suggest(args: argparse.Namespace) -> int:
+    from research_harness.workflows.domain_engine import facts_from_store, suggest_contracts
+    try:
+        facts = facts_from_store(_resolve_store(_resolve_project_id(args), getattr(args, "home", None)), research_question_id=getattr(args, "question", None),
+                                 study_design=getattr(args, "study_design", None), research_purpose=getattr(args, "research_purpose", None), problem_id=getattr(args, "problem_id", None))
+        out = suggest_contracts(facts)
+    except Exception as e:
+        sys.stderr.write(f"Domain workflow error: {e}\n")
+        return 1
+    if args.json:
+        _json_out(out)
+        return 0
+    print(f"{out['status']}: recorded design {out['recorded']['study_design'] or 'none'}, purposes {', '.join(out['recorded']['research_purposes']) or 'none'}")
+    for r in out["contracts"]:
+        print(f"  {r['fit']:<24}{r['spec']}  {'; '.join(r['reasons'])}")
+    print(out["note"])
+    return 0
+
+
 def cmd_domain_next(args: argparse.Namespace) -> int:
     from research_harness.workflows.domain_engine import evaluate, facts_from_store, next_steps
     try:
@@ -684,7 +703,8 @@ def cmd_domain_next(args: argparse.Namespace) -> int:
     for e in evals:
         mark = "n/a " if e.applicability.value == "NOT_APPLICABLE" else "done" if e.done else "RUN " if e.runnable else "wait"
         extra = f"  REOPENED by {e.reopened_by['by']}: {e.reopened_by['reason']}" if e.reopened_by else ""
-        print(f"  [{mark}] {e.stage:<12} {e.step_id}{extra}")
+        how = (f"  ({e.completion.lower().replace('_', ' ')}" + ("; OUT OF ORDER: its entry conditions are not met" if e.out_of_order else "") + ")") if e.done and e.completion else ""
+        print(f"  [{mark}] {e.stage:<12} {e.step_id}{how}{extra}")
         for reason in e.blocked_by:
             print(f"           - {reason}")
     return 0
@@ -1113,6 +1133,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_domnext.add_argument("--home")
     p_domnext.add_argument("--json", action="store_true")
     p_domnext.set_defaults(func=cmd_domain_next)
+    p_domsug = s_dom.add_parser("suggest", help="Which contracts fit the recorded inquiry (nothing is chosen for you; the generic contract is never offered as the appropriate one)")
+    p_domsug.add_argument("--project", "--project-id", dest="project", required=True)
+    p_domsug.add_argument("--question", "--question-id", dest="question")
+    p_domsug.add_argument("--study-design", dest="study_design")
+    p_domsug.add_argument("--research-purpose", dest="research_purpose")
+    p_domsug.add_argument("--problem", dest="problem_id")
+    p_domsug.add_argument("--home")
+    p_domsug.add_argument("--json", action="store_true")
+    p_domsug.set_defaults(func=cmd_domain_suggest)
 
     p_wfruns = s_wf.add_parser("runs", help="List recorded workflow runs (newest first)")
     _run_args(p_wfruns)

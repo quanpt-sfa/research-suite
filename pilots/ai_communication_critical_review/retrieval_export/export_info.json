@@ -1,0 +1,10 @@
+{
+  "exported_at": "2026-10-22T11:55:08.572880+00:00",
+  "exporter_version": "1",
+  "note": "variable data: excluded from the reproducibility of the export",
+  "platform": "Windows",
+  "project_id": "PRJ_AICOMM_PILOT",
+  "python": "3.12.2",
+  "state_sha256": "d6fa85a397caceb8dc1cc7c92f7831fb1f9526adfbd8ee7069396504cb5dc80b",
+  "suite_version": "9.2.0"
+}

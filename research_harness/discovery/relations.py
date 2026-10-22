@@ -6,8 +6,8 @@ that says nothing about meaning). Everything that needs a reading of meaning is 
 a deterministic gate before it is stored, is `UNCONFIRMED` until the researcher decides, and never becomes an entry an author wrote.
 
 A proposal must say which claims it concerns (entries, so Source@revision, passage and place), what they share, how they differ, why they conflict, differ only in scope
-or complement each other, and what information is missing. The suite never says a tension is "unrecognised": it records the papers of the reviewed set that already address
-it, or says that none was found in the reviewed set, which is a statement about that set and not about the literature.
+or complement each other, and what information is missing. The suite never says a tension is "unrecognised": it states a recognition
+status only from an inspection record (`inspection.py`), never from a model's empty list of sources.
 """
 from __future__ import annotations
 
@@ -33,7 +33,8 @@ PROPOSAL_SCHEMA: dict[str, Any] = {
                        "shared": {"type": "string"}, "differences": {"type": "string"}, "rationale": {"type": "string"}, "missing_information": {"type": "array", "items": {"type": "string"}},
                        "levels": {"type": "object", "additionalProperties": {"type": "string"}}, "meaning_difference": {"type": "string"},
                        "already_addressed_by": {"type": "array", "items": {"type": "object", "properties": {"entry": {"type": "string"}, "how": {"type": "string"}}, "required": ["entry"]}},
-                       "search_terms": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string"}, "reasoning": {"type": "string"}},
+                       "search_terms": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string"}, "reasoning": {"type": "string"},
+                       "premises": {"type": "array", "items": {"type": "string"}}, "alternative_interpretations": {"type": "array", "items": {"type": "string"}}},
         "required": ["kind", "entries"]}}},
     "required": ["proposals"], "additionalProperties": True}
 
@@ -45,12 +46,14 @@ SYSTEM_PROMPT = (
     "if the levels differ the theories are not incompatible, so propose boundary_tension or complementarity instead); explanatory_incompleteness (a theory leaves a stated "
     "phenomenon unexplained); boundary_tension (claims conflict only at the edge of their scopes); complementarity (claims explain different parts of the same matter); "
     "empirical_disagreement (findings disagree, including where they are worded differently); implied_assumption (an assumption that a stated claim needs but its authors did not "
-    "write: give `text` and `reasoning`; it is never presented as the authors' assumption).\n\n"
+    "write: give `text`, `premises` (what you start from), `reasoning`, `missing_information` (what you would need to know to tell whether the assumption is really needed; an empty list "
+    "only if nothing is missing) and `alternative_interpretations` (other ways to read the passage that would make the assumption unnecessary); it is never presented as the "
+    "authors' assumption).\n\n"
     "For every relation give: `entries` (at least two, from at least two different works), `shared` (what the claims share: object, scope, unit of analysis), `differences` "
     "(how they differ: definition, assumption, mechanism or reasoning), `rationale` (why they are incompatible, differ only in scope, or complement each other), "
     "`missing_information` (what you would need to know to be sure; an empty list only if nothing is missing), `topic` (a short name) and `search_terms` (words that would find "
-    "papers that already address this). If an entry shown already recognises or resolves the tension, list it in `already_addressed_by` with how. Never claim that nobody has "
-    "noticed a tension.\n\nRespond with exactly one JSON object and nothing else. It must validate against this JSON Schema:\n" + json.dumps(PROPOSAL_SCHEMA, indent=2, sort_keys=True))
+    "papers that already address this). If an entry shown seems to recognise or resolve the tension, list it in `already_addressed_by` with how: this is only a hint that someone will inspect. An empty list "
+    "does NOT mean that no paper addresses the tension, and you must not claim that nobody has noticed it.\n\nRespond with exactly one JSON object and nothing else. It must validate against this JSON Schema:\n" + json.dumps(PROPOSAL_SCHEMA, indent=2, sort_keys=True))
 SKILL_DIGEST = canonical_json_hash(SYSTEM_PROMPT)
 
 
@@ -100,8 +103,12 @@ def validate_proposal(content: dict[str, Any], p: dict[str, Any], *, enforce_lev
                       "passage_id": e["author_claim"]["passage_id"], "passage_revision": e["author_claim"]["passage_revision"], "locator": e["author_claim"]["locator"]})
     out: dict[str, Any] = {"kind": kind, "relationship": _text(p, "topic") if p.get("topic") else kind, "sides": sides, "search_terms": [str(t).strip() for t in p.get("search_terms") or [] if str(t).strip()]}
     if kind == "implied_assumption":
-        out.update(text=_text(p, "text"), reasoning=_text(p, "reasoning"), relation="implied_assumption", missing_information=[], shared=None, differences=None, rationale=None,
-                   levels={}, meaning_difference=None, addressed_by=[])
+        if not isinstance(p.get("missing_information"), list):
+            raise KnowledgeError("FIELD_REQUIRED", "missing_information is required for an implied assumption (a list; empty only if nothing is missing): "
+                                 "say what you would need to know to tell whether the assumption is needed", field="missing_information")
+        out.update(text=_text(p, "text"), reasoning=_text(p, "reasoning"), relation="implied_assumption", missing_information=[str(m).strip() for m in p["missing_information"] if str(m).strip()],
+                   premises=[str(x).strip() for x in p.get("premises") or [] if str(x).strip()], alternative_interpretations=[str(x).strip() for x in p.get("alternative_interpretations") or [] if str(x).strip()],
+                   shared=None, differences=None, rationale=None, levels={}, meaning_difference=None, addressed_by=[])
     else:
         if len({s["work_id"] for s in sides}) < 2:
             raise KnowledgeError("SAME_WORK", "the entries come from one work (versions of it): a difference between versions is a version matter, not a relation between studies")
@@ -147,35 +154,3 @@ def confirmation(i: dict[str, Any]) -> dict[str, Any]:
     r = i["reviews"][-1]
     state = {"CONFIRMED": "CONFIRMED_BY_RESEARCHER", "DISMISSED": "DISMISSED_BY_RESEARCHER", "NEEDS_SCOPE": "NEEDS_SCOPE"}[r["decision"]]
     return {"state": state, "by": r["by"], "at": r["at"], "reason": r["reason"], "acknowledged_missing": bool(r.get("acknowledged_missing"))}
-
-
-def recognition(i: dict[str, Any], works_read: int) -> Optional[dict[str, Any]]:
-    """For a proposed relation: the reviewed papers that address it, or the statement that none was found in the reviewed set. Never 'unrecognised'."""
-    if i.get("derivation") == "rule" or i["kind"] == "implied_assumption":
-        return None
-    if i.get("addressed_by"):
-        return {"status": "ADDRESSED_IN_REVIEWED_LITERATURE", "addressed_by": i["addressed_by"],
-                "note": "at least one paper in the reviewed set already addresses this; restate the tension against it"}
-    return {"status": "NOT_FOUND_IN_REVIEWED_SET", "addressed_by": [],
-            "note": f"no paper among the {works_read} work(s) read was found addressing it; this is a statement about the reviewed set, not a statement that the idea is new, "
-                    "and it is re-assessed when the corpus changes"}
-
-
-def dependencies(store: Any, i: dict[str, Any], corpus_snapshot_now: str) -> tuple[list[dict[str, Any]], list[str]]:
-    """The Source@revisions an inference rests on, and why it needs reassessment now (empty when nothing it rests on moved). An absence statement also rests on the corpus."""
-    deps: dict[tuple[str, int], dict[str, Any]] = {}
-    for s in list(i["sides"]) + list(i.get("addressed_by") or []):
-        deps[(s["source_id"], s["source_revision"])] = {"source_id": s["source_id"], "source_revision": s["source_revision"]}
-    reasons = []
-    for (sid, rev) in sorted(deps):
-        head = store.get_object(sid)
-        if head is None:
-            reasons.append(f"{sid} no longer exists")
-        elif head["revision"] != rev:
-            reasons.append(f"{sid} was revised (r{rev} -> r{head['revision']}) or its place in the corpus changed after this was made")
-        elif head["content"].get("excluded"):
-            reasons.append(f"{sid} is excluded from the corpus")
-    rec = recognition(i, 0)
-    if rec and rec["status"] == "NOT_FOUND_IN_REVIEWED_SET" and i.get("corpus_snapshot_at_proposal") and i["corpus_snapshot_at_proposal"] != corpus_snapshot_now:
-        reasons.append(f"the corpus changed since this absence statement was made ({i['corpus_snapshot_at_proposal'][:12]} -> {corpus_snapshot_now[:12]}): a paper that addresses it may now be held")
-    return list(deps.values()), reasons

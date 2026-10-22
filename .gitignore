@@ -24,3 +24,6 @@ Reusable_Research_Harness_Suite_*.zip
 .tmp/
 .verify_venv/
 /sample/
+
+# Isolated pilot stores (rebuilt by scripts/pilot/build_*.py); deliverables and verified metadata are committed, the store is not
+/pilots/*/_store/

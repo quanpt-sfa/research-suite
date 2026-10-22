@@ -1,0 +1,27 @@
+source_id,revision,citation_key,doi,title,year,tier,document_type,review_status,excluded,screening_decision,screening_stage,stream,full_text
+SRC_CARMELI2009,1,carmeli2009,10.1002/sres.932,Learning behaviours in the workplace: The role of high‐quality interpersonal relationships and psychological safety,2008,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_CROPANZANO2005,1,cropanzano2005,10.1177/0149206305279602,Social Exchange Theory: An Interdisciplinary Review,2005,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_DAFT1986,1,daft1986,10.1287/mnsc.32.5.554,"Organizational Information Requirements, Media Richness and Structural Design",1986,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_DETERT2007,1,detert2007,10.5465/amj.2007.26279183,Leadership Behavior and Employee Voice: Is the Door Really Open?,2007,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_ELLISON2015,1,ellison2015,10.1177/0002764214540510,The Use of Enterprise Social Network Sites for Knowledge Sharing in Distributed Organizations: The Role of Organizational Affordances,2014,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_EPPLER2004,1,eppler2004,10.1080/01972240490507974,"The Concept of Information Overload: A Review of Literature from Organization Science, Accounting, Marketing, MIS, and Related Disciplines",2004,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_GITTELL2002,1,gittell2002,10.1287/mnsc.48.11.1408.268,Coordinating Mechanisms in Care Provider Groups: Relational Coordination as a Mediator and Input Uncertainty as a Moderator of Performance Effects,2002,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_HANCOCK2020,1,hancock2020,10.1093/jcmc/zmz022,"AI-Mediated Communication: Definition, Research Agenda, and Ethical Considerations",2020,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_HOHENSTEIN2020,1,hohenstein2020,10.1016/j.chb.2019.106190,AI as a moral crumple zone: The effects of AI-mediated communication on attribution and trust,2020,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_HOHENSTEIN2023,1,hohenstein2023,10.1038/s41598-023-30938-9,Artificial intelligence in communication impacts language and social relationships,2023,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_JAKESCH2019,1,jakesch2019,10.1145/3290605.3300469,AI-Mediated Communication: How the Perception that Profile Text was Written by AI Affects Trustworthiness,2019,METADATA_ONLY,conference_paper,PUBLISHED,False,,,,False
+SRC_KAHN1990,1,kahn1990,10.2307/256287,PSYCHOLOGICAL CONDITIONS OF PERSONAL ENGAGEMENT AND DISENGAGEMENT AT WORK.,1990,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_KARR2010,1,karr2010,10.1016/j.chb.2010.03.008,When more is too much: Operationalizing technology overload and exploring its impact on knowledge worker productivity,2010,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_LEONARDI2014,1,leonardi2014,10.1287/isre.2014.0536,"Social Media, Knowledge Sharing, and Innovation: Toward a Theory of Communication Visibility",2014,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_LORENZ2019,1,lorenz2019,10.1038/s41467-019-09311-w,Accelerating dynamics of collective attention,2019,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_MIECZKOWSKI2021,1,mieczkowski2021,10.1145/3449091,AI-Mediated Communication: Language Use and Interpersonal Effects in a Referential Communication Task,2021,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_MORRISON2000,1,morrison2000,10.2307/259200,Organizational Silence: A Barrier to Change and Development in a Pluralistic World,2000,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_OCASIO1997,1,ocasio1997,10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.0.co;2-k,TOWARDS AN ATTENTION-BASED VIEW OF THE FIRM,1997,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_OCASIO2018,1,ocasio2018,10.1002/smj.2702,Communication and attention dynamics: An attention‐based view of strategic change,2017,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_QUINN2005,1,quinn2005,10.5465/amr.2005.15281422,Coordination as Energy-in-Conversation,2005,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_SAKS2006,1,saks2006,10.1108/02683940610690169,Antecedents and consequences of employee engagement,2006,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_SCHAUFELI2002,1,schaufeli2002,10.1023/a:1015630930326,The Measurement of Engagement and Burnout: A Two Sample Confirmatory Factor Analytic Approach,2002,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_TREEM2013,1,treem2013,10.2139/ssrn.2129853,"Social Media Use in Organizations: Exploring the Affordances of Visibility, Editability, Persistence, and Association",2012,METADATA_ONLY,preprint,NOT_REVIEWED,False,,,,False
+SRC_WALTHER1996,1,walther1996,10.1177/009365096023001001,"Computer-Mediated Communication: Impersonal, Interpersonal, and Hyperpersonal Interaction",1996,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_WENG2012,1,weng2012,10.1038/srep00335,Competition among memes in a world with limited attention,2012,METADATA_ONLY,journal_article,PUBLISHED,False,,,,False
+SRC_WU2007,1,wu2007,10.2139/ssrn.989672,Novelty and Collective Attention,2007,METADATA_ONLY,preprint,NOT_REVIEWED,False,,,,False

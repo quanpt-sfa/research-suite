@@ -53,7 +53,7 @@ Each item: what is wrong or untested today, where, how to show it, and what a fi
 * **Landscape entries join the ECA sampling pool.** Every landscape entry is a STANDARD statement sampled at the D15 rate; a large landscape therefore adds adjudication work. The
   coverage report already shows it; whether findings should default to HIGH once a candidate rests on them is decided in WP7 (`use_in_conclusion`).
 
-## B5. WP6.1: what is not validated, and what WP7 must change so that contribution generation fits each research genre (2026-10-23)
+## B5. WP6.1: what is not validated, and what WP7 must change so that contribution generation fits each research genre (2026-10-22; first written as 2026-10-23 in error)
 
 Not validated (needs the researcher's materials, not more code): relation proposals, implied assumptions and the levels-of-analysis guard have only been run on invented papers and scripted models
 (`REAL_CORPUS_VALIDATION_PENDING`). A model can state levels of analysis that are wrong, or use a synonym ("team" for "group") that makes the guard disagree with the researcher; the researcher's `add-proposal` path
@@ -64,8 +64,7 @@ For WP7 (not started; blocked on the WP14 acceptance):
 
 1. **A candidate declares the kind of contribution it would make**, taken from the problem's inquiry and the claims it rests on: an empirical gap (a finding not yet reported for a scope), a conceptual one (a reconceptualisation
    of a confirmed tension), an interpretive one, a methodological one. The checks that follow differ by kind (route considerations), and a candidate must say which claim kinds it rests on.
-2. **Candidates rest on confirmed relations, or say they do not.** A candidate built on a relation that is `UNCONFIRMED`, `needs_reassessment` or `ADDRESSED_IN_REVIEWED_LITERATURE` must show that state; a confirmed
-   `NOT_FOUND_IN_REVIEWED_SET` is only a statement about the reviewed set and cannot become "novel".
+2. **Candidates rest on confirmed relations, or say they do not.** A candidate built on a relation that is `UNCONFIRMED`, `needs_reassessment`, or whose recognition status is `RECOGNITION_NOT_ASSESSED`, `POTENTIAL_ADDRESSING_SOURCES`, `INSPECTION_INCOMPLETE` or `ADDRESSED_IN_INSPECTED_SET` must show that state; a `NOT_FOUND_IN_INSPECTED_SET` is only a statement about the inspected set in its corpus snapshot and cannot become "novel" (revised in the remediation of 2026-10-22; this item first referred to the earlier statuses).
 3. **Pre-emption for conceptual candidates.** The WP14 precedence rules and truth table are written for empirical claims (a study that already found the result). For a conceptual candidate "pre-empted" means that a theory
    already makes the argument; the researcher's expert cases must cover those, and the rules must be extended before WP8 (they are the researcher's to write; the suite does not fill them).
 4. **`use_in_conclusion` for landscape entries**: whether a theoretical claim or an interpretive finding that a candidate rests on becomes a HIGH ECA statement like a finding (decision for WP7).
@@ -74,3 +73,22 @@ For WP7 (not started; blocked on the WP14 acceptance):
 6. **Currency propagates**: `needs_reassessment` on an inference must carry into every candidate that cites it.
 7. The ordering gap noticed in the critical-synthesis contract: redoing `identify_tensions` after a loop-back does not make `search_recognition` runnable again (the engine reopens a step only on a diagnostic signal); the
    researcher records the step again by hand. A rule "redo downstream steps when an upstream decide step is redone" would need an engine change and is not part of WP6.1.
+
+## B6. WP6.1 remediation (2026-10-22): what remains open
+
+B1 and B2 above are still open and unchanged. No paid-model batch run was started by the remediation.
+
+* **The three execution contracts are `EXTRACTED` skeletons, now with methods and findings, still not validated by a researcher in those traditions.** The remediation fixed the structural error (no
+  methods/results for a critical review, a conceptual paper, a qualitative study) and defined for each step what it is for, what completes it (`completed_by`) and when it applies, but whether the steps and
+  their order match how such researchers work is the Research Owner's judgement (`REAL_CORPUS_VALIDATION_PENDING`). Which appraisal tool a critical review uses, if any, is deliberately left to the researcher's protocol.
+* **A step completed by "the researcher recorded it" is labelled `RECORDED_BY_RESEARCHER`.** The suite does not check the work behind such a record; a stage with only such steps reports `REQUIRES_VERIFICATION`.
+* **Recognition inspection is only as good as the inspected set.** Candidates come from word matching (BM25) over the held corpus and the retrieval results, not from a database search or semantic retrieval;
+  papers outside the corpus are invisible to it, and abstract-only sources can be listed but not inspected. `NOT_FOUND_IN_INSPECTED_SET` is a statement about the inspected set in its snapshot, never about the literature.
+* **`BASIS_CHECKED` is a structural check** (passage exists at the current revision, excerpt verbatim in it, limit stated; argument steps resolve). It does not judge whether the basis supports the criterion.
+  Earlier assessments are not upgraded and are shown `BASIS_NOT_TRACEABLE`.
+* **The pilot `ai_communication_critical_review` is set up, not run** (`pilots/ai_communication_critical_review/`, status `REAL_CORPUS_VALIDATION_PENDING`): 26 of 27 candidate seeds matched Crossref records
+  (`simon1971`, a book chapter, did not); the corpus is metadata only; the review protocol is a `DRAFT` with screening empty and appraisal undeclared. It needs the researcher's adoption of a protocol, lawful full texts,
+  and an approved model run before any landscape, relation or tension result exists. The seed list is the assistant's proposal, not a search result and not a screening decision.
+* **Redoing an upstream decide step does not reopen downstream steps automatically** (B5 item 7), still an engine change that is not part of WP6.1.
+* **`review-protocol` stores the screening log and PRISMA counts as data; there is no flow-diagram renderer** and no import from reference managers or database exports.
+* **Not started, on instruction:** WP7, WP8, WP14.

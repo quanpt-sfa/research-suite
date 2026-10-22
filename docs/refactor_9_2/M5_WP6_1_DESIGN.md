@@ -1,6 +1,8 @@
 # WP6.1 — Research-design-aware scientific synthesis: audit and change design
 
-Scope amendment to M5 (owner decision 2026-10-23, after WP6 `ac65f45`). WP6.1 does not complete M5 or Gate M. WP7–WP8 stay closed until WP14 is accepted.
+> **Amended by the remediation of 2026-10-22 (`M5_WP6_1_REMEDIATION.md`).** Superseded here: methods and results of the critical-synthesis and qualitative contracts are no longer `NOT_APPLICABLE` (the contracts define their method and findings); the recognition statuses `ADDRESSED_IN_REVIEWED_LITERATURE` and `NOT_FOUND_IN_REVIEWED_SET` are replaced by the inspection-based statuses; a question promoted from a problem reads the problem at the pinned revision; an assessment's verdict and the check of its basis are shown apart. The text below is kept as the record of what was decided then.
+
+Scope amendment to M5 (owner decision 2026-10-22, after WP6 `ac65f45`; the date was first written as 2026-10-23 in error, the commits are timestamped 2026-10-22). WP6.1 does not complete M5 or Gate M. WP7–WP8 stay closed until WP14 is accepted.
 Status when this document was written: baseline `5010732`, CI green on four jobs, WP6 accepted technically on a synthetic corpus and scripted adapters only.
 
 ## 1. What was audited

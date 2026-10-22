@@ -1,0 +1,159 @@
+{
+  "closure_digest": "d93cb2cfa261533e3efc73c3cac9a9d29015ceb58ddc3862db56b4fb1516424a",
+  "corpus_snapshot_id": "b50d36c7da6ae6b519ef61c4ea0b34a784d00b66652811832191c8342242c991",
+  "exporter_version": "1",
+  "files": [
+    {
+      "bytes": 1660,
+      "path": "coverage_report.md",
+      "sha256": "50a0a53154d7e5cd33496194058f78f629bea82e57c9f7659fe4ca3e4de87c20"
+    },
+    {
+      "bytes": 4728,
+      "path": "not_read_candidates.csv",
+      "sha256": "4f7ab17d02827425fb6f0c528555cb6b5e08108fc33a31b1fb7aac0c386433dd"
+    },
+    {
+      "bytes": 781,
+      "path": "queries_and_expansions.md",
+      "sha256": "95fe8076668632517ebc26c3b45cb15b010968c191f719cad847fc4fd53af5c8"
+    },
+    {
+      "bytes": 878,
+      "path": "reading_list.md",
+      "sha256": "97f3b80f6cff48a2cac643c68f80c0f054c6364638a4c813d3b6df4c53f7e324"
+    }
+  ],
+  "kind": "retrieval",
+  "not_available": [],
+  "provenance_counts": {
+    "coverage_report.md": {},
+    "not_read_candidates.csv": {
+      "data_derived": 19
+    },
+    "queries_and_expansions.md": {
+      "data_derived": 1
+    },
+    "reading_list.md": {}
+  },
+  "runs": [],
+  "scope": {
+    "retrieval": "RET_000001"
+  },
+  "sources": [
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_CARMELI2009",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_DETERT2007",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_GITTELL2002",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_HANCOCK2020",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_HOHENSTEIN2020",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_HOHENSTEIN2023",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_JAKESCH2019",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_KAHN1990",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_LEONARDI2014",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_LORENZ2019",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_MIECZKOWSKI2021",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_OCASIO1997",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_OCASIO2018",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_SAKS2006",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_SCHAUFELI2002",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_TREEM2013",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_WALTHER1996",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_WENG2012",
+      "text_sha256": null
+    },
+    {
+      "fulltext_status": "MISSING",
+      "revision": 1,
+      "source_id": "SRC_WU2007",
+      "text_sha256": null
+    }
+  ]
+}

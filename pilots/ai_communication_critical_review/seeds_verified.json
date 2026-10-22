@@ -1,0 +1,1695 @@
+{
+  "verified_at": "2026-10-22T11:51:38+00:00",
+  "source": "Crossref REST API (api.crossref.org), query.bibliographic",
+  "threshold": {
+    "title_similarity": 0.9,
+    "rule": "title similarity >= threshold AND first author's family name matches AND year within one year"
+  },
+  "results": [
+    {
+      "key": "ocasio1997",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Towards+an+attention-based+view+of+the+firm+Ocasio+1997&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.0.co;2-k",
+          "title": "TOWARDS AN ATTENTION-BASED VIEW OF THE FIRM",
+          "year": 1997,
+          "first_author": "OCASIO",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.3.co;2-b",
+          "title": "TOWARDS AN ATTENTION‐BASED VIEW OF THE FIRM",
+          "year": 1997,
+          "first_author": "OCASIO",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1177/14761270231223397",
+          "title": "Research frontiers on the attention-based view of the firm",
+          "year": 2024,
+          "first_author": "Joseph",
+          "similarity": 0.747,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.0.co;2-k",
+      "title": "TOWARDS AN ATTENTION-BASED VIEW OF THE FIRM",
+      "authors": [
+        "OCASIO, WILLIAM"
+      ],
+      "year": 1997,
+      "container": "Strategic Management Journal",
+      "volume": "18",
+      "issue": "S1",
+      "pages": "187-206",
+      "publisher": "Wiley",
+      "issued": [
+        [
+          1997,
+          7
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 1357
+    },
+    {
+      "key": "ocasio2018",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Communication+and+attention+dynamics%3A+An+attention-based+view+of+strategic+change+Ocasio+2018&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1002/smj.2702",
+          "title": "Communication and attention dynamics: An attention‐based view of strategic change",
+          "year": 2017,
+          "first_author": "Ocasio",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.0.co;2-k",
+          "title": "TOWARDS AN ATTENTION-BASED VIEW OF THE FIRM",
+          "year": 1997,
+          "first_author": "OCASIO",
+          "similarity": 0.545,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/(sici)1097-0266(199707)18:1+<187::aid-smj936>3.3.co;2-b",
+          "title": "TOWARDS AN ATTENTION‐BASED VIEW OF THE FIRM",
+          "year": 1997,
+          "first_author": "OCASIO",
+          "similarity": 0.545,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1002/smj.2702",
+      "title": "Communication and attention dynamics: An attention‐based view of strategic change",
+      "authors": [
+        "Ocasio, William",
+        "Laamanen, Tomi",
+        "Vaara, Eero"
+      ],
+      "year": 2017,
+      "container": "Strategic Management Journal",
+      "volume": "39",
+      "issue": "1",
+      "pages": "155-167",
+      "publisher": "Wiley",
+      "issued": [
+        [
+          2017,
+          12,
+          13
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 391
+    },
+    {
+      "key": "wu2007",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Novelty+and+collective+attention+Wu+2007&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.2139/ssrn.989672",
+          "title": "Novelty and Collective Attention",
+          "year": 2007,
+          "first_author": "Wu",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "posted-content"
+        },
+        {
+          "doi": "10.1073/pnas.0704916104",
+          "title": "Novelty and collective attention",
+          "year": 2007,
+          "first_author": "Wu",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.2139/ssrn.1087132",
+          "title": "Popularity, Novelty and Attention",
+          "year": 2008,
+          "first_author": "Wu",
+          "similarity": 0.656,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "posted-content"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.2139/ssrn.989672",
+      "title": "Novelty and Collective Attention",
+      "authors": [
+        "Wu, Fang",
+        "Huberman, Bernardo A."
+      ],
+      "year": 2007,
+      "container": "",
+      "volume": null,
+      "issue": null,
+      "pages": null,
+      "publisher": "Elsevier BV",
+      "issued": [
+        [
+          2007
+        ]
+      ],
+      "publication": {
+        "crossref_type": "posted-content",
+        "label": "posted content (preprint or similar)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 9
+    },
+    {
+      "key": "lorenz2019",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Accelerating+dynamics+of+collective+attention+Lorenz-Spreen+2019&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1038/s41467-019-09311-w",
+          "title": "Accelerating dynamics of collective attention",
+          "year": 2019,
+          "first_author": "Lorenz-Spreen",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1038/s41598-023-46187-9",
+          "title": "Modelling opinion dynamics under the impact of influencer and media strategies",
+          "year": 2023,
+          "first_author": "Helfmann",
+          "similarity": 0.423,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1126/sciadv.ady8022",
+          "title": "Disentangling participation in online political discussions with a collective field experiment",
+          "year": 2025,
+          "first_author": "Oswald",
+          "similarity": 0.374,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1038/s41467-019-09311-w",
+      "title": "Accelerating dynamics of collective attention",
+      "authors": [
+        "Lorenz-Spreen, Philipp",
+        "Mønsted, Bjarke Mørch",
+        "Hövel, Philipp",
+        "Lehmann, Sune"
+      ],
+      "year": 2019,
+      "container": "Nature Communications",
+      "volume": "10",
+      "issue": "1",
+      "pages": null,
+      "publisher": "Springer Science and Business Media LLC",
+      "issued": [
+        [
+          2019,
+          4,
+          15
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 257
+    },
+    {
+      "key": "weng2012",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Competition+among+memes+in+a+world+with+limited+attention+Weng+2012&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1038/srep00335",
+          "title": "Competition among memes in a world with limited attention",
+          "year": 2012,
+          "first_author": "Weng",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1038/srep02304",
+          "title": "Erratum: Competition among memes in a world with limited attention",
+          "year": 2013,
+          "first_author": "Weng",
+          "similarity": 0.934,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1016/j.jet.2018.09.012",
+          "title": "Limited attention, competition and welfare",
+          "year": 2018,
+          "first_author": "Hefti",
+          "similarity": 0.347,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1038/srep00335",
+      "title": "Competition among memes in a world with limited attention",
+      "authors": [
+        "Weng, L.",
+        "Flammini, A.",
+        "Vespignani, A.",
+        "Menczer, F."
+      ],
+      "year": 2012,
+      "container": "Scientific Reports",
+      "volume": "2",
+      "issue": "1",
+      "pages": null,
+      "publisher": "Springer Science and Business Media LLC",
+      "issued": [
+        [
+          2012,
+          3,
+          29
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": true,
+        "notes": [
+          "updated-by: erratum 10.1038/srep02304"
+        ]
+      },
+      "cited_by_count_at_query": 455
+    },
+    {
+      "key": "simon1971",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Designing+organizations+for+an+information-rich+world+Simon+1971&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.46895/lis.9.371",
+          "title": "Organizations concerned with library and information science",
+          "year": 1971,
+          "first_author": "Horiuchi",
+          "similarity": 0.589,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1016/s1475-9152(07)00216-5",
+          "title": "Designing organizations as if life matters: Principles of appreciative organizing",
+          "year": null,
+          "first_author": "Whitney",
+          "similarity": 0.561,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1016/0172-2190(81)90023-5",
+          "title": "Organizations and events",
+          "year": 1981,
+          "first_author": null,
+          "similarity": 0.5,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "NOT_VERIFIED",
+      "reason": "no Crossref record matched title, first author and year together; the seed is a book chapter and may have no DOI"
+    },
+    {
+      "key": "leonardi2014",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Social+media%2C+knowledge+sharing%2C+and+innovation%3A+Toward+a+theory+of+communication+visibility+Leonardi+2014&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1287/isre.2014.0536",
+          "title": "Social Media, Knowledge Sharing, and Innovation: Toward a Theory of Communication Visibility",
+          "year": 2014,
+          "first_author": "Leonardi",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.4324/9781315884172-8",
+          "title": "The Sharing Industry",
+          "year": 2016,
+          "first_author": null,
+          "similarity": 0.275,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.4324/9781315884172-7",
+          "title": "What Are Social Media?",
+          "year": 2016,
+          "first_author": null,
+          "similarity": 0.218,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1287/isre.2014.0536",
+      "title": "Social Media, Knowledge Sharing, and Innovation: Toward a Theory of Communication Visibility",
+      "authors": [
+        "Leonardi, Paul M."
+      ],
+      "year": 2014,
+      "container": "Information Systems Research",
+      "volume": "25",
+      "issue": "4",
+      "pages": "796-816",
+      "publisher": "Institute for Operations Research and the Management Sciences (INFORMS)",
+      "issued": [
+        [
+          2014,
+          12
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 661
+    },
+    {
+      "key": "treem2013",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Social+media+use+in+organizations%3A+Exploring+the+affordances+of+visibility%2C+editability%2C+persistence%2C+and+association+Treem+2013&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.2139/ssrn.2129853",
+          "title": "Social Media Use in Organizations: Exploring the Affordances of Visibility, Editability, Persistence, and Association",
+          "year": 2012,
+          "first_author": "Treem",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "posted-content"
+        },
+        {
+          "doi": "10.4324/9780203113653-11",
+          "title": "Social Media Use in Organizations: Exploring the Affordances of Visibility, Editability, Persistence, and Association",
+          "year": 2012,
+          "first_author": null,
+          "similarity": 1.0,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1080/23808985.2013.11679130",
+          "title": "Social Media Use in Organizations: Exploring the Affordances of Visibility, Editability, Persistence, and Association",
+          "year": 2013,
+          "first_author": "Treem",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.2139/ssrn.2129853",
+      "title": "Social Media Use in Organizations: Exploring the Affordances of Visibility, Editability, Persistence, and Association",
+      "authors": [
+        "Treem, Jeffrey W.",
+        "Leonardi, Paul M."
+      ],
+      "year": 2012,
+      "container": "",
+      "volume": null,
+      "issue": null,
+      "pages": null,
+      "publisher": "Elsevier BV",
+      "issued": [
+        [
+          2012
+        ]
+      ],
+      "publication": {
+        "crossref_type": "posted-content",
+        "label": "posted content (preprint or similar)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 176
+    },
+    {
+      "key": "morrison2000",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Organizational+silence%3A+A+barrier+to+change+and+development+in+a+pluralistic+world+Morrison+2000&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.2307/259200",
+          "title": "Organizational Silence: A Barrier to Change and Development in a Pluralistic World",
+          "year": 2000,
+          "first_author": "Morrison",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1515/9781685855574-007",
+          "title": "3 Organizational Change Strategies: Development Interventions",
+          "year": 1987,
+          "first_author": null,
+          "similarity": 0.596,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.2307/259205",
+          "title": "Change and Development in a Pluralistic World: The View from the Classics",
+          "year": 2000,
+          "first_author": "Kilduff",
+          "similarity": 0.588,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.2307/259200",
+      "title": "Organizational Silence: A Barrier to Change and Development in a Pluralistic World",
+      "authors": [
+        "Morrison, Elizabeth Wolfe",
+        "Milliken, Frances J."
+      ],
+      "year": 2000,
+      "container": "The Academy of Management Review",
+      "volume": "25",
+      "issue": "4",
+      "pages": "706",
+      "publisher": "Academy of Management",
+      "issued": [
+        [
+          2000,
+          10
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 6511
+    },
+    {
+      "key": "detert2007",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Leadership+behavior+and+employee+voice%3A+Is+the+door+really+open%3F+Detert+2007&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.5465/amj.2007.26279183",
+          "title": "Leadership Behavior and Employee Voice: Is the Door Really Open?",
+          "year": 2007,
+          "first_author": "Detert",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1007/978-3-032-19163-2_5",
+          "title": "Authentic Leadership and Employee Voice",
+          "year": 2026,
+          "first_author": "McCleskey",
+          "similarity": 0.574,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1007/978-3-032-19163-2_9",
+          "title": "Gender, Inclusive Leadership, and Employee Voice",
+          "year": 2026,
+          "first_author": "Bayntun-Lees",
+          "similarity": 0.537,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.5465/amj.2007.26279183",
+      "title": "Leadership Behavior and Employee Voice: Is the Door Really Open?",
+      "authors": [
+        "Detert, James R.",
+        "Burris, Ethan R."
+      ],
+      "year": 2007,
+      "container": "Academy of Management Journal",
+      "volume": "50",
+      "issue": "4",
+      "pages": "869-884",
+      "publisher": "Academy of Management",
+      "issued": [
+        [
+          2007,
+          8
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 1800
+    },
+    {
+      "key": "ellison2015",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=The+use+of+enterprise+social+network+sites+for+knowledge+sharing+in+distributed+organizations%3A+The+role+of+organizational+affordances+Ellison+2015&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1177/0002764214540510",
+          "title": "The Use of Enterprise Social Network Sites for Knowledge Sharing in Distributed Organizations: The Role of Organizational Affordances",
+          "year": 2014,
+          "first_author": "Ellison",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1007/978-3-319-24520-1_14",
+          "title": "Knowledge Sharing in Organizations: A Multilevel Network Analysis",
+          "year": 2015,
+          "first_author": "Zappa",
+          "similarity": 0.469,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.24052/icbes/askstesnc",
+          "title": "Achieving successful knowledge sharing through enterprise social network collaboration",
+          "year": 2017,
+          "first_author": "Shaarawy",
+          "similarity": 0.339,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "proceedings-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1177/0002764214540510",
+      "title": "The Use of Enterprise Social Network Sites for Knowledge Sharing in Distributed Organizations: The Role of Organizational Affordances",
+      "authors": [
+        "Ellison, Nicole B.",
+        "Gibbs, Jennifer L.",
+        "Weber, Matthew S."
+      ],
+      "year": 2014,
+      "container": "American Behavioral Scientist",
+      "volume": "59",
+      "issue": "1",
+      "pages": "103-123",
+      "publisher": "SAGE Publications",
+      "issued": [
+        [
+          2014,
+          7,
+          17
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 330
+    },
+    {
+      "key": "kahn1990",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Psychological+conditions+of+personal+engagement+and+disengagement+at+work+Kahn+1990&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.2307/256287",
+          "title": "PSYCHOLOGICAL CONDITIONS OF PERSONAL ENGAGEMENT AND DISENGAGEMENT AT WORK.",
+          "year": 1990,
+          "first_author": "Kahn",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1007/978-3-319-51886-2_2",
+          "title": "Engagement and Disengagement at Work: What’s New",
+          "year": 2017,
+          "first_author": "Imperatori",
+          "similarity": 0.605,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.58955/jecer.159729",
+          "title": "Work engagement of novice ECEC teachers: psychological safety in terms of personal and workplace resources",
+          "year": 2026,
+          "first_author": "Rautamies",
+          "similarity": 0.427,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.2307/256287",
+      "title": "PSYCHOLOGICAL CONDITIONS OF PERSONAL ENGAGEMENT AND DISENGAGEMENT AT WORK.",
+      "authors": [
+        "Kahn, W. A."
+      ],
+      "year": 1990,
+      "container": "Academy of Management Journal",
+      "volume": "33",
+      "issue": "4",
+      "pages": "692-724",
+      "publisher": "Academy of Management",
+      "issued": [
+        [
+          1990,
+          12,
+          1
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 12596
+    },
+    {
+      "key": "saks2006",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Antecedents+and+consequences+of+employee+engagement+Saks+2006&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1108/02683940610690169",
+          "title": "Antecedents and consequences of employee engagement",
+          "year": 2006,
+          "first_author": "Saks",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.4337/9781035364213.00011",
+          "title": "Antecedents and consequences of employee engagement",
+          "year": 2026,
+          "first_author": "Saks",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1108/joepp-06-2018-0034",
+          "title": "Antecedents and consequences of employee engagement revisited",
+          "year": 2019,
+          "first_author": "Saks",
+          "similarity": 0.911,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1108/02683940610690169",
+      "title": "Antecedents and consequences of employee engagement",
+      "authors": [
+        "Saks, Alan M."
+      ],
+      "year": 2006,
+      "container": "Journal of Managerial Psychology",
+      "volume": "21",
+      "issue": "7",
+      "pages": "600-619",
+      "publisher": "Emerald",
+      "issued": [
+        [
+          2006,
+          10,
+          1
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 3478
+    },
+    {
+      "key": "cropanzano2005",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Social+exchange+theory%3A+An+interdisciplinary+review+Cropanzano+2005&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1177/0149206305279602",
+          "title": "Social Exchange Theory: An Interdisciplinary Review",
+          "year": 2005,
+          "first_author": "Cropanzano",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.4337/9781035322473",
+          "title": "Handbook of Social Exchange Theory in Organizations",
+          "year": 2026,
+          "first_author": null,
+          "similarity": 0.554,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "edited-book"
+        },
+        {
+          "doi": "10.1007/978-1-4614-4175-5_6",
+          "title": "Social Exchange Theory, Exchange Resources, and Interpersonal Relationships: A Modest Resolution of Theoretical Difficulties",
+          "year": 2012,
+          "first_author": "Mitchell",
+          "similarity": 0.456,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1177/0149206305279602",
+      "title": "Social Exchange Theory: An Interdisciplinary Review",
+      "authors": [
+        "Cropanzano, Russell",
+        "Mitchell, Marie S."
+      ],
+      "year": 2005,
+      "container": "Journal of Management",
+      "volume": "31",
+      "issue": "6",
+      "pages": "874-900",
+      "publisher": "SAGE Publications",
+      "issued": [
+        [
+          2005,
+          12
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 7195
+    },
+    {
+      "key": "schaufeli2002",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=The+measurement+of+engagement+and+burnout%3A+A+two+sample+confirmatory+factor+analytic+approach+Schaufeli+2002&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1023/a:1015630930326",
+          "title": "The Measurement of Engagement and Burnout: A Two Sample Confirmatory Factor Analytic Approach",
+          "year": 2002,
+          "first_author": "Schaufeli",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1111/j.1464-0597.2010.00428.x",
+          "title": "The Convergent Validity of Four Burnout Measures in a Chinese Sample: A Confirmatory Factor‐Analytic Approach",
+          "year": 2010,
+          "first_author": "Qiao",
+          "similarity": 0.683,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/jclp.22927",
+          "title": "A five‐sample confirmatory factor analytic study of burnout‐depression overlap",
+          "year": 2020,
+          "first_author": "Bianchi",
+          "similarity": 0.476,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1023/a:1015630930326",
+      "title": "The Measurement of Engagement and Burnout: A Two Sample Confirmatory Factor Analytic Approach",
+      "authors": [
+        "Schaufeli, Wilmar B.",
+        "Salanova, Marisa",
+        "González-romá, Vicente",
+        "Bakker, Arnold B."
+      ],
+      "year": 2002,
+      "container": "Journal of Happiness Studies",
+      "volume": "3",
+      "issue": "1",
+      "pages": "71-92",
+      "publisher": "Springer Science and Business Media LLC",
+      "issued": [
+        [
+          2002,
+          3
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 7825
+    },
+    {
+      "key": "quinn2005",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Coordination+as+energy-in-conversation+Quinn+2005&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.5465/amr.2005.15281422",
+          "title": "Coordination as Energy-in-Conversation",
+          "year": 2005,
+          "first_author": "Quinn",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.35613/ccl.2008.2014",
+          "title": "Globally Responsible Leadership: A Leading Edge Conversation",
+          "year": 2008,
+          "first_author": "Quinn",
+          "similarity": 0.442,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "report"
+        },
+        {
+          "doi": "10.2986/tren.033-0477",
+          "title": "Gathering For Holy Conversation: A Spirituality of Communal Discernment",
+          "year": null,
+          "first_author": "QUINN",
+          "similarity": 0.302,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "dissertation"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.5465/amr.2005.15281422",
+      "title": "Coordination as Energy-in-Conversation",
+      "authors": [
+        "Quinn, Ryan W.",
+        "Dutton, Jane E."
+      ],
+      "year": 2005,
+      "container": "Academy of Management Review",
+      "volume": "30",
+      "issue": "1",
+      "pages": "36-57",
+      "publisher": "Academy of Management",
+      "issued": [
+        [
+          2005,
+          1
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 289
+    },
+    {
+      "key": "gittell2002",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Coordinating+mechanisms+in+care+provider+groups%3A+Relational+coordination+as+a+mediator+and+input+uncertainty+as+a+moderator+of+performance+effects+Gittell+2002&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1287/mnsc.48.11.1408.268",
+          "title": "Coordinating Mechanisms in Care Provider Groups: Relational Coordination as a Mediator and Input Uncertainty as a Moderator of Performance Effects",
+          "year": 2002,
+          "first_author": "Hoffer Gittell",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.4324/9781003036371-6",
+          "title": "Constructing Relational Coordination Variables",
+          "year": 2021,
+          "first_author": "Gittell",
+          "similarity": 0.387,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1515/9780804797047",
+          "title": "Transforming Relationships for High Performance: The Power of Relational Coordination",
+          "year": 2016,
+          "first_author": "Hoffer Gittell",
+          "similarity": 0.367,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "monograph"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1287/mnsc.48.11.1408.268",
+      "title": "Coordinating Mechanisms in Care Provider Groups: Relational Coordination as a Mediator and Input Uncertainty as a Moderator of Performance Effects",
+      "authors": [
+        "Hoffer Gittell, Jody"
+      ],
+      "year": 2002,
+      "container": "Management Science",
+      "volume": "48",
+      "issue": "11",
+      "pages": "1408-1426",
+      "publisher": "Institute for Operations Research and the Management Sciences (INFORMS)",
+      "issued": [
+        [
+          2002,
+          11
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 659
+    },
+    {
+      "key": "carmeli2009",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Learning+behaviours+in+the+workplace%3A+The+role+of+high-quality+interpersonal+relationships+and+psychological+safety+Carmeli+2009&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1002/sres.932",
+          "title": "Learning behaviours in the workplace: The role of high‐quality interpersonal relationships and psychological safety",
+          "year": 2008,
+          "first_author": "Carmeli",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1080/10400419.2010.504654",
+          "title": "Inclusive Leadership and Employee Involvement in Creative Tasks in the Workplace: The Mediating Role of Psychological Safety",
+          "year": 2010,
+          "first_author": "Carmeli",
+          "similarity": 0.525,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/job.565",
+          "title": "High‐quality relationships, psychological safety, and learning from failures in work organizations",
+          "year": 2008,
+          "first_author": "Carmeli",
+          "similarity": 0.442,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1002/sres.932",
+      "title": "Learning behaviours in the workplace: The role of high‐quality interpersonal relationships and psychological safety",
+      "authors": [
+        "Carmeli, Abraham",
+        "Brueller, Daphna",
+        "Dutton, Jane E"
+      ],
+      "year": 2008,
+      "container": "Systems Research and Behavioral Science",
+      "volume": "26",
+      "issue": "1",
+      "pages": "81-98",
+      "publisher": "Wiley",
+      "issued": [
+        [
+          2008,
+          11,
+          25
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 504
+    },
+    {
+      "key": "hancock2020",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=AI-Mediated+Communication%3A+Definition%2C+Research+Agenda%2C+and+Ethical+Considerations+Hancock+2020&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1093/jcmc/zmz022",
+          "title": "AI-Mediated Communication: Definition, Research Agenda, and Ethical Considerations",
+          "year": 2020,
+          "first_author": "Hancock",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.25215/9371837764.10",
+          "title": "ETHICAL CONSIDERATIONS IN AI – POWERED BUSINESS OPERATIONS",
+          "year": 2020,
+          "first_author": "Dr. P. Maheswari",
+          "similarity": 0.326,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.31219/osf.io/asnv4",
+          "title": "Examining Agency, Expertise, and Roles of AI Systems in AI-Mediated Communication",
+          "year": 2022,
+          "first_author": "Mieczkowski",
+          "similarity": 0.308,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "posted-content"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1093/jcmc/zmz022",
+      "title": "AI-Mediated Communication: Definition, Research Agenda, and Ethical Considerations",
+      "authors": [
+        "Hancock, Jeffrey T",
+        "Naaman, Mor",
+        "Levy, Karen"
+      ],
+      "year": 2020,
+      "container": "Journal of Computer-Mediated Communication",
+      "volume": "25",
+      "issue": "1",
+      "pages": "89-100",
+      "publisher": "Oxford University Press (OUP)",
+      "issued": [
+        [
+          2020,
+          1
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 599
+    },
+    {
+      "key": "jakesch2019",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=AI-Mediated+Communication%3A+How+the+Perception+that+Profile+Text+was+Written+by+AI+Affects+Trustworthiness+Jakesch+2019&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1145/3290605.3300469",
+          "title": "AI-Mediated Communication: How the Perception that Profile Text was Written by AI Affects Trustworthiness",
+          "year": 2019,
+          "first_author": "Jakesch",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "proceedings-article"
+        },
+        {
+          "doi": "10.46916/19022026-3-978-5-00276-010-7",
+          "title": "ALGORITHMIC TRUST IN A MULTIPOLAR CONTEXT: HOW AI-MEDIATED COMMUNICATION RESHAPES THE PERCEPTION OF MEDIA TEXTS AMONG CROSS-CULTURAL AUDIENCES",
+          "year": 2026,
+          "first_author": "",
+          "similarity": 0.488,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.31234/osf.io/tb37z",
+          "title": "Experimental Evidence for Efficiency Gains on Trust via AI-Mediated Communication",
+          "year": 2024,
+          "first_author": "Purcell",
+          "similarity": 0.262,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "posted-content"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1145/3290605.3300469",
+      "title": "AI-Mediated Communication: How the Perception that Profile Text was Written by AI Affects Trustworthiness",
+      "authors": [
+        "Jakesch, Maurice",
+        "French, Megan",
+        "Ma, Xiao",
+        "Hancock, Jeffrey T.",
+        "Naaman, Mor"
+      ],
+      "year": 2019,
+      "container": "Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems",
+      "volume": null,
+      "issue": null,
+      "pages": "1-13",
+      "publisher": "ACM",
+      "issued": [
+        [
+          2019,
+          5,
+          2
+        ]
+      ],
+      "publication": {
+        "crossref_type": "proceedings-article",
+        "label": "conference proceedings paper",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 175
+    },
+    {
+      "key": "hohenstein2020",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=AI+as+a+moral+crumple+zone%3A+The+effects+of+AI-mediated+communication+on+attribution+and+trust+Hohenstein+2020&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1016/j.chb.2019.106190",
+          "title": "AI as a moral crumple zone: The effects of AI-mediated communication on attribution and trust",
+          "year": 2020,
+          "first_author": "Hohenstein",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.2139/ssrn.7288164",
+          "title": "AI and I: Differential Effects of Competency Signals on Trust and Responsibility Attribution in Human-AI Collaboration",
+          "year": 2026,
+          "first_author": "Gonzalez",
+          "similarity": 0.473,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "posted-content"
+        },
+        {
+          "doi": "10.2139/ssrn.5993114",
+          "title": "Epistemic Authority without Stability? The Moral Crumple Zone in Agentic AI Workflows",
+          "year": 2026,
+          "first_author": "Bronner-Martin",
+          "similarity": 0.389,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "posted-content"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1016/j.chb.2019.106190",
+      "title": "AI as a moral crumple zone: The effects of AI-mediated communication on attribution and trust",
+      "authors": [
+        "Hohenstein, Jess",
+        "Jung, Malte"
+      ],
+      "year": 2020,
+      "container": "Computers in Human Behavior",
+      "volume": "106",
+      "issue": null,
+      "pages": "106190",
+      "publisher": "Elsevier BV",
+      "issued": [
+        [
+          2020,
+          5
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 179
+    },
+    {
+      "key": "hohenstein2023",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Artificial+intelligence+in+communication+impacts+language+and+social+relationships+Hohenstein+2023&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1038/s41598-023-30938-9",
+          "title": "Artificial intelligence in communication impacts language and social relationships",
+          "year": 2023,
+          "first_author": "Hohenstein",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1038/s41598-023-43601-0",
+          "title": "Publisher Correction: Artificial intelligence in communication impacts language and social relationships",
+          "year": 2023,
+          "first_author": "Hohenstein",
+          "similarity": 0.886,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.62047/css.2023.12.31.135",
+          "title": "Artificial Intelligence and its Impacts on the Society",
+          "year": 2023,
+          "first_author": "Mahajan",
+          "similarity": 0.647,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "journal-article"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1038/s41598-023-30938-9",
+      "title": "Artificial intelligence in communication impacts language and social relationships",
+      "authors": [
+        "Hohenstein, Jess",
+        "Kizilcec, Rene F.",
+        "DiFranzo, Dominic",
+        "Aghajari, Zhila",
+        "Mieczkowski, Hannah",
+        "Levy, Karen",
+        "Naaman, Mor",
+        "Hancock, Jeffrey",
+        "Jung, Malte F."
+      ],
+      "year": 2023,
+      "container": "Scientific Reports",
+      "volume": "13",
+      "issue": "1",
+      "pages": null,
+      "publisher": "Springer Science and Business Media LLC",
+      "issued": [
+        [
+          2023,
+          4,
+          4
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": true,
+        "notes": [
+          "updated-by: correction 10.1038/s41598-023-43601-0",
+          "relation correction: 10.1038/s41598-023-43601-0"
+        ]
+      },
+      "cited_by_count_at_query": 232
+    },
+    {
+      "key": "mieczkowski2021",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=AI-Mediated+Communication%3A+Language+Use+and+Interpersonal+Effects+in+a+Referential+Communication+Task+Mieczkowski+2021&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1145/3449091",
+          "title": "AI-Mediated Communication: Language Use and Interpersonal Effects in a Referential Communication Task",
+          "year": 2021,
+          "first_author": "Mieczkowski",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1007/978-3-030-67425-0_3",
+          "title": "Computer-Mediated Communication (CMC)",
+          "year": 2021,
+          "first_author": "Chew",
+          "similarity": 0.376,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "book-chapter"
+        },
+        {
+          "doi": "10.1007/978-3-030-67425-0_1",
+          "title": "Communication is Vital",
+          "year": 2021,
+          "first_author": "Chew",
+          "similarity": 0.314,
+          "first_author_matches": false,
+          "year_ok": true,
+          "type": "book-chapter"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1145/3449091",
+      "title": "AI-Mediated Communication: Language Use and Interpersonal Effects in a Referential Communication Task",
+      "authors": [
+        "Mieczkowski, Hannah",
+        "Hancock, Jeffrey T.",
+        "Naaman, Mor",
+        "Jung, Malte",
+        "Hohenstein, Jess"
+      ],
+      "year": 2021,
+      "container": "Proceedings of the ACM on Human-Computer Interaction",
+      "volume": "5",
+      "issue": "CSCW1",
+      "pages": "1-14",
+      "publisher": "Association for Computing Machinery (ACM)",
+      "issued": [
+        [
+          2021,
+          4,
+          13
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 85
+    },
+    {
+      "key": "eppler2004",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=The+concept+of+information+overload%3A+A+review+of+literature+from+organization+science%2C+accounting%2C+marketing%2C+MIS%2C+and+related+disciplines+Eppler+2004&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1080/01972240490507974",
+          "title": "The Concept of Information Overload: A Review of Literature from Organization Science, Accounting, Marketing, MIS, and Related Disciplines",
+          "year": 2004,
+          "first_author": "Eppler",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1109/emr.2010.5494688",
+          "title": "The concept of information overload: a review of literature from organization science, accounting, marketing, MIS, and related disciplines",
+          "year": 2010,
+          "first_author": null,
+          "similarity": 1.0,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1007/978-3-8349-9772-2_15",
+          "title": "The Concept of Information Overload - A Review of Literature from Organization Science, Accounting, Marketing, MIS, and Related Disciplines (2004)",
+          "year": null,
+          "first_author": "Eppler",
+          "similarity": 0.978,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "book-chapter"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1080/01972240490507974",
+      "title": "The Concept of Information Overload: A Review of Literature from Organization Science, Accounting, Marketing, MIS, and Related Disciplines",
+      "authors": [
+        "Eppler, Martin J.",
+        "Mengis, Jeanne"
+      ],
+      "year": 2004,
+      "container": "The Information Society",
+      "volume": "20",
+      "issue": "5",
+      "pages": "325-344",
+      "publisher": "Informa UK Limited",
+      "issued": [
+        [
+          2004,
+          11
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 1585
+    },
+    {
+      "key": "karr2010",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=When+more+is+too+much%3A+Operationalizing+technology+overload+and+exploring+its+impact+on+knowledge+worker+productivity+Karr-Wisniewski+2010&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1016/j.chb.2010.03.008",
+          "title": "When more is too much: Operationalizing technology overload and exploring its impact on knowledge worker productivity",
+          "year": 2010,
+          "first_author": "Karr-Wisniewski",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1037/t13009-000",
+          "title": "Information Overload Measure",
+          "year": 2010,
+          "first_author": "Karr-Wisniewski",
+          "similarity": 0.292,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "dataset"
+        },
+        {
+          "doi": "10.1037/t13013-000",
+          "title": "Technology Dependence Measure",
+          "year": 2010,
+          "first_author": "Karr-Wisniewski",
+          "similarity": 0.29,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "dataset"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1016/j.chb.2010.03.008",
+      "title": "When more is too much: Operationalizing technology overload and exploring its impact on knowledge worker productivity",
+      "authors": [
+        "Karr-Wisniewski, Pamela",
+        "Lu, Ying"
+      ],
+      "year": 2010,
+      "container": "Computers in Human Behavior",
+      "volume": "26",
+      "issue": "5",
+      "pages": "1061-1072",
+      "publisher": "Elsevier BV",
+      "issued": [
+        [
+          2010,
+          9
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 577
+    },
+    {
+      "key": "walther1996",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Computer-mediated+communication%3A+Impersonal%2C+interpersonal%2C+and+hyperpersonal+interaction+Walther+1996&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1177/009365096023001001",
+          "title": "Computer-Mediated Communication: Impersonal, Interpersonal, and Hyperpersonal Interaction",
+          "year": 1996,
+          "first_author": "WALTHER",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1207/s15327027hc1502_10",
+          "title": "Impersonal, Interpersonal, and Hyperpersonal Social Support: Cancer and Older Adults",
+          "year": 2003,
+          "first_author": "Robinson",
+          "similarity": 0.59,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.1002/9781118426456.ch1",
+          "title": "Interpersonal and Hyperpersonal Dimensions of Computer‐Mediated Communication",
+          "year": 2015,
+          "first_author": "Walther",
+          "similarity": 0.534,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "other"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1177/009365096023001001",
+      "title": "Computer-Mediated Communication: Impersonal, Interpersonal, and Hyperpersonal Interaction",
+      "authors": [
+        "WALTHER, JOSEPH B."
+      ],
+      "year": 1996,
+      "container": "Communication Research",
+      "volume": "23",
+      "issue": "1",
+      "pages": "3-43",
+      "publisher": "SAGE Publications",
+      "issued": [
+        [
+          1996,
+          2
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 2911
+    },
+    {
+      "key": "daft1986",
+      "query_url": "https://api.crossref.org/works?query.bibliographic=Organizational+information+requirements%2C+media+richness+and+structural+design+Daft+1986&rows=5&select=DOI%2Ctitle%2Csubtitle%2Cissued%2Ccontainer-title%2Ctype%2Cauthor%2Crelation%2Cupdate-to%2Cupdated-by%2Cpublisher%2Cvolume%2Cissue%2Cpage%2Cis-referenced-by-count",
+      "nearest": [
+        {
+          "doi": "10.1287/mnsc.32.5.554",
+          "title": "Organizational Information Requirements, Media Richness and Structural Design",
+          "year": 1986,
+          "first_author": "Daft",
+          "similarity": 1.0,
+          "first_author_matches": true,
+          "year_ok": true,
+          "type": "journal-article"
+        },
+        {
+          "doi": "10.2139/ssrn.969774",
+          "title": "Organizational Information Asymmetry, Media Sociability and Structural Design",
+          "year": 2007,
+          "first_author": "Touve",
+          "similarity": 0.789,
+          "first_author_matches": false,
+          "year_ok": false,
+          "type": "posted-content"
+        },
+        {
+          "doi": "10.21236/ada128980",
+          "title": "Information Richness. A New Approach to Managerial Behavior and Organization Design",
+          "year": 1983,
+          "first_author": "Daft",
+          "similarity": 0.418,
+          "first_author_matches": true,
+          "year_ok": false,
+          "type": "report"
+        }
+      ],
+      "status": "VERIFIED_CROSSREF",
+      "doi": "10.1287/mnsc.32.5.554",
+      "title": "Organizational Information Requirements, Media Richness and Structural Design",
+      "authors": [
+        "Daft, Richard L.",
+        "Lengel, Robert H."
+      ],
+      "year": 1986,
+      "container": "Management Science",
+      "volume": "32",
+      "issue": "5",
+      "pages": "554-571",
+      "publisher": "Institute for Operations Research and the Management Sciences (INFORMS)",
+      "issued": [
+        [
+          1986,
+          5
+        ]
+      ],
+      "publication": {
+        "crossref_type": "journal-article",
+        "label": "published journal article (per Crossref type; peer review is not asserted by Crossref)",
+        "retraction_or_correction_noticed": false,
+        "notes": []
+      },
+      "cited_by_count_at_query": 6858
+    }
+  ],
+  "summary": {
+    "seeds": 27,
+    "verified": 26,
+    "not_verified": 1
+  }
+}

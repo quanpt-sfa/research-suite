@@ -117,6 +117,13 @@ def register(sub: Any) -> None:
     q.add_argument("--exclude", action="append")
     _inquiry_args(q)
 
+    q = add("update-question", "Bring a question promoted from a problem up to the problem's current inquiry (a question keeps the problem revision it was promoted from until you do this)",
+            lambda st, a: P.update_question_inquiry(st, tok(a), a.question, a.rationale),
+            lambda o: print(f"{o['research_question']} r{o['revision']}: now follows {o['problem_id']} r{o['to_problem_revision']} (was r{o['from_problem_revision']})"
+                            + (f"; to review: {', '.join(o['needs_review'])}" if o["needs_review"] else "")))
+    q.add_argument("question")
+    q.add_argument("--rationale", required=True)
+
     q = add("set-aside", "Set the problem aside, with your reason", lambda st, a: P.set_aside(st, tok(a), a.problem, a.rationale),
             lambda o: print(f"{o['problem_id']} r{o['revision']}: {o['status']}"))
     q.add_argument("problem")

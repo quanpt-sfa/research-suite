@@ -1,6 +1,6 @@
 # Research Suite 9.2 → M5: task entry points, Contribution Discovery, knowledge accumulation, readable outputs
 
-## Current status (updated 2026-10-23)
+## Current status (updated 2026-10-22; first written as 2026-10-23 in error)
 
 **M5 and Gate M are not complete.** This document began as a plan for approval; the sections below are the **original design decisions (historical)** and are kept, with the amendments that
 superseded parts of them. Three levels are kept apart on purpose: *implemented* (code exists), *technically tested* (tests and CI pass), *scientifically validated* (checked against real literature,
@@ -15,7 +15,7 @@ real full texts or expert judgement). **Nothing in M5 is scientifically validate
 | WP4 ResearchProblem | `af5ffcc` | 39709007021 green | no | TECHNICALLY_ACCEPTED |
 | WP5 internal retrieval | `3ad25bc`; review remediation `b9e152c` | 39710830016, 39719697663 green | no (benchmark is synthetic) | TECHNICALLY_ACCEPTED |
 | WP6 Landscape | `ac65f45` | 39722036277 green | no | **TECHNICALLY_ACCEPTED — REAL SCIENTIFIC VALIDATION PENDING** |
-| WP6.1 research-design-aware synthesis (scope amendment, owner 2026-10-23) | `95b49ef` | 39730603834 green | no (`REAL_CORPUS_VALIDATION_PENDING`) | implemented and tested on synthetic corpora; awaiting the owner's review (`M5_WP6_1_DESIGN.md`, `M5_WP6_1_REPORT.md`) |
+| WP6.1 research-design-aware synthesis (scope amendment, owner 2026-10-22) | `95b49ef` | 39730603834 green | no (`REAL_CORPUS_VALIDATION_PENDING`) | implemented and tested on synthetic corpora; awaiting the owner's review (`M5_WP6_1_DESIGN.md`, `M5_WP6_1_REPORT.md`) |
 | WP14 precedence table | design and fixtures only | fixtures tested | expert cases not written | **waiting for the researcher's 20 expert cases and scientific approval** |
 | WP7–WP13 | not started | — | — | WP7–WP8 closed until WP14 is accepted; WP9–WP13 not approved |
 

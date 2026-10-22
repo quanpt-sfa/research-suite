@@ -11,7 +11,9 @@ research landscape assess LAND_000001 E008 --verdict LIMITED --criteria c.json -
 research landscape link-reproduction LAND_000001 E008 --kind package_run --package PKG_X --outputs pos --reason "..."
 research landscape propose LAND_000001        # a model proposes relations between studies and implied assumptions (WP6.1): proposals only, checked by a gate
 research landscape add-proposal LAND_000001 --proposal p.json --provenance critic_proposed --critic "Reviewer 2"
-research landscape candidates LAND_000001 I003 # held full texts that may already address a proposed tension (words only, no model)
+research landscape candidates LAND_000001 I003 # held sources that may already address a proposed tension (words only, no model): papers to read, not evidence
+research landscape inspect LAND_000001 I003 --results r.json --rationale "..."   # your inspection of them: the only basis of a recognition statement
+research review-protocol set|adopt|screen|audit PROB_000001 ...   # the method of the review as a record (docs/REVIEW_PROTOCOL.md)
 research export landscape LAND_000001          # research_landscape.md, evidence_table.csv, works_and_versions.csv, relations.csv + manifest
 research task start --goal build_landscape --statement "..." --params '{"retrieval_id": "RET_000001"}'     # the same, as a task with checkpoints
 ```
@@ -65,6 +67,8 @@ reflexivity; conceptual clarity, logical coherence, consistency of assumptions, 
 reconstruction of the prior literature, evidence that an attributed assumption exists, fair treatment of competing interpretations, the reasoning from tension to reconceptualisation). They are prompts
 shown in the view and the export, never a mandatory checklist, and no composite scientific score is computed from them (there is no rubric or validation for one). Nothing is ever displayed as "established" or "supported" without the three values beside it.
 
+**The verdict and the check of its basis are kept apart.** A criterion may cite its basis only in words, or as `basis_refs` (`[{kind: source|passage, ref, revision, excerpt, supports_only}]`) or as an `argument` record (`{premises, steps: [{from, infers}], conclusion, rival_assumptions | no_rivals_reason}`). The verdict is the researcher's judgement (`RESEARCHER_ASSESSED`, `INFERENCE_JUDGMENT`). The suite's check of the basis is recomputed whenever the assessment is shown (`discovery/basis.py`): `BASIS_NOT_TRACEABLE` (a sentence only; every assessment recorded before this existed is shown so and is not upgraded), `BASIS_TRACEABLE` (the source, passage or argument record is identified), `BASIS_CHECKED` (deterministic checks passed: the passage is quote-verified at its source's current revision, the excerpt the criterion relies on is verbatim inside it and the limit of what it supports is stated; or the argument's steps cite existing premises or earlier steps, a conclusion is given and rivals are listed or their absence justified), `BASIS_CHECK_FAILED` and `BASIS_STALE` (a cited source was revised). **BASIS_CHECKED means those checks passed. It does not mean the passage supports the criterion, the argument is valid or the conclusion is right.** A basis that failed its checks does not count toward `SUPPORTED_WITHIN_SCOPE`; a sentence-only basis still counts, as before.
+
 Landscape entries are statements ECA can adjudicate (stratum `Landscape:<type>`): the coverage policy samples them like any other STANDARD statement and raises
 the rate where errors occur.
 
@@ -95,12 +99,20 @@ A relation carries: the claims (entry, Source@revision, passage, place), what th
 **Confirming** needs your reason, and, where information is missing, your acknowledgement (`--acknowledge-missing`). A model's proposal never becomes an entry (an assumption nobody wrote is never shown as an author's), never
 confirms itself, and the confirmed state does not change what it is: its provenance stays.
 
-**Recognition.** The suite never says that a tension is "unrecognised". For a proposed relation the view says `ADDRESSED_IN_REVIEWED_LITERATURE` (with the entries, Source@revision, how, and the quote) or
-`NOT_FOUND_IN_REVIEWED_SET`: a statement about the works read, not about the literature, and not a claim that the idea is new. `landscape candidates` lists held full texts that may already address it (BM25 over
-the stored sections, no model); a match is a paper to read, not a finding.
+**Recognition (remediated).** Whether the literature already addresses a tension is stated only from an **inspection record**; a model's list of sources is a hint, and an empty list is not a finding.
 
-**What each conclusion rests on.** Every inference lists its Source@revisions; `needs_reassessment` explains why when one of them was revised, removed or excluded, and for `NOT_FOUND_IN_REVIEWED_SET` also when the
-corpus changed since the statement was made. The state you gave (for example `CONFIRMED_BY_RESEARCHER`) stays visible next to the flag.
+| Status | Means |
+|---|---|
+| `RECOGNITION_NOT_ASSESSED` | no inspection is recorded; nothing about absence follows (a model that named no source has assessed nothing) |
+| `POTENTIAL_ADDRESSING_SOURCES` | a model named sources and nobody has inspected them (shown as unverified hints) |
+| `ADDRESSED_IN_INSPECTED_SET` | you inspected sources and at least one is recorded as addressing the tension, with a verbatim quote that became a quote-verified EvidencePassage at that Source@revision |
+| `NOT_FOUND_IN_INSPECTED_SET` | a stated set of candidates (found by stated terms, in the stated corpus snapshot) was inspected completely, every candidate was readable, and none addresses the tension: a statement about that set in that snapshot, not about the literature and not about novelty |
+| `INSPECTION_INCOMPLETE` | a candidate was not inspected, or only an abstract or metadata is held for it (it cannot be inspected: recorded as `NOT_READABLE`); no absence statement is made |
+
+`landscape candidates` lists held sources (full texts by BM25 over the stored sections, weaker tiers by title and abstract, and model hints) with whether each can be read: **a match is a paper to read, not evidence that it addresses the tension, and finding none is not evidence that none does.** `landscape inspect` records, per source, `ADDRESSES`, `MENTIONS_PHENOMENON_ONLY` (a mention is not a resolution), `DOES_NOT_ADDRESS` or `NOT_READABLE`, what you inspected (the whole text or which sections), a note, and for the first two the verbatim words that show it. The record keeps the tension's identity (a digest of its definition), the corpus snapshot, the terms and candidates, what was not inspected, the limitations, and your decision with reason and time. Versions of one work are judged separately: if one version addresses the tension and another does not, the status is stated with that conflict (the argument may have been withdrawn). An inspection is flagged `needs_reassessment` when the corpus changed (for a negative or incomplete one), when an inspected source was revised, or when the tension was redefined.
+
+**What each conclusion rests on.** Every inference lists its Source@revisions; `needs_reassessment` explains why when one of them was revised, removed or excluded, and for a negative or incomplete recognition statement also when the
+corpus changed since the inspection. The state you gave (for example `CONFIRMED_BY_RESEARCHER`) stays visible next to the flag.
 
 ## Versions
 
