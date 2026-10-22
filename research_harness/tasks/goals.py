@@ -65,6 +65,21 @@ def _assess_claims(p: dict) -> dict[str, Any]:
     return {"steps": steps, "mandatory_checkpoints": ["S03"]}
 
 
+def _build_landscape(p: dict) -> dict[str, Any]:
+    _need(p, "retrieval_id")
+    rid = p["retrieval_id"]
+    steps = [
+        _decide("S01", "reading_list", "Confirm the reading list of the retrieval run (set aside, add, acquire: research retrieval review)", {"retrieval_id": rid}, []),
+        _run("S02", "landscape_build", "Read the reading list and build the landscape (entries are quote-verified; nothing is decided)",
+             {"retrieval_id": rid, "versions": p.get("versions", "retrieved"), "works": p.get("works"), "aliases": p.get("aliases"), "label": p.get("label"),
+              "allow_stale_corpus": bool(p.get("allow_stale_corpus"))}, ["S01"], model=True),
+        _decide("S03", "landscape_review", "Review the suite's inferences (contradictions, version differences, differing definitions) and any later version that was not read",
+                {"landscape": {"$step": "S02", "key": "landscape_id"}}, ["S02"]),
+        _run("S04", "export_landscape", "Write the readable landscape export", {"landscape": {"$step": "S02", "key": "landscape_id"}, "out": p.get("out")}, ["S03"]),
+    ]
+    return {"steps": steps, "mandatory_checkpoints": ["S01", "S03"]}
+
+
 @dataclass(frozen=True)
 class Goal:
     name: str
@@ -79,9 +94,10 @@ GOALS: dict[str, Goal] = {g.name: g for g in (
     Goal("evaluate_methods", "From sources to a drafted playbook, its adjudications and a readable export", _evaluate_methods,
          ("sources", "playbook_id", "label")),
     Goal("assess_claims", "Adjudicate the high-impact statements the coverage policy asks for", _assess_claims),
+    Goal("build_landscape", "From a current retrieval run to a landscape of the literature (entries with passages, evidence dimensions, suite inferences) and its export",
+         _build_landscape, ("retrieval_id",)),
     Goal("discover_contribution", "From a problem to checked contribution candidates", None,
-         missing=("problem representation (WP4)", "content retrieval and coverage (WP5)", "landscape (WP6)", "candidate generation (WP7)",
-                  "adversarial verification (WP8)")),
+         missing=("candidate generation (WP7)", "adversarial verification (WP8)")),
     Goal("analyze_results", "From an analysis plan to results and claim changes", None,
          missing=("a packaged plan-run step with a working directory (planned with the Results export)",)),
 )}

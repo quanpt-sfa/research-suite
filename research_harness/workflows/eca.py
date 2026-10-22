@@ -608,11 +608,11 @@ def use_in_conclusion(store: StateStore, token: Optional[str], statements: list[
 
 
 def iter_statements(store: StateStore) -> list[dict[str, Any]]:
-    """Every statement ECA can be asked about: Claims, and the elements of knowledge items, playbooks and arguments."""
+    """Every statement ECA can be asked about: Claims, and the elements of knowledge items, playbooks, arguments and landscapes."""
     out = []
     with store.read() as conn:
         rows = conn.execute("SELECT object_id, object_type FROM object_heads WHERE object_type IN "
-                            "('Claim','KnowledgeItem','MethodPlaybook','ContributionArgument') ORDER BY object_id").fetchall()
+                            "('Claim','KnowledgeItem','MethodPlaybook','ContributionArgument','Landscape') ORDER BY object_id").fetchall()
         objs = [store.get_object(r[0], conn=conn) for r in rows]
     for o in objs:
         c = o["content"]

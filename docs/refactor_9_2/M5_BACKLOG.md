@@ -37,3 +37,18 @@ Each item: what is wrong or untested today, where, how to show it, and what a fi
 * Proposals made by an earlier model for statements the researcher has not confirmed stay on record after a model change and still appear in
   `research adjudicate sheet` next to the new model's proposals; the sheet could mark them superseded.
 * Tasks created before the charge rows existed (2026-10-22) report a spend of 0. No such task exists outside tests.
+
+## B4. Noticed in WP5 review follow-up and WP6 (2026-10-22), not fixed
+
+* **Relationship naming is the weak point of contradiction detection.** The landscape compares findings only by the relationship label the extraction gave them (case and
+  spacing normalised, plus equivalences the researcher declares with `--same`). A contradiction stated in other words is missed; the coverage counts findings without a label but cannot
+  count findings whose label differs. A measured answer needs the researcher's own list of known contradictions in a real pilot corpus (not written here); a model-assisted label
+  normaliser would be a proposal to the researcher, never a decision, and should be evaluated against that list before it is adopted.
+* **No model-proposed method assessment.** `landscape assess` is written by the researcher only. A model could draft criteria and threats from the paper's design passages and the
+  methodological literature in the library; it would be stored as a proposal, and the cap in `method_verdict` would still apply to anything the researcher confirms. Not built.
+* **Introduction arguments and contribution claims are not part of the landscape** (`RP_INTRO_ARGUMENT`, `RP_CONTRIBUTION` are not run by `landscape build`): WP7 needs the claimed
+  contribution of the closest papers and will add that step with its own tests.
+* **Retrieval top-n union.** The reading list is the union of the R1 and R2 lists, each cut at `top_n` per tier and query, so it can hold up to twice that; a paper ranked below the
+  cut in both lists is not shown. Whether a larger default `top_n` is worth the reading cost is an empirical question for a real corpus.
+* **Landscape entries join the ECA sampling pool.** Every landscape entry is a STANDARD statement sampled at the D15 rate; a large landscape therefore adds adjudication work. The
+  coverage report already shows it; whether findings should default to HIGH once a candidate rests on them is decided in WP7 (`use_in_conclusion`).

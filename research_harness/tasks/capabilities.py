@@ -166,6 +166,47 @@ def _cov_pins(store: StateStore, inp: dict) -> list:
     return [["coverage", canonical_json_hash(eca.coverage_report(store, rate=float(inp.get("rate", eca.STANDARD_SAMPLE_RATE))))]]
 
 
+# ------------------------------------------------------------------------------------------------ landscape
+
+def _land_run(ctx: Ctx, inp: dict) -> dict:
+    from research_harness.discovery import landscape as L
+    _need(inp, "retrieval_id")
+    out = L.build(ctx.store, ctx.token, inp["retrieval_id"], ctx.adapter, label=inp.get("label"), versions=inp.get("versions") or "retrieved", works=inp.get("works"),
+                  aliases=inp.get("aliases"), allow_stale_corpus=bool(inp.get("allow_stale_corpus")), reuse=not ctx.fresh)
+    return {k: out[k] for k in ("landscape_id", "revision", "entries", "inferences", "works_read", "sources_read", "model_calls")}
+
+
+def _land_pins(store: StateStore, inp: dict) -> list:
+    run = store.get_object(inp.get("retrieval_id") or "")
+    if not run or run["object_type"] != "RetrievalRun":
+        raise KnowledgeError("STEP_INPUT_MISSING", f"{inp.get('retrieval_id')} is not a RetrievalRun in this store")
+    return _head_pin(store, run["object_id"]) + _head_pin(store, run["content"]["problem_id"])
+
+
+def _land_estimate(store: StateStore, inp: dict) -> dict:
+    from research_harness.discovery import landscape as L
+    if not inp.get("retrieval_id"):
+        return _est(None, None, None, "unknown_run")
+    e = L.estimate(store, inp["retrieval_id"], versions=inp.get("versions") or "retrieved", works=inp.get("works"))
+    return _est(e["llm_calls"], e["input_tokens"], e["llm_calls"] * DEFAULT_OUTPUT_TOKENS, "heuristic: whole source text as input for each (source, protocol) not yet extracted; cached extractions cost 0")
+
+
+def _land_export_run(ctx: Ctx, inp: dict) -> dict:
+    from pathlib import Path
+    from research_harness.export.landscape import build_landscape_export
+    from research_harness.export.manifest import write_export
+    _need(inp, "landscape")
+    out = write_export(ctx.store, build_landscape_export(ctx.store, inp["landscape"]), Path(inp["out"]) if inp.get("out") else None)
+    return {k: out[k] for k in ("out", "closure_digest", "files", "not_available")}
+
+
+def _land_export_pins(store: StateStore, inp: dict) -> list:
+    if not inp.get("landscape") or not store.get_object(inp["landscape"]):
+        return []
+    from research_harness.export.landscape import build_landscape_export
+    return [["closure", build_landscape_export(store, inp["landscape"]).closure_digest]]
+
+
 _ZERO = lambda store, inp: _est(0, 0, 0, "deterministic")   # noqa: E731
 
 CAPABILITIES: dict[str, Capability] = {c.name: c for c in (
@@ -174,4 +215,6 @@ CAPABILITIES: dict[str, Capability] = {c.name: c for c in (
     Capability("adjudicate_pending", "1", True, _adj_run, _adj_pins, _adj_estimate),
     Capability("export_methods", "1", False, _export_run, _export_pins, _ZERO, ("playbook",)),
     Capability("coverage_check", "1", False, _cov_run, _cov_pins, _ZERO),
+    Capability("landscape_build", "1", True, _land_run, _land_pins, _land_estimate, ("retrieval_id",)),
+    Capability("export_landscape", "1", False, _land_export_run, _land_export_pins, _ZERO, ("landscape",)),
 )}

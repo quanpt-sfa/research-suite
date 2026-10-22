@@ -20,7 +20,8 @@ research task status|retry|revise|replan|cancel|continue ...
 | `review_literature` | confirm sources → literature review (theory, method or contribution) | reading list |
 | `evaluate_methods` | confirm sources → method review → draft playbook → adjudicate pending (proposals) → confirm adjudications → readable export | reading list, adjudications |
 | `assess_claims` | coverage → adjudicate pending → confirm adjudications → coverage | adjudications |
-| `discover_contribution`, `analyze_results` | **not available yet**: `task goals` says what is missing | |
+| `build_landscape` | confirm the retrieval run's reading list → build the landscape (`landscape_build`, model calls) → review inferences and later versions not read → export (`docs/LANDSCAPE.md`) | reading list, landscape review |
+| `discover_contribution`, `analyze_results` | **not available yet**: `task goals` says what is missing (`discover_contribution` needs candidate generation and adversarial verification, WP7–WP8) | |
 
 A goal that needs capabilities the suite lacks is refused with the list of what is missing; it is never planned with a stand-in (I19).
 

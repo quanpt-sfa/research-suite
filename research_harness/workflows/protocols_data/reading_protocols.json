@@ -203,6 +203,86 @@
           "repeatable": true
         }
       ]
+    },
+    "RP_LANDSCAPE": {
+      "version": "1",
+      "label": "Landscape record",
+      "purpose": "Record what a paper reports, assumes, measures and admits, as entries of a landscape of the literature on a problem. The landscape compares papers; it never decides which of them is right.",
+      "dimension": "results",
+      "extra_dimensions": [
+        "introduction_argument",
+        "design",
+        "sample_construction",
+        "measurement",
+        "robustness",
+        "limitations",
+        "conclusion"
+      ],
+      "include_unlabeled": true,
+      "instructions": "Report only what the paper states, with the words that state it. Each `value` restates only what its own `quote` says: no number, name or condition that is not in the quote. For a `finding`, put a short name for the relationship or quantity it concerns in `label` (for example \"detection model use -> manipulation\"; use the same name for the same relationship wherever it appears) and its direction in `type`: positive, negative, null (no effect found), mixed or descriptive. Do not compare the paper with other papers, do not say whether a finding is credible, and do not complete an assumption or a limitation the paper does not state; what it does not state is a gap.",
+      "fields": [
+        {
+          "name": "finding",
+          "description": "a result the paper reports, with the population, period or estimand the sentence states",
+          "required": false,
+          "repeatable": true,
+          "max_records": 8,
+          "types": [
+            "positive",
+            "negative",
+            "null",
+            "mixed",
+            "descriptive"
+          ]
+        },
+        {
+          "name": "boundary_condition",
+          "description": "where the paper says a finding does not hold, or holds only under a stated condition",
+          "required": false,
+          "repeatable": true,
+          "max_records": 4
+        },
+        {
+          "name": "identifying_assumption",
+          "description": "an assumption the paper's design relies on; type says whether the paper tests it",
+          "required": false,
+          "repeatable": true,
+          "max_records": 4,
+          "types": [
+            "tested_in_source",
+            "untested_in_source",
+            "testing_not_stated"
+          ]
+        },
+        {
+          "name": "measurement",
+          "description": "the measure or proxy used for a construct (name the construct in `label`)",
+          "required": false,
+          "repeatable": true,
+          "max_records": 5
+        },
+        {
+          "name": "design",
+          "description": "the study design and the data regime, as stated",
+          "required": false,
+          "repeatable": true,
+          "max_records": 3
+        },
+        {
+          "name": "stated_limitation",
+          "description": "a limitation the authors themselves state",
+          "required": false,
+          "repeatable": true,
+          "max_records": 4
+        },
+        {
+          "name": "open_question",
+          "description": "a question the authors themselves leave open",
+          "required": false,
+          "repeatable": true,
+          "max_records": 3
+        }
+      ]
     }
   }
 }

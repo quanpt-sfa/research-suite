@@ -86,7 +86,7 @@ def test_task_starts_without_question_manuscript_methods_or_results(world):
 def test_unavailable_goals_say_what_is_missing(world):
     with pytest.raises(KnowledgeError) as e:
         T.start_task(world["store"], world["token"], goal="discover_contribution", statement="a phenomenon")
-    assert e.value.code == "GOAL_NOT_AVAILABLE" and "retrieval" in e.value.message and "WP5" in e.value.message
+    assert e.value.code == "GOAL_NOT_AVAILABLE" and "candidate generation" in e.value.message and "WP7" in e.value.message
     with pytest.raises(KnowledgeError, match="GOAL_UNKNOWN"):
         T.start_task(world["store"], world["token"], goal="make_it_publishable", statement="x")
     with pytest.raises(KnowledgeError, match="GOAL_PARAMS_MISSING"):

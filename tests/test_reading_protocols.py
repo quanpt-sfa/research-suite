@@ -84,7 +84,7 @@ def test_each_protocol_reads_its_own_sections(proj):
         assert out["status"] == "EXTRACTED" and not out["rejected"], (pid, out["rejected"])
     assert "Agency theory" in seen_text(theory) and "We start from all annual reports" not in seen_text(theory)
     assert "We start from all annual reports" not in seen_text(intro) and "Financial restatements impose" in seen_text(intro)
-    assert {p.id for p in rp.list_protocols()} == {"RP_INTRO_ARGUMENT", "RP_THEORY", "RP_METHOD", "RP_CONTRIBUTION"}
+    assert {p.id for p in rp.list_protocols()} == {"RP_INTRO_ARGUMENT", "RP_THEORY", "RP_METHOD", "RP_CONTRIBUTION", "RP_LANDSCAPE"}
 
 
 def test_extraction_is_cached_by_source_revision_and_protocol_version(proj):

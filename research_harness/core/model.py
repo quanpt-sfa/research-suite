@@ -71,8 +71,10 @@ OBJECT_TYPES = (
     "ResearchProblem",
     # M5 WP5 (appended): one execution of the internal retrieval over the corpus, with its queries, hits and coverage
     "RetrievalRun",
+    # M5 WP6 (appended): the landscape of the literature on a problem: entries with their passages, evidence dimensions and suite inferences
+    "Landscape",
 )
-SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem", "RetrievalRun"})  # can never be created through a proposal
+SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem", "RetrievalRun", "Landscape"})  # can never be created through a proposal
 
 CLAIM_TIERS = (
     "descriptive", "associational", "predictive", "mechanism_consistent", "causal",

@@ -1,0 +1,305 @@
+# WP6 demo: from a searched reading list to a landscape, over five invented papers
+
+$ research retrieval new PROB_000001 --term "detection models earnings manipulation disclosure audit fees" --label "Detection models and manipulation" --project PRJ_LAND --home <home> --token-file <token-file>
+RET_000001 created (DRAFT): queries Q1; 0 proposed term(s) offered from the interpretations
+
+$ research retrieval search RET_000001 --project PRJ_LAND --home <home> --token-file <token-file>
+RET_000001 r2 searched on snapshot f1d8b53a73e7: reading list 5 full text(s), 1 possibly relevant not read, 0 citation neighbour(s)
+
+# 1. build: every record is quote-verified; the evidence of a version stays at that version (the retrieved one is read by default)
+
+$ research landscape build RET_000001 --project PRJ_LAND --home <home> --token-file <token-file>
+LAND_000001 built: 15 entries from 4 works (4 sources), 8 model call(s); inferences {'contradiction': 1, 'version_difference': 0, 'definitions_differ': 1}
+
+$ research landscape show LAND_000001 --project PRJ_LAND --home <home>
+LAND_000001 r1 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  4 of 4 works read (4 sources, versions: retrieved); 15 entries {'boundary': 2, 'construct': 2, 'design': 2, 'finding': 4, 'identifying_assumption': 1, 'measurement': 1, 'mechanism': 1, 'method_limitation': 1, 'unresolved_question': 1}; 1 possibly relevant papers not read
+  ! W_REN: SRC_REN2 is held and later than what was read (SRC_REN1); its claims are not in this landscape
+  construct:
+    E001 SRC_PAT@1 (earnings manipulation): Earnings manipulation: a managerial choice moving reported earnings from performance.
+        quote: "We define earnings manipulation as a managerial choice that moves reported earnings away from underlying performance."  at SRC_PAT chars 124-241 (passage EP_SRC_PAT_THEORY_124)
+    E002 SRC_QUINN@1 (earnings manipulation): Earnings manipulation: any action changing reported earnings but not cash flows.
+        quote: "We define earnings manipulation as any action that changes reported earnings without changing cash flows."  at SRC_QUINN chars 123-228 (passage EP_SRC_QUINN_THEORY_123)
+  mechanism:
+    E003 SRC_PAT@1: Detection raises the expected cost of manipulation, so managers manipulate less.
+        quote: "Detection models raise the expected cost of manipulation, so managers manipulate less."  at SRC_PAT chars 242-328 (passage EP_SRC_PAT_THEORY_242)
+  design:
+    E004 SRC_PAT@1: A difference-in-differences design around staggered adoption of a detection model.
+        quote: "We use a difference-in-differences design around the staggered adoption of a regulator's detection model."  at SRC_PAT chars 348-453 (passage EP_SRC_PAT_LANDSCAPE_348)
+    E005 SRC_QUINN@1: A regression discontinuity around the size threshold for detection models.
+        quote: "We use a regression discontinuity around the regulator's size threshold for detection models."  at SRC_QUINN chars 248-341 (passage EP_SRC_QUINN_LANDSCAPE_248)
+  measurement:
+    E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
+        quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
+  identifying_assumption:
+    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+        quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
+  finding:
+    E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
+        quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage EP_SRC_PAT_LANDSCAPE_662)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
+        quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
+        quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
+        quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
+        quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
+    E013 SRC_QUINN@1 (detection model use -> manipulation): The increase is concentrated among firms with high analyst coverage.
+        quote: "The increase is concentrated among firms with high analyst coverage."  at SRC_QUINN chars 453-521 (passage EP_SRC_QUINN_LANDSCAPE_453)
+  method_limitation:
+    E014 SRC_PAT@1: Listed US firms, 2010 to 2020 only.
+        quote: "Our sample is limited to listed US firms from 2010 to 2020."  at SRC_PAT chars 837-896 (passage EP_SRC_PAT_LANDSCAPE_837)
+  unresolved_question:
+    E015 SRC_PAT@1: Whether managers move to other margins of manipulation is open.
+        quote: "Whether managers move to other margins of manipulation remains open."  at SRC_PAT chars 897-965 (passage EP_SRC_PAT_LANDSCAPE_897)
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 contradiction (opposite_direction) on "detection model use -> manipulation": E008 (SRC_PAT@1, negative) vs E009 (SRC_QUINN@1, positive); not reviewed by you
+    I002 definitions_differ (wording) on "earnings manipulation": E001 (SRC_PAT@1) vs E002 (SRC_QUINN@1); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+# 2. the reading dimension moves only through ECA and your confirmation; a model proposal alone does not move it
+
+$ research adjudicate run --statement LAND_000001 --element E008 --passage <passage> --project PRJ_LAND --home <home> --token-file <token-file>
+ADJ_000001 -> SUPPORTED_AS_STATED
+
+$ research adjudicate confirm ADJ_000001 --verdict SUPPORTED_AS_STATED --rationale "The restatement is a fair reading of the quote." --project PRJ_LAND --home <home> --token-file <token-file>
+ADJ_000002 confirms ADJ_000001: SUPPORTED_AS_STATED
+
+# 3. your decision on the suite's inference; the inference stays PROVISIONAL and generated by the suite
+
+$ research landscape review LAND_000001 I001 NEEDS_SCOPE --reason "One measures accruals, the other real earnings management: check the populations before calling it a conflict." --project PRJ_LAND --home <home> --token-file <token-file>
+LAND_000001 r2: I001 NEEDS_SCOPE
+
+# 4. a method assessment is yours alone, and its verdict is capped by the rule (no methodological-literature basis -> LIMITED)
+
+$ research landscape assess LAND_000001 E008 --verdict SUPPORTED_WITHIN_SCOPE --criteria <criteria.json> --threats "[{"threat": "Concurrent regulatory changes", "status": "addressed"}]" --rationale "Looks sound to me, but I only have the paper's own basis." --project PRJ_LAND --home <home> --token-file <token-file>
+LAND_000001 r3: E008 method assessment LIMITED (capped: no criterion rests on methodological literature (application papers alone do not show a design permits an inference))
+
+$ research landscape show LAND_000001 --project PRJ_LAND --home <home>
+LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  4 of 4 works read (4 sources, versions: retrieved); 15 entries {'boundary': 2, 'construct': 2, 'design': 2, 'finding': 4, 'identifying_assumption': 1, 'measurement': 1, 'mechanism': 1, 'method_limitation': 1, 'unresolved_question': 1}; 1 possibly relevant papers not read
+  ! W_REN: SRC_REN2 is held and later than what was read (SRC_REN1); its claims are not in this landscape
+  construct:
+    E001 SRC_PAT@1 (earnings manipulation): Earnings manipulation: a managerial choice moving reported earnings from performance.
+        quote: "We define earnings manipulation as a managerial choice that moves reported earnings away from underlying performance."  at SRC_PAT chars 124-241 (passage EP_SRC_PAT_THEORY_124)
+    E002 SRC_QUINN@1 (earnings manipulation): Earnings manipulation: any action changing reported earnings but not cash flows.
+        quote: "We define earnings manipulation as any action that changes reported earnings without changing cash flows."  at SRC_QUINN chars 123-228 (passage EP_SRC_QUINN_THEORY_123)
+  mechanism:
+    E003 SRC_PAT@1: Detection raises the expected cost of manipulation, so managers manipulate less.
+        quote: "Detection models raise the expected cost of manipulation, so managers manipulate less."  at SRC_PAT chars 242-328 (passage EP_SRC_PAT_THEORY_242)
+  design:
+    E004 SRC_PAT@1: A difference-in-differences design around staggered adoption of a detection model.
+        quote: "We use a difference-in-differences design around the staggered adoption of a regulator's detection model."  at SRC_PAT chars 348-453 (passage EP_SRC_PAT_LANDSCAPE_348)
+    E005 SRC_QUINN@1: A regression discontinuity around the size threshold for detection models.
+        quote: "We use a regression discontinuity around the regulator's size threshold for detection models."  at SRC_QUINN chars 248-341 (passage EP_SRC_QUINN_LANDSCAPE_248)
+  measurement:
+    E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
+        quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
+  identifying_assumption:
+    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+        quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
+  finding:
+    E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
+        quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
+        reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+    E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
+        quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
+        quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
+        quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
+        quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
+    E013 SRC_QUINN@1 (detection model use -> manipulation): The increase is concentrated among firms with high analyst coverage.
+        quote: "The increase is concentrated among firms with high analyst coverage."  at SRC_QUINN chars 453-521 (passage EP_SRC_QUINN_LANDSCAPE_453)
+  method_limitation:
+    E014 SRC_PAT@1: Listed US firms, 2010 to 2020 only.
+        quote: "Our sample is limited to listed US firms from 2010 to 2020."  at SRC_PAT chars 837-896 (passage EP_SRC_PAT_LANDSCAPE_837)
+  unresolved_question:
+    E015 SRC_PAT@1: Whether managers move to other margins of manipulation is open.
+        quote: "Whether managers move to other margins of manipulation remains open."  at SRC_PAT chars 897-965 (passage EP_SRC_PAT_LANDSCAPE_897)
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 contradiction (opposite_direction) on "detection model use -> manipulation": E008 (SRC_PAT@1, negative) vs E009 (SRC_QUINN@1, positive); your decision: NEEDS_SCOPE
+    I002 definitions_differ (wording) on "earnings manipulation": E001 (SRC_PAT@1) vs E002 (SRC_QUINN@1); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+# 5. reading every held version of each work: a reversal between versions is a version difference, never a contradiction between studies
+
+$ research landscape build RET_000001 --versions all --label "All versions" --project PRJ_LAND --home <home> --token-file <token-file>
+LAND_000002 built: 16 entries from 4 works (5 sources), 2 model call(s); inferences {'contradiction': 1, 'version_difference': 1, 'definitions_differ': 1}
+
+$ research landscape show LAND_000002 --project PRJ_LAND --home <home>
+LAND_000002 r1 "All versions" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: CURRENT  search config: CURRENT  sources read: CURRENT
+  4 of 4 works read (5 sources, versions: all); 16 entries {'boundary': 2, 'construct': 2, 'design': 2, 'finding': 5, 'identifying_assumption': 1, 'measurement': 1, 'mechanism': 1, 'method_limitation': 1, 'unresolved_question': 1}; 1 possibly relevant papers not read
+  construct:
+    E001 SRC_PAT@1 (earnings manipulation): Earnings manipulation: a managerial choice moving reported earnings from performance.
+        quote: "We define earnings manipulation as a managerial choice that moves reported earnings away from underlying performance."  at SRC_PAT chars 124-241 (passage EP_SRC_PAT_THEORY_124)
+    E002 SRC_QUINN@1 (earnings manipulation): Earnings manipulation: any action changing reported earnings but not cash flows.
+        quote: "We define earnings manipulation as any action that changes reported earnings without changing cash flows."  at SRC_QUINN chars 123-228 (passage EP_SRC_QUINN_THEORY_123)
+  mechanism:
+    E003 SRC_PAT@1: Detection raises the expected cost of manipulation, so managers manipulate less.
+        quote: "Detection models raise the expected cost of manipulation, so managers manipulate less."  at SRC_PAT chars 242-328 (passage EP_SRC_PAT_THEORY_242)
+  design:
+    E004 SRC_PAT@1: A difference-in-differences design around staggered adoption of a detection model.
+        quote: "We use a difference-in-differences design around the staggered adoption of a regulator's detection model."  at SRC_PAT chars 348-453 (passage EP_SRC_PAT_LANDSCAPE_348)
+    E005 SRC_QUINN@1: A regression discontinuity around the size threshold for detection models.
+        quote: "We use a regression discontinuity around the regulator's size threshold for detection models."  at SRC_QUINN chars 248-341 (passage EP_SRC_QUINN_LANDSCAPE_248)
+  measurement:
+    E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
+        quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
+  identifying_assumption:
+    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+        quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
+  finding:
+    E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
+        quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
+        quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
+        quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
+        quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E012 SRC_REN2@1 (disclosure after detection -> tone) [negative]: Disclosures become less optimistic in tone after detection models spread.
+        quote: "After detection models spread, disclosures become less optimistic in tone."  at SRC_REN2 chars 220-294 (passage EP_SRC_REN2_LANDSCAPE_220)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E013 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
+        quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
+    E014 SRC_QUINN@1 (detection model use -> manipulation): The increase is concentrated among firms with high analyst coverage.
+        quote: "The increase is concentrated among firms with high analyst coverage."  at SRC_QUINN chars 453-521 (passage EP_SRC_QUINN_LANDSCAPE_453)
+  method_limitation:
+    E015 SRC_PAT@1: Listed US firms, 2010 to 2020 only.
+        quote: "Our sample is limited to listed US firms from 2010 to 2020."  at SRC_PAT chars 837-896 (passage EP_SRC_PAT_LANDSCAPE_837)
+  unresolved_question:
+    E016 SRC_PAT@1: Whether managers move to other margins of manipulation is open.
+        quote: "Whether managers move to other margins of manipulation remains open."  at SRC_PAT chars 897-965 (passage EP_SRC_PAT_LANDSCAPE_897)
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 contradiction (opposite_direction) on "detection model use -> manipulation": E008 (SRC_PAT@1, negative) vs E009 (SRC_QUINN@1, positive); not reviewed by you
+    I002 version_difference (opposite_direction) on "disclosure after detection -> tone": E011 (SRC_REN1@1, positive) vs E012 (SRC_REN2@1, negative); not reviewed by you
+    I003 definitions_differ (wording) on "earnings manipulation": E001 (SRC_PAT@1) vs E002 (SRC_QUINN@1); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+# 6. export, and verification against the store
+
+$ research export landscape LAND_000001 --out <export-dir> --project PRJ_LAND --home <home>
+exported to <export-dir> (closure 84fdead5cebd): evidence_table.csv, manifest.json, research_landscape.md, works_and_versions.csv
+
+$ research export verify <export-dir> --project PRJ_LAND --home <home>
+VERIFIED
+
+----- research_landscape.md (first lines) -----
+<!-- research-suite export · landscape · LAND_000001@3 · closure 84fdead5cebd · corpus f1d8b53a73e7 · exporter 1 -->
+# Landscape LAND_000001: Landscape for PROB_000001
+
+retrieval run RET_000001: **CURRENT**; corpus snapshot f1d8b53a73e7c56c5c6c8475b6e9bf948a665102918736adfec80769f7e755a4: **CURRENT**; problem input (r1): **CURRENT**; search configuration: **CURRENT**; sources read: **CURRENT**
+
+Built from RET_000001 for PROB_000001 with RP_LANDSCAPE@1, RP_THEORY@2; versions read: retrieved. 4 of 4 works on the reading list were read (4 sources), 15 entries; 1 possibly relevant papers were **not read** (no full text).
+
+Each entry shows the verbatim quote and where it is. A finding carries three separate dimensions — reading, inference, reproduction — and none of them says the finding is established. What the authors say is author-asserted; what the suite derives is listed under *Suite inferences*.
+
+## Versions to know about
+
+- **W_REN**: SRC_REN2 is held and later than what was read (SRC_REN1); its claims are not in this landscape.
+
+## Works and versions
+
+Evidence is cited at Source@revision; the work only groups papers for reading.
+
+| work | versions held | read | carry entries (evidence) | latest held | later version not read | class |
+|---|---|---|---|---|---|---|
+| SRC_PAT | SRC_PAT@1 (-, ?, public unknown) | SRC_PAT | SRC_PAT | SRC_PAT (the only version held) | False | data_derived |
+| SRC_QUINN | SRC_QUINN@1 (-, ?, public unknown) | SRC_QUINN | SRC_QUINN | SRC_QUINN (the only version held) | False | data_derived |
+| SRC_SAM | SRC_SAM@1 (-, ?, public unknown) | SRC_SAM | SRC_SAM | SRC_SAM (the only version held) | False | data_derived |
+| W_REN | SRC_REN1@1 (v1, working_paper, public 2024-02-01); SRC_REN2@1 (v2, working_paper, public 2025-01-15) | SRC_REN1 | SRC_REN1 | SRC_REN2 (latest first_public_date among all held versions) | True | data_derived |
+
+## Findings
+
+| entry | paper (Source@revision) | relationship | direction | what it says | quote | where | reading | inference | reproduction | class |
+|---|---|---|---|---|---|---|---|---|---|---|
+| E008 | SRC_PAT@1 | detection model use -> manipulation | negative | Detection model use reduces discretionary accruals by 0.8 percentage points of assets. | Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets. | SRC_PAT chars 662-758 | READING_CONFIRMED | METHOD_CRITICALLY_ASSESSED: LIMITED | NOT_ATTEMPTED | researcher_confirmed |
+| E009 | SRC_QUINN@1 | DETECTION MODEL USE -> MANIPULATION | positive | Detection model use raises real earnings management by 1.2 percentage points of sales. | Firms facing a detection model increase real earnings management by 1.2 percentage points of sales. | SRC_QUINN chars 353-452 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
+| E010 | SRC_SAM@1 | detection model use -> audit fees | positive | Audit fees rise by four percent after a detection model is adopted. | Audit fees rise by four percent after the regulator adopts a detection model. | SRC_SAM chars 207-284 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
+| E011 | SRC_REN1@1 | disclosure after detection -> tone | positive | Disclosures become more optimistic in tone after detection models spread. | After detection models spread, disclosures become more optimistic in tone. | SRC_REN1 chars 303-377 | AUTHOR_REPORTED | NOT_ASSESSED | NOT_ATTEMPTED | model_synthesised |
+
+## Constructs and how each paper defines them
+
+# 7. the problem is reframed: the landscape (and the run it came from) no longer describe it
+
+$ research problem revise PROB_000001 --rationale "the question is about disclosure only" --statement "Disclosure by firms after detection models spread is not understood." --project PRJ_LAND --home <home> --token-file <token-file>
+PROB_000001 r2: OPEN; to review: RET_000001@2, LAND_000001@3, LAND_000002@1
+
+$ research landscape show LAND_000001 --project PRJ_LAND --home <home>
+LAND_000001 r3 "Landscape for PROB_000001" from RET_000001 for PROB_000001
+  retrieval run: CURRENT  corpus: CURRENT  problem: STALE  search config: CURRENT  sources read: CURRENT
+  ! this landscape no longer matches what it was built from: do not build on it; rebuild from a current run (research landscape build RUN --carry-from LAND_000001)
+  4 of 4 works read (4 sources, versions: retrieved); 15 entries {'boundary': 2, 'construct': 2, 'design': 2, 'finding': 4, 'identifying_assumption': 1, 'measurement': 1, 'mechanism': 1, 'method_limitation': 1, 'unresolved_question': 1}; 1 possibly relevant papers not read
+  ! W_REN: SRC_REN2 is held and later than what was read (SRC_REN1); its claims are not in this landscape
+  construct:
+    E001 SRC_PAT@1 (earnings manipulation): Earnings manipulation: a managerial choice moving reported earnings from performance.
+        quote: "We define earnings manipulation as a managerial choice that moves reported earnings away from underlying performance."  at SRC_PAT chars 124-241 (passage EP_SRC_PAT_THEORY_124)
+    E002 SRC_QUINN@1 (earnings manipulation): Earnings manipulation: any action changing reported earnings but not cash flows.
+        quote: "We define earnings manipulation as any action that changes reported earnings without changing cash flows."  at SRC_QUINN chars 123-228 (passage EP_SRC_QUINN_THEORY_123)
+  mechanism:
+    E003 SRC_PAT@1: Detection raises the expected cost of manipulation, so managers manipulate less.
+        quote: "Detection models raise the expected cost of manipulation, so managers manipulate less."  at SRC_PAT chars 242-328 (passage EP_SRC_PAT_THEORY_242)
+  design:
+    E004 SRC_PAT@1: A difference-in-differences design around staggered adoption of a detection model.
+        quote: "We use a difference-in-differences design around the staggered adoption of a regulator's detection model."  at SRC_PAT chars 348-453 (passage EP_SRC_PAT_LANDSCAPE_348)
+    E005 SRC_QUINN@1: A regression discontinuity around the size threshold for detection models.
+        quote: "We use a regression discontinuity around the regulator's size threshold for detection models."  at SRC_QUINN chars 248-341 (passage EP_SRC_QUINN_LANDSCAPE_248)
+  measurement:
+    E006 SRC_PAT@1 (earnings manipulation): Manipulation is measured by discretionary accruals (modified Jones model).
+        quote: "Manipulation is measured with discretionary accruals from a modified Jones model."  at SRC_PAT chars 454-535 (passage EP_SRC_PAT_LANDSCAPE_454)
+  identifying_assumption:
+    E007 SRC_PAT@1: Parallel pre-trends, tested in an event study.
+        quote: "The design relies on parallel pre-trends between adopting and non-adopting firms, which we test in an event study."  at SRC_PAT chars 536-650 (passage EP_SRC_PAT_LANDSCAPE_536)
+  finding:
+    E008 SRC_PAT@1 (detection model use -> manipulation) [negative]: Detection model use reduces discretionary accruals by 0.8 percentage points of assets.
+        quote: "Firms facing a detection model reduce discretionary accruals by 0.8 percentage points of assets."  at SRC_PAT chars 662-758 (passage <passage>)
+        reading READING_CONFIRMED · inference METHOD_CRITICALLY_ASSESSED (LIMITED) · reproduction NOT_ATTEMPTED
+    E009 SRC_QUINN@1 (DETECTION MODEL USE -> MANIPULATION) [positive]: Detection model use raises real earnings management by 1.2 percentage points of sales.
+        quote: "Firms facing a detection model increase real earnings management by 1.2 percentage points of sales."  at SRC_QUINN chars 353-452 (passage EP_SRC_QUINN_LANDSCAPE_353)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E010 SRC_SAM@1 (detection model use -> audit fees) [positive]: Audit fees rise by four percent after a detection model is adopted.
+        quote: "Audit fees rise by four percent after the regulator adopts a detection model."  at SRC_SAM chars 207-284 (passage EP_SRC_SAM_LANDSCAPE_207)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+    E011 SRC_REN1@1 (disclosure after detection -> tone) [positive]: Disclosures become more optimistic in tone after detection models spread.
+        quote: "After detection models spread, disclosures become more optimistic in tone."  at SRC_REN1 chars 303-377 (passage EP_SRC_REN1_LANDSCAPE_303)
+        reading AUTHOR_REPORTED · inference NOT_ASSESSED · reproduction NOT_ATTEMPTED
+  boundary:
+    E012 SRC_PAT@1 (detection model use -> manipulation): No reduction for firms with concentrated ownership.
+        quote: "The reduction is absent for firms with concentrated ownership."  at SRC_PAT chars 759-821 (passage EP_SRC_PAT_LANDSCAPE_759)
+    E013 SRC_QUINN@1 (detection model use -> manipulation): The increase is concentrated among firms with high analyst coverage.
+        quote: "The increase is concentrated among firms with high analyst coverage."  at SRC_QUINN chars 453-521 (passage EP_SRC_QUINN_LANDSCAPE_453)
+  method_limitation:
+    E014 SRC_PAT@1: Listed US firms, 2010 to 2020 only.
+        quote: "Our sample is limited to listed US firms from 2010 to 2020."  at SRC_PAT chars 837-896 (passage EP_SRC_PAT_LANDSCAPE_837)
+  unresolved_question:
+    E015 SRC_PAT@1: Whether managers move to other margins of manipulation is open.
+        quote: "Whether managers move to other margins of manipulation remains open."  at SRC_PAT chars 897-965 (passage EP_SRC_PAT_LANDSCAPE_897)
+  suite inferences (PROVISIONAL; derived by the suite, not by a model):
+    I001 contradiction (opposite_direction) on "detection model use -> manipulation": E008 (SRC_PAT@1, negative) vs E009 (SRC_QUINN@1, positive); your decision: NEEDS_SCOPE
+    I002 definitions_differ (wording) on "earnings manipulation": E001 (SRC_PAT@1) vs E002 (SRC_QUINN@1); not reviewed by you
+  reading / inference / reproduction are separate; none of them says a finding is established
+
+$ research landscape build RET_000001 --project PRJ_LAND --home <home> --token-file <token-file>
+Error: RETRIEVAL_PROBLEM_STALE - RET_000001: problem input STALE (statement); start a new run
+(exit 1)
+
