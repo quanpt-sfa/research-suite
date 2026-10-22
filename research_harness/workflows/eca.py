@@ -700,6 +700,37 @@ def coverage_report(store: StateStore, *, rate: float = STANDARD_SAMPLE_RATE) ->
 # working through many statements: run what the coverage policy asks for, review on one sheet, decide in one file
 # ---------------------------------------------------------------------------------------------------
 
+def completeness(store: StateStore, objects: Optional[set[str]] = None) -> dict[str, Any]:
+    """Where every HIGH statement (in `objects`, or in the whole store) stands for its CURRENT words:
+
+    confirmed (a researcher confirmation exists), awaiting_confirmation (a proposal exists and nobody has confirmed it), or not_adjudicated (no
+    proposal at all: the run was limited, the statement has no passage, nobody ran it). The two open states are different work for the researcher."""
+    high = [s for s in iter_statements(store) if s["risk_tier"] == "HIGH" and (objects is None or s["object_id"] in objects)]
+    records: dict[tuple, dict[str, Any]] = {}
+    with store.read() as conn:
+        for r in conn.execute("SELECT object_id FROM object_heads WHERE object_type='Adjudication' ORDER BY object_id"):
+            obj = store.get_object(r[0], conn=conn)
+            c = obj["content"]
+            if c.get("kind") != "evidence_claim":
+                continue
+            key = (c["subject"]["object_id"], (c.get("statement") or {}).get("element"), (c.get("statement") or {}).get("text_sha256"))
+            slot = records.setdefault(key, {"proposals": [], "confirmed": False})
+            if c.get("confirms"):
+                slot["confirmed"] = True
+            else:
+                slot["proposals"].append(obj["object_id"])
+    confirmed, awaiting, missing = 0, [], []
+    for s in high:
+        slot = records.get((s["object_id"], s["element"], s["text_sha256"]))
+        if slot and slot["confirmed"]:
+            confirmed += 1
+        elif slot and slot["proposals"]:
+            awaiting.append({"object_id": s["object_id"], "element": s["element"], "adjudication_id": slot["proposals"][-1]})
+        else:
+            missing.append({"object_id": s["object_id"], "element": s["element"]})
+    return {"high_total": len(high), "confirmed": confirmed, "awaiting_confirmation": awaiting, "not_adjudicated": missing}
+
+
 def basis_passage(store: StateStore, object_id: str, element: Optional[str]) -> Optional[str]:
     """The passage an element rests on (its first source-passage basis), as an object id; None for a statement with no passage."""
     obj = store.get_object(object_id)
@@ -711,13 +742,17 @@ def basis_passage(store: StateStore, object_id: str, element: Optional[str]) -> 
 
 
 def run_pending(store: StateStore, token: Optional[str], adapter: Any, *, rate: float = STANDARD_SAMPLE_RATE, limit: Optional[int] = None,
-                only_objects: Optional[set[str]] = None) -> dict[str, Any]:
+                only_objects: Optional[set[str]] = None, reuse: bool = True, redo_unconfirmed: bool = False) -> dict[str, Any]:
     """Adjudicate (one model call each, proposals only) every statement the coverage policy still asks for: all HIGH ones and the
     sampled STANDARD ones, each against the passage it rests on. A statement with no passage is listed, not guessed at."""
     cov = coverage_report(store, rate=rate)
     todo = cov["high_not_adjudicated"] + cov["sample_not_adjudicated"]
     if only_objects is not None:      # a task works on one playbook, not on the whole project
         todo = [s for s in todo if s["object_id"] in only_objects]
+    if redo_unconfirmed:     # a different model is asked again for every statement the researcher has not confirmed; confirmations stand
+        have = {(s["object_id"], s["element"]) for s in todo}
+        todo += [{"object_id": x["object_id"], "element": x["element"], "risk_tier": "HIGH"} for x in completeness(store, only_objects)["awaiting_confirmation"]
+                 if (x["object_id"], x["element"]) not in have]
     done: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
@@ -727,7 +762,7 @@ def run_pending(store: StateStore, token: Optional[str], adapter: Any, *, rate: 
             skipped.append({"object_id": s["object_id"], "element": s["element"], "why": "no source passage to adjudicate against"})
             continue
         try:
-            res = adjudicate(store, token, resolve_statement(store, s["object_id"], element=s["element"]), passage, adapter)
+            res = adjudicate(store, token, resolve_statement(store, s["object_id"], element=s["element"]), passage, adapter, reuse=reuse)
         except KnowledgeError as exc:
             failed.append({"object_id": s["object_id"], "element": s["element"], "error": exc.code})
             continue

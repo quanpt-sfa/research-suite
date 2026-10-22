@@ -102,14 +102,18 @@ def has_task_columns(conn: Any) -> bool:
 
 
 def tokens_of(usage: Optional[dict]) -> int:
+    """Tokens a usage record stands for: the charged figure of a charge row, otherwise input plus output as reported."""
     u = usage or {}
+    if u.get("charged_tokens") is not None:
+        return int(u["charged_tokens"])
     return int(u.get("input_tokens") or 0) + int(u.get("output_tokens") or 0)
 
 
 def task_spent(conn: Any, task_id: str) -> dict[str, int]:
-    """Model calls and tokens charged to a task: every run row carrying its id except the step summaries (which repeat their runs)."""
+    """Model calls and tokens charged to a task: the charge rows of its calls (`task_call:*`) and nothing else. The runs those calls were made
+    for, and the step summaries, repeat the same usage and are never added."""
     calls = tokens = 0
-    for (usage,) in conn.execute("SELECT usage FROM workflow_runs WHERE task_id=? AND workflow NOT LIKE 'task_step:%'", (task_id,)):
+    for (usage,) in conn.execute("SELECT usage FROM workflow_runs WHERE task_id=? AND workflow LIKE 'task_call:%'", (task_id,)):
         u = json.loads(usage or "{}")
         calls += int(u.get("llm_calls") or 0)
         tokens += tokens_of(u)
@@ -148,8 +152,10 @@ def insert_run(conn: Any, row: dict[str, Any], *, state_revision: int) -> str:
                  [values[c] for c in cols])
     if scope is not None and values.get("task_id") == scope.task_id:
         scope.run_ids.append(values["run_id"])
-        scope.llm_calls += int((json.loads(values["usage"]) if isinstance(values["usage"], str) else values["usage"]).get("llm_calls") or 0)
-        scope.tokens += tokens_of(json.loads(values["usage"]) if isinstance(values["usage"], str) else values["usage"])
+        if str(values.get("workflow", "")).startswith("task_call:"):          # only charge rows count toward a step's usage
+            usage = json.loads(values["usage"]) if isinstance(values["usage"], str) else values["usage"]
+            scope.llm_calls += int(usage.get("llm_calls") or 0)
+            scope.tokens += tokens_of(usage)
     return values["run_id"]
 
 

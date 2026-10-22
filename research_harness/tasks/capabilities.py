@@ -31,6 +31,7 @@ class Ctx:
     adapter: Any
     task_id: str
     step_id: str
+    fresh: bool = False     # the step is being redone because the model changed: ask the new model, do not serve another model's cached answer
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,7 @@ def _median_usage(store: StateStore, workflow: str) -> Optional[tuple[int, int]]
 
 def _lit_run(ctx: Ctx, inp: dict) -> dict:
     _need(inp, "purpose", "sources")
-    review = literature.run_literature(ctx.store, ctx.token, inp["purpose"], list(inp["sources"]), ctx.adapter)
+    review = literature.run_literature(ctx.store, ctx.token, inp["purpose"], list(inp["sources"]), ctx.adapter, reuse=not ctx.fresh)
     return {"purpose": inp["purpose"], "sources": list(inp["sources"]), "run_id": review.get("run_id"), "review": review}
 
 
@@ -120,7 +121,7 @@ def _adj_objects(inp: dict) -> Optional[set]:
 
 def _adj_run(ctx: Ctx, inp: dict) -> dict:
     res = eca.run_pending(ctx.store, ctx.token, ctx.adapter, rate=float(inp.get("rate", eca.STANDARD_SAMPLE_RATE)), limit=inp.get("limit"),
-                          only_objects=_adj_objects(inp))
+                          only_objects=_adj_objects(inp), reuse=not ctx.fresh, redo_unconfirmed=ctx.fresh)
     return res
 
 

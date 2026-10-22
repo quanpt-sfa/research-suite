@@ -1,13 +1,16 @@
 """A hard token budget for the model calls of a task (M5 Amendment 1 A8, contract C3).
 
 Every call is wrapped: its input is counted with an upper bound, its output is capped by what the budget still allows (the adapter's
-`max_output_tokens`), and an intent record is written before the call. A call whose outcome is unknown (the process died between the intent
-and the answer) is charged at its full reservation when the task next runs. Unreported usage is charged at the reservation too.
+`max_output_tokens`), and an intent record is written before the call. When the call returns (or fails) its charge is written to the run
+registry as a `task_call:charged` row, and only then is the intent removed; the budget is read from those rows, so what was charged survives a
+restart whether or not the provider reported usage, and the runs the calls were made for are never counted again. A call whose outcome is
+unknown (the process died between the intent and the charge) is charged at its full reservation when the task next runs.
 
 Limits that remain, stated rather than hidden:
-* an adapter without a `max_output_tokens` attribute (the scripted double) cannot be capped; its usage is whatever it reports;
+* an adapter without a `max_output_tokens` attribute (the scripted double) cannot be capped; it is reserved a bounded answer and charged what it reports;
 * a provider may bill a request that completed after the client timed out, or bill differently from its reported usage;
-* money cannot be capped by tokens alone: reports show tokens, and money only with a price table.
+* money cannot be capped by tokens alone: reports show tokens, and money only with a price table;
+* if the charge row cannot be written after a call, the intent stays and the call is charged again at its reservation on the next run (conservative).
 """
 from __future__ import annotations
 
@@ -19,6 +22,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from research_harness.core.canonical import canonical_json_hash
+from research_harness.state import workflow_runs
 from research_harness.workflows.adapters import ModelError, adapter_identity, adapter_token_count
 
 MIN_USEFUL_OUTPUT = 256        # a call that cannot be given at least this many output tokens is not started
@@ -63,7 +68,7 @@ def _write_atomic(path: Path, data: dict[str, Any]) -> None:
 
 
 def outstanding_intents(store: Any, task_id: str) -> list[dict[str, Any]]:
-    """Calls whose answer never arrived: an intent record that was neither completed nor accounted."""
+    """Calls that were started and not yet accounted: an intent record whose charge row was never written."""
     d = store.paths.staging / "attempts" / task_id
     out = []
     for p in sorted(d.glob("*.json")) if d.is_dir() else []:
@@ -77,18 +82,42 @@ def outstanding_intents(store: Any, task_id: str) -> list[dict[str, Any]]:
 
 
 def mark_accounted(intent: dict[str, Any]) -> None:
-    p = Path(intent["_path"])
-    p.unlink(missing_ok=True)
+    Path(intent["_path"]).unlink(missing_ok=True)
+
+
+def _tokens(usage: Any) -> tuple[Optional[int], Optional[int]]:
+    return getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None)
 
 
 class BudgetedAdapter:
-    """Delegates to `inner`, enforcing the ledger on every `generate` call."""
+    """Delegates to `inner`, enforcing the ledger on every `generate` call and writing every call's charge to the registry."""
 
     def __init__(self, inner: Any, ledger: Ledger, store: Any, task_id: str, step_id: str):
         self._inner, self._ledger, self._store, self._task_id, self._step_id = inner, ledger, store, task_id, step_id
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
+
+    def _persist_charge(self, path: Path, *, outcome: str, usage: Any, in_reserved: int, reserved_out: int) -> int:
+        """The charge of one call, written before its intent is removed. Reported usage is charged as reported; a call whose usage the provider
+        did not report (or that failed without it) is charged at its reservation."""
+        tin, tout = _tokens(usage)
+        reported = tin is not None or tout is not None
+        in_tok, out_tok = (int(tin or 0), int(tout or 0)) if reported else (in_reserved, reserved_out)
+        charged = in_tok + out_tok
+        row = {"workflow": "task_call:charged", "input_fingerprint": canonical_json_hash({"intent": path.name, "task": self._task_id}),
+               "executor": "task_engine@1", "execution_status": "SUCCEEDED" if outcome == "ok" else "FAILED", "context_status": "COMPLETE",
+               "assessment_status": "NOT_ASSESSED", "applicability": "APPLICABLE", "legacy_status": "SUCCESS" if outcome == "ok" else "FAILED",
+               "status_reason": outcome,
+               "usage": {"llm_calls": 1, "input_tokens": in_tok, "output_tokens": out_tok, "charged_tokens": charged,
+                         "usage_source": "provider_reported" if reported else "reserved"},
+               "model_descriptor": adapter_identity(self._inner), "task_id": self._task_id, "task_step_id": self._step_id}
+        try:
+            workflow_runs.append_run(self._store, row)
+        except Exception:  # noqa: BLE001 - keep the intent: the next run charges this call at its reservation
+            return charged
+        path.unlink(missing_ok=True)
+        return charged
 
     def generate(self, system_prompt: str, user_prompt: str, *, expected_schema: Optional[dict[str, Any]] = None, temperature: float = 0.0):
         led = self._ledger
@@ -118,19 +147,11 @@ class BudgetedAdapter:
         try:
             result, usage = self._inner.generate(system_prompt, user_prompt, expected_schema=expected_schema, temperature=temperature)
         except ModelError as exc:
-            led.add(self._charge(getattr(exc, "usage", None), reservation))
-            path.unlink(missing_ok=True)       # the outcome is known (an error was returned), so it is accounted
+            led.add(self._persist_charge(path, outcome=f"error:{type(exc).__name__}", usage=getattr(exc, "usage", None),
+                                         in_reserved=in_reserved, reserved_out=reserved_out))
             raise
         finally:
             if hasattr(self._inner, "max_output_tokens") and previous is not None:
                 self._inner.max_output_tokens = previous
-        led.add(self._charge(usage, reservation))
-        path.unlink(missing_ok=True)
+        led.add(self._persist_charge(path, outcome="ok", usage=usage, in_reserved=in_reserved, reserved_out=reserved_out))
         return result, usage
-
-    @staticmethod
-    def _charge(usage: Any, reservation: int) -> int:
-        tin, tout = getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None)
-        if tin is None and tout is None:
-            return reservation                  # not reported: charge what was reserved
-        return int(tin or 0) + int(tout or 0)

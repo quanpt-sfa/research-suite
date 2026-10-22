@@ -246,7 +246,7 @@ def test_budget_blocks_a_step_before_any_call_is_made(world):
     assert r["state"] == "BLOCKED" and r["reason"].startswith("BUDGET_EXCEEDED: S02") and adapter.recorded_requests == []
 
 
-def test_every_call_is_capped_by_the_remaining_budget():
+def test_every_call_is_capped_by_the_remaining_budget(world):
     seen = {}
 
     class Adapter:
@@ -257,25 +257,23 @@ def test_every_call_is_capped_by_the_remaining_budget():
             seen["cap"] = self.max_output_tokens
             return {"ok": True}, SimpleNamespace(input_tokens=None, output_tokens=None)        # the provider did not report usage
 
-    store = SimpleNamespace(paths=SimpleNamespace(staging=Path(__file__).parent / ".attempts_unit"))
+    store = world["store"]
     ledger = B.Ledger(max_tokens=3000, max_calls=None)
     wrapped = B.BudgetedAdapter(Adapter(), ledger, store, "TASK_X", "S01")
-    try:
-        wrapped.generate("system " * 20, "user " * 20)
-        assert seen["cap"] < 3000 and Adapter.max_output_tokens == 64000 and wrapped.max_output_tokens == 64000    # capped for the call, restored after
-        assert ledger.spent_tokens > seen["cap"] and ledger.spent_calls == 1       # unreported usage is charged at the reservation
-        with pytest.raises(B.BudgetExceeded):
-            for _ in range(5):
-                wrapped.generate("system " * 20, "user " * 20)                        # the budget runs out: the call is refused, not made
-        assert ledger.blocked_by == "max_tokens"
-        calls = B.Ledger(max_tokens=None, max_calls=1)
-        w2 = B.BudgetedAdapter(Adapter(), calls, store, "TASK_X", "S01")
+    wrapped.generate("system " * 20, "user " * 20)
+    assert seen["cap"] < 3000 and Adapter.max_output_tokens == 64000 and wrapped.max_output_tokens == 64000    # capped for the call, restored after
+    assert ledger.spent_tokens > seen["cap"] and ledger.spent_calls == 1       # unreported usage is charged at the reservation
+    with store.read() as conn:
+        assert workflow_runs.task_spent(conn, "TASK_X") == {"llm_calls": 1, "tokens": ledger.spent_tokens}      # and it is on record
+    with pytest.raises(B.BudgetExceeded):
+        for _ in range(5):
+            wrapped.generate("system " * 20, "user " * 20)                        # the budget runs out: the call is refused, not made
+    assert ledger.blocked_by == "max_tokens"
+    calls = B.Ledger(max_tokens=None, max_calls=1)
+    w2 = B.BudgetedAdapter(Adapter(), calls, store, "TASK_Y", "S01")
+    w2.generate("s", "u")
+    with pytest.raises(B.BudgetExceeded, match="model calls"):
         w2.generate("s", "u")
-        with pytest.raises(B.BudgetExceeded, match="model calls"):
-            w2.generate("s", "u")
-    finally:
-        import shutil
-        shutil.rmtree(store.paths.staging, ignore_errors=True)
 
 
 def test_a_call_that_died_unanswered_is_charged_and_the_step_runs_again(world):

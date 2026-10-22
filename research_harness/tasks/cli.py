@@ -17,7 +17,7 @@ def _task_text(v: dict) -> None:
         est = s["estimate"]
         cost = "" if est.get("llm_calls") is None else f" ~{est['llm_calls']} call(s)"
         mark = " (mandatory)" if s["step_id"] in v["mandatory_checkpoints"] else ""
-        what = s["capability"] if s["kind"] == "run" else f"DECIDE {s['decision']}{mark}"
+        what = (s["capability"] + (f" [{s['produced_by']}]" if s.get("produced_by") else "")) if s["kind"] == "run" else f"DECIDE {s['decision']}{mark}"
         extra = f" — {s['stale_reason']}" if s.get("stale_reason") else (f" — {s['error']}" if s.get("error") else "")
         print(f"  {s['step_id']:<5}{s['status']:<20}{what}: {s['title']}{cost}{extra}")
     rem = v["remaining_estimate"]
@@ -29,6 +29,16 @@ def _run_text(o: dict) -> None:
     unknown = o.get("recovered_unknown_calls") or []
     print(f"  ran {', '.join(o['executed']) or 'nothing'}; already done {', '.join(o['reused']) or 'nothing'}"
           + (f"; {len(unknown)} call(s) of an earlier run had no answer and were charged at their reservation" if unknown else ""))
+
+
+def _exempt(items: Optional[list[str]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for it in items or []:
+        key, sep, reason = it.partition("=")
+        if not sep or "#" not in key:
+            raise ValueError(f"--exempt {it!r}: use OBJECT#ELEMENT=reason")
+        out[key] = reason
+    return out
 
 
 def _set_pairs(items: Optional[list[str]]) -> dict[str, Any]:
@@ -57,7 +67,7 @@ def register(sub: Any) -> None:
 
     def run_kwargs(a: argparse.Namespace) -> dict[str, Any]:
         return {"adapter_factory": lambda: K._adapter(a), "until": getattr(a, "until", None), "rerun_stale": getattr(a, "rerun_stale", False),
-                "break_lease": getattr(a, "break_lease", False)}
+                "break_lease": getattr(a, "break_lease", False), "accept_recorded_models": getattr(a, "accept_recorded_models", False)}
 
     def add(name: str, help_: str, fn: Callable[[Any, argparse.Namespace], Any], text: Optional[Callable[[Any], None]] = None, *,
             token: bool = True, model: bool = False, store: bool = True) -> argparse.ArgumentParser:
@@ -118,19 +128,24 @@ def register(sub: Any) -> None:
     q.add_argument("--until", help="Pause before this step")
     q.add_argument("--rerun-stale", action="store_true", dest="rerun_stale", help="Redo steps whose inputs changed since they ran")
     q.add_argument("--break-lease", action="store_true", dest="break_lease", help="Owner only: take over a task whose runner is dead")
+    q.add_argument("--accept-recorded-models", action="store_true", dest="accept_recorded_models",
+                   help="Reuse finished model steps whatever model is configured now (otherwise a changed model makes them stale)")
 
     q = add("retry", "Run again from a failed or blocked step", lambda st, a: T.retry_task(st, tok(a), a.task, a.step, **run_kwargs(a)), _run_text, model=True)
     q.add_argument("task")
     q.add_argument("step")
     q.add_argument("--rerun-stale", action="store_true", dest="rerun_stale")
     q.add_argument("--break-lease", action="store_true", dest="break_lease")
+    q.add_argument("--accept-recorded-models", action="store_true", dest="accept_recorded_models")
 
     q = add("decide", "Clear a checkpoint with your own reason (author or owner token); there is no default",
-            lambda st, a: T.decide(st, tok(a), a.task, a.step, a.rationale),
+            lambda st, a: T.decide(st, tok(a), a.task, a.step, a.rationale, exempt=_exempt(a.exempt)),
             lambda o: print(f"{o['step_id']} {'was already decided' if o['already_decided'] else 'decided'} by {o['by']}"))
     q.add_argument("task")
     q.add_argument("step")
     q.add_argument("--rationale", required=True)
+    q.add_argument("--exempt", action="append", metavar="OBJECT#ELEMENT=REASON",
+                   help="Set aside a HIGH statement that has no adjudication, with your reason (recorded in the decision)")
 
     q = add("cancel", "Stop the task; runs already registered stay registered", lambda st, a: T.cancel_task(st, tok(a), a.task, a.reason),
             lambda o: print(f"{o['task_id']} cancelled"))
