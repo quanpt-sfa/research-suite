@@ -305,6 +305,269 @@
           "max_records": 3
         }
       ]
+    },
+    "RP_CLAIMS": {
+      "version": "1",
+      "label": "Claim inventory",
+      "purpose": "Record every claim a paper makes or reports, with who holds it (the authors themselves, or earlier work the authors describe or criticise), what kind of claim it is, and the conditions the authors attach to it. A claim stays one claim: its qualifiers, scope and conditions stay with it.",
+      "dimension": "results",
+      "model_scoped": true,
+      "all_sections": true,
+      "exclude_labels": [
+        "references"
+      ],
+      "one_record_per_span": true,
+      "extra_quotes": true,
+      "attribute_schema": {
+        "type": "object",
+        "properties": {
+          "constructs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "population": {
+                "type": "string"
+              },
+              "setting": {
+                "type": "string"
+              },
+              "period": {
+                "type": "string"
+              },
+              "level_of_analysis": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "premises": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mechanism": {
+            "type": "string"
+          },
+          "boundary_conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "direction": {
+            "enum": [
+              "positive",
+              "negative",
+              "null",
+              "mixed",
+              "descriptive"
+            ]
+          },
+          "granularity": {
+            "enum": [
+              "ATOMIC",
+              "COMPOUND"
+            ]
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "cited_works": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attribution_cue": {
+            "type": "string"
+          },
+          "needs_deeper_reading": {
+            "type": "boolean"
+          },
+          "needs_deeper_reading_reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "instructions": "Read all the text shown and report claims as records. A record's `field` is the kind of claim: empirical_finding (a result), interpretive_finding (a theme or interpretation drawn from qualitative material), theoretical_proposition (a proposition, an argument's conclusion, a proposed framework or reconceptualisation), methodological_claim (a claim about a method or measure), definition (a construct or distinction defined), claimed_contribution (what the paper says it adds), assumption (one the authors state), boundary_condition (where a claim is said not to hold), limitation (one the authors state), gap_statement (a gap or open question the authors identify). `type` is WHO HOLDS THE CLAIM according to the text: AUTHOR_OWN_CLAIM (the authors assert it as their own result or argument), AUTHOR_REPORTS_PRIOR_WORK (the authors describe what earlier work found or argued: `Smith (2020) argues ...`, `previous studies have shown ...`), AUTHOR_CRITIQUES_PRIOR_WORK (the authors dispute or qualify earlier work). A sentence that describes earlier work is not the authors' own claim, even in a sentence the authors agree with; and a paper may move from describing earlier work to arguing its own, so decide for each sentence. Never attribute a reported claim to the cited authors as if you had read them: you have read only this paper. Put the citation text you see (for example `Smith (2020)`) in `attributes.cited_works`. `quote` is the exact words of the claim. `value` restates the claim without adding anything the quote does not say. In `attributes` give only what the text states or what you must infer, and leave out what neither gives you: `constructs` (names of the ideas the claim is about), `scope` (population, setting, period, level_of_analysis), `premises`, `mechanism`, `boundary_conditions`, `direction` (for an empirical finding), `granularity` (ATOMIC if one proposition can be judged alone; COMPOUND if several are tied together: then list them in `components`, each with its own `conditions`, and keep the whole claim as one record), `cited_works`, `attribution_cue` (the words that show who holds the claim), `needs_deeper_reading` with a reason if the claim cannot be understood from this passage alone. If conditions or qualifiers sit in other sentences, give those sentences in `extra_quotes` (each an exact span, with a `role` of QUALIFIER, SUPPORTING_EVIDENCE, PREMISE, CONTEXT or BOUNDARY and `why` it is needed). Report each sentence once. Do not stop after a few claims: report all of them. Do not judge whether a claim is true, and do not complete a claim, a premise or a condition the text does not give.",
+      "fields": [
+        {
+          "name": "empirical_finding",
+          "description": "a result the paper reports or describes, with the population, period or estimand the sentence states",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "interpretive_finding",
+          "description": "an interpretation, theme or pattern derived from qualitative material",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "theoretical_proposition",
+          "description": "a proposition, the conclusion of an argument, a proposed framework or a reconceptualisation",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "methodological_claim",
+          "description": "a claim about a method, a measure or a design choice",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "definition",
+          "description": "a construct or a conceptual distinction as defined",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "claimed_contribution",
+          "description": "what the paper says it contributes",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "assumption",
+          "description": "an assumption that is stated",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "boundary_condition",
+          "description": "where a claim is said not to hold, or to hold only under a stated condition",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "limitation",
+          "description": "a limitation that is stated",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        },
+        {
+          "name": "gap_statement",
+          "description": "a gap, tension or open question that is identified",
+          "required": false,
+          "repeatable": true,
+          "types": [
+            "AUTHOR_OWN_CLAIM",
+            "AUTHOR_REPORTS_PRIOR_WORK",
+            "AUTHOR_CRITIQUES_PRIOR_WORK"
+          ]
+        }
+      ]
+    },
+    "RP_CLAIM_EVIDENCE": {
+      "version": "1",
+      "label": "Evidence for one claim",
+      "purpose": "Given one claim of a paper, find in the text shown the sentences that bear on it: its conditions and qualifiers, the evidence offered for it, and the premises it needs.",
+      "dimension": "results",
+      "model_scoped": true,
+      "extra_quotes": true,
+      "one_record_per_span": true,
+      "instructions": "The line after the source title names ONE claim of this paper. Read the text shown and report only sentences that bear on that claim. `field` says how: qualifier (a condition or limit attached to the claim), supporting_evidence (a result, observation or argument the paper offers for the claim), premise (something the claim rests on), context (needed to read the claim correctly), boundary (where it is said not to hold). `quote` is the exact sentence. `value` says in a few words why the sentence bears on the claim. Report nothing that does not bear on the claim, and nothing the text does not say. If no sentence in the text shown bears on it, return no records and name that in `gaps`.",
+      "fields": [
+        {
+          "name": "qualifier",
+          "description": "a condition or limit the paper attaches to the claim",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "supporting_evidence",
+          "description": "a result, observation or argument the paper offers for the claim",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "premise",
+          "description": "something the claim rests on, as the paper states it",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "context",
+          "description": "a sentence needed to read the claim correctly",
+          "required": false,
+          "repeatable": true
+        },
+        {
+          "name": "boundary",
+          "description": "where the paper says the claim does not hold",
+          "required": false,
+          "repeatable": true
+        }
+      ]
     }
   }
 }

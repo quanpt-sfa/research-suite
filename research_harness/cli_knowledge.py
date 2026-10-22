@@ -525,6 +525,8 @@ def register(sub: Any) -> None:
     _landscape_cli.register(sub)
     from research_harness.discovery import cli_review as _review_cli
     _review_cli.register(sub)
+    from research_harness.knowledge import cli_claims as _claims_cli
+    _claims_cli.register(sub)
     _add_provider_options(sub)
 
 
@@ -1089,6 +1091,9 @@ def cmd_export_verify(args: argparse.Namespace) -> int:
         elif kind == "landscape":
             from research_harness.export.landscape import build_landscape_export
             rebuild = lambda scope: build_landscape_export(store, scope["landscape"])   # noqa: E731
+        elif kind == "claims":
+            from research_harness.export.claims import build_claims_export
+            rebuild = lambda scope: build_claims_export(store, scope["inventory"])   # noqa: E731
         else:
             rebuild = lambda scope: build_methods_export(store, scope["playbook"], scope.get("plan"))   # noqa: E731
         outcome.update(verify_export(store, args.directory, rebuild))

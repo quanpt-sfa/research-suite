@@ -14,7 +14,15 @@ verbatim `quote` (invariant I9). A verified quote shows that the passage exists;
 is a fair reading of it, so every record stays `PROVISIONAL` until it is adjudicated (ECA).
 
 The extraction is cached by `(source revision and text, protocol@version)`; a repeat run is served from the run
-registry (and registered as a reuse). The cache key deliberately omits the model: use `reuse=False` to re-extract.
+registry (and registered as a reuse). For the protocols that existed before WP6.2 the cache key deliberately omits the model: use `reuse=False` to
+re-extract, and read `reuse.model_matches` in the result to see whether a reused extraction came from the model now asked for. A protocol with
+`model_scoped: true` (the claim protocols, WP6.2) puts the model identity and the extraction configuration (chunk size, the spans read, the extra
+context) into the key, so another model or other settings is another run and is never served another run's records.
+
+Options a protocol may use (all absent from the digest of a protocol that does not use them, so older pins still resolve): `all_sections` with
+`exclude_labels` (read every detected section except those), `attribute_schema` (a JSON Schema for an `attributes` object each record may carry;
+the suite, not the model, decides the basis of what an attribute says), `extra_quotes` (further verbatim spans of a record, each verified, each
+stored as its own passage), `one_record_per_span` (a span is one record whatever its field).
 """
 from __future__ import annotations
 
@@ -58,6 +66,12 @@ class ReadingProtocol:
     fields: tuple[dict[str, Any], ...]
     extra_dimensions: tuple[str, ...] = ()   # further comparison dimensions whose sections are read as well
     include_unlabeled: bool = False          # also read sections whose heading matched no label (`other`)
+    model_scoped: bool = False               # the cache key includes the model identity and the extraction configuration
+    all_sections: bool = False               # read every detected section (except `exclude_labels`) instead of the sections of a dimension
+    exclude_labels: tuple[str, ...] = ()
+    attribute_schema: Optional[dict[str, Any]] = None   # JSON Schema of the `attributes` object a record may carry
+    extra_quotes: bool = False               # a record may carry further verbatim spans (`extra_quotes`: [{quote, role}])
+    one_record_per_span: bool = False        # a span is one record whatever its field, and its passage id includes the span's end
 
     @property
     def dimensions(self) -> tuple[str, ...]:
@@ -69,22 +83,35 @@ class ReadingProtocol:
 
     @property
     def digest(self) -> str:
-        return canonical_json_hash({"id": self.id, "version": self.version, "dimension": self.dimension,
-                                    "extra_dimensions": list(self.extra_dimensions), "include_unlabeled": self.include_unlabeled, "instructions": self.instructions, "fields": list(self.fields)})
+        body: dict[str, Any] = {"id": self.id, "version": self.version, "dimension": self.dimension,
+                                "extra_dimensions": list(self.extra_dimensions), "include_unlabeled": self.include_unlabeled, "instructions": self.instructions, "fields": list(self.fields)}
+        options = {"model_scoped": self.model_scoped or None, "all_sections": self.all_sections or None, "exclude_labels": list(self.exclude_labels) or None,
+                   "attribute_schema": self.attribute_schema, "extra_quotes": self.extra_quotes or None, "one_record_per_span": self.one_record_per_span or None}
+        body.update({k: v for k, v in options.items() if v is not None})      # an option that is not used is not part of the pin
+        return canonical_json_hash(body)
 
     def field(self, name: str) -> Optional[dict[str, Any]]:
         return next((f for f in self.fields if f["name"] == name), None)
 
+    def validation_schema(self) -> dict[str, Any]:
+        return _relaxed(self.output_schema())
+
     def output_schema(self) -> dict[str, Any]:
+        item_props: dict[str, Any] = {"field": {"enum": [f["name"] for f in self.fields]},
+                                      "value": {"type": "string", "minLength": 1},
+                                      "quote": {"type": "string", "minLength": 1},
+                                      "label": {"type": "string"}, "type": {"type": "string"}}
+        if self.attribute_schema:
+            item_props["attributes"] = self.attribute_schema
+        if self.extra_quotes:
+            item_props["extra_quotes"] = {"type": "array", "items": {"type": "object", "properties": {"quote": {"type": "string", "minLength": 1}, "role": {"type": "string"},
+                                                                                                    "why": {"type": "string"}}, "required": ["quote"]}}
         return {
             "$schema": "https://json-schema.org/draft/2020-12/schema", "title": f"{self.id}_extraction", "type": "object",
             "properties": {
                 "records": {"type": "array", "items": {
                     "type": "object",
-                    "properties": {"field": {"enum": [f["name"] for f in self.fields]},
-                                   "value": {"type": "string", "minLength": 1},
-                                   "quote": {"type": "string", "minLength": 1},
-                                   "label": {"type": "string"}, "type": {"type": "string"}},
+                    "properties": item_props,
                     "required": ["field", "value", "quote"]}},
                 "gaps": {"type": "array", "items": {"type": "string"}},
             },
@@ -92,11 +119,24 @@ class ReadingProtocol:
         }
 
 
+def _relaxed(schema: dict[str, Any]) -> dict[str, Any]:
+    """The schema the model's answer as a whole is checked against: the shown schema, but with `attributes` and `extra_quotes` left to a per-record check, so that one
+    malformed attribute loses that attribute and not the whole answer."""
+    items = schema["properties"]["records"]["items"]
+    props = {**items["properties"]}
+    for name in ("attributes", "extra_quotes"):
+        if name in props:
+            props[name] = {"type": "object"} if name == "attributes" else {"type": "array"}
+    return {**schema, "properties": {**schema["properties"], "records": {**schema["properties"]["records"], "items": {**items, "properties": props}}}}
+
+
 @lru_cache(maxsize=1)
 def _load() -> dict[str, ReadingProtocol]:
     raw = json.loads(_DATA.read_text(encoding="utf-8"))
     return {pid: ReadingProtocol(pid, p["version"], p["label"], p["purpose"], p["dimension"], p["instructions"],
-                                 tuple(p["fields"]), tuple(p.get("extra_dimensions", ())), bool(p.get("include_unlabeled", False))) for pid, p in raw["protocols"].items()}
+                                 tuple(p["fields"]), tuple(p.get("extra_dimensions", ())), bool(p.get("include_unlabeled", False)),
+                                 bool(p.get("model_scoped", False)), bool(p.get("all_sections", False)), tuple(p.get("exclude_labels", ())), p.get("attribute_schema"),
+                                 bool(p.get("extra_quotes", False)), bool(p.get("one_record_per_span", False))) for pid, p in raw["protocols"].items()}
 
 
 def list_protocols() -> list[ReadingProtocol]:
@@ -110,8 +150,22 @@ def get_protocol(protocol_id: str) -> ReadingProtocol:
     return _load()[pid]
 
 
-def extraction_key(source_id: str, source_revision: int, text_digest: str, protocol: ReadingProtocol) -> str:
-    return f"{source_id}@{source_revision}#{text_digest[:16]}|{protocol.pin}"
+def config_digest(max_input_tokens: int, spans: Optional[list[tuple[int, int]]], context: Optional[str]) -> str:
+    """What besides the text and the protocol shapes a run: how the text was cut, which spans were read, what else the model was told."""
+    return canonical_json_hash({"max_input_tokens": max_input_tokens, "spans": [list(x) for x in spans] if spans else None, "context": context, "chunking": "paragraph-v1"})
+
+
+def model_digest(model: dict[str, Any]) -> str:
+    return canonical_json_hash({k: model.get(k) for k in ("provider", "model_id", "adapter_version", "script")})
+
+
+def extraction_key(source_id: str, source_revision: int, text_digest: str, protocol: ReadingProtocol, *, config: Optional[str] = None, model: Optional[dict[str, Any]] = None) -> str:
+    key = f"{source_id}@{source_revision}#{text_digest[:16]}|{protocol.pin}"
+    if protocol.model_scoped:                       # the other protocols keep the key they always had
+        if config is None or model is None:
+            raise KnowledgeError("EXTRACTION_KEY_NEEDS_MODEL", f"{protocol.pin} is model-scoped: its cache key needs the model identity and the configuration")
+        key += f"|cfg:{config[:16]}|model:{model_digest(model)[:16]}"
+    return key
 
 
 def _text_digest(obj: dict[str, Any], text: str) -> str:
@@ -144,11 +198,13 @@ def build_system_prompt(protocol: ReadingProtocol) -> str:
         "Do not fill it from general knowledge.\n")
 
 
-def build_user_prompt(obj: dict[str, Any], section_note: str, text: str, part: int, parts: int) -> str:
+def build_user_prompt(obj: dict[str, Any], section_note: str, text: str, part: int, parts: int, context: Optional[str] = None) -> str:
     c = obj["content"]
     head = f"Source: {c.get('citation_key', obj['object_id'])} ({obj['object_id']} revision {obj['revision']})"
     if c.get("title"):
         head += f"\nTitle: {c['title']}"
+    if context:
+        head += f"\n{context}"
     return f"{head}\nSections shown: {section_note}\nPart {part} of {parts}\n\n--- TEXT START ---\n{text}\n--- TEXT END ---"
 
 
@@ -178,19 +234,31 @@ def chunk_ranges(spans: list[tuple[int, int]], text: str, budget_tokens: int) ->
 # validation of one model answer
 # ---------------------------------------------------------------------------------------------------
 
-def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, chunk_start: int, full_text: str,
+def _locate(pieces: list[tuple[str, int]], quote: str) -> Optional[tuple[int, int]]:
+    """Absolute `(start, end)` of the first piece of text shown that contains the quote."""
+    for piece, start in pieces:
+        found = quotes.find_quote(piece, quote)
+        if found:
+            return start + found[0], start + found[1]
+    return None
+
+
+def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, chunk_start: int, full_text: str, *, pieces: Optional[list[tuple[str, int]]] = None,
                         ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], Optional[str]]:
-    """`(accepted, rejected, gaps, error)`. `error` is set when the answer as a whole is unusable."""
+    """`(accepted, rejected, gaps, error)`. `error` is set when the answer as a whole is unusable. `pieces` (text, start) are the separate stretches of text the model was shown in one
+    call (spans read together); a quote must be in one of them."""
+    pieces = pieces or [(chunk_text, chunk_start)]
     parsed, err = parse_model_output(raw)
     if parsed is None:
         return [], [], [], err
-    problems = sorted(Draft202012Validator(protocol.output_schema()).iter_errors(parsed), key=lambda e: list(map(str, e.absolute_path)))
+    problems = sorted(Draft202012Validator(protocol.validation_schema()).iter_errors(parsed), key=lambda e: list(map(str, e.absolute_path)))
     if problems:
         return [], [], [], "schema: " + "; ".join(
             f"{'.'.join(str(p) for p in e.absolute_path) or '$'}: {e.message[:120]}" for e in problems[:5])
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     seen: set[tuple] = set()
+    spans_used: set[tuple] = set()
     counts: dict[str, int] = {}
     for rec in parsed["records"]:
         reject = lambda why: rejected.append({**rec, "reason": why})  # noqa: E731
@@ -199,17 +267,20 @@ def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, ch
         if len(quotes.normalize_whitespace(quote)) < MIN_QUOTE_CHARS:
             reject("quote_too_short")
             continue
-        found = quotes.find_quote(chunk_text, quote)
+        found = _locate(pieces, quote)
         if not found:
             reject("quote_not_in_text_shown")
             continue
-        start, end = chunk_start + found[0], chunk_start + found[1]
+        start, end = found
         check = quotes.verify_span(full_text, start, end, quote)
         if not check.ok:
             reject("span_does_not_verify_against_stored_text")
             continue
         if (rec["field"], start, end) in seen:
             reject("duplicate_record")
+            continue
+        if protocol.one_record_per_span and (start, end) in spans_used:
+            reject("span_already_used_by_another_field")
             continue
         if counts.get(rec["field"], 0) >= 1 and not (spec or {}).get("repeatable"):
             reject("field_not_repeatable")
@@ -218,12 +289,33 @@ def validate_extraction(protocol: ReadingProtocol, raw: Any, chunk_text: str, ch
             reject("type_not_allowed")
             continue
         seen.add((rec["field"], start, end))
+        spans_used.add((start, end))
         counts[rec["field"]] = counts.get(rec["field"], 0) + 1
         item = {"field": rec["field"], "value": rec["value"].strip(), "quote": full_text[start:end],
                 "char_start": start, "char_end": end}
         for extra in ("label", "type"):
             if rec.get(extra):
                 item[extra] = rec[extra].strip()
+        if protocol.attribute_schema and isinstance(rec.get("attributes"), dict) and rec["attributes"]:
+            if Draft202012Validator(protocol.attribute_schema).is_valid(rec["attributes"]):
+                item["attributes"] = rec["attributes"]
+            else:                                       # the record is kept; only what it said about itself is dropped, and the run says so
+                rejected.append({"field": rec["field"], "quote": item["quote"], "value": "(attributes of: " + rec["value"][:80] + ")", "reason": "attributes_invalid_dropped", "record_kept": True})
+        if protocol.extra_quotes and isinstance(rec.get("extra_quotes"), list) and rec["extra_quotes"]:
+            extras = []
+            for eq in (e for e in rec["extra_quotes"] if isinstance(e, dict) and isinstance(e.get("quote"), str)):
+                eq_found = _locate(pieces, eq["quote"]) if len(quotes.normalize_whitespace(eq["quote"])) >= MIN_QUOTE_CHARS else None
+                if not eq_found:
+                    rejected.append({"field": rec["field"], "quote": eq["quote"], "value": "(extra quote of: " + rec["value"][:80] + ")", "reason": "extra_quote_not_in_text_shown"})
+                    continue
+                e_start, e_end = eq_found
+                if not quotes.verify_span(full_text, e_start, e_end, eq["quote"]).ok:
+                    rejected.append({"field": rec["field"], "quote": eq["quote"], "value": "(extra quote of: " + rec["value"][:80] + ")", "reason": "extra_quote_span_does_not_verify"})
+                    continue
+                extras.append({"quote": full_text[e_start:e_end], "char_start": e_start, "char_end": e_end, "role": str(eq.get("role") or "").strip() or None,
+                               "why": str(eq.get("why") or "").strip() or None})
+            if extras:
+                item["extra_quotes"] = extras
         accepted.append(item)
     return accepted, rejected, [str(g) for g in parsed.get("gaps", [])], None
 
@@ -262,6 +354,8 @@ def _passage_content(protocol: ReadingProtocol, obj: dict[str, Any], rec: dict[s
         c["item_label"] = rec["label"]
     if rec.get("type"):
         c["item_type"] = rec["type"]
+    if rec.get("attributes"):
+        c["attributes"] = rec["attributes"]
     return c
 
 
@@ -270,20 +364,40 @@ def _write_passages(tx: Any, store: StateStore, protocol: ReadingProtocol, obj: 
     stored: list[dict[str, Any]] = []
     frag = id_fragment(obj["object_id"], 28)
     proto = id_fragment(protocol.id.replace("RP_", ""), 12)
-    for rec in records:
-        section = next((s for s in sections if s["char_start"] <= rec["char_start"] < s["char_end"]), None)
-        content = _passage_content(protocol, obj, rec, key, model, (section or {}).get("heading") or (section or {}).get("label") or "")
-        pid = scope_id(store, f"EP_{frag}_{proto}_{rec['char_start']}")
+    def put(pid: str, content: dict[str, Any]) -> int:
         head = tx.head(pid)
         if head:
             cur = tx.get(pid)
             if cur["content"] == content:
-                stored.append({**rec, "passage_id": pid, "revision": cur["revision"]})
-                continue
+                return cur["revision"]
         res = tx.add_revision(object_id=pid, object_type="EvidencePassage", content=content,
                               edges=[("derived_from", obj["object_id"], obj["revision"], {"origin": "reading_protocol"})],
                               origin=engine_origin("extract", tx.actor_id, protocol=protocol.pin, extraction_key=key))
-        stored.append({**rec, "passage_id": pid, "revision": res["revision"]})
+        return res["revision"]
+
+    def section_of(char_start: int) -> str:
+        section = next((s for s in sections if s["char_start"] <= char_start < s["char_end"]), None)
+        return (section or {}).get("heading") or (section or {}).get("label") or ""
+
+    for rec in records:
+        content = _passage_content(protocol, obj, rec, key, model, section_of(rec["char_start"]))
+        span = f"{rec['char_start']}_{rec['char_end']}" if protocol.one_record_per_span else f"{rec['char_start']}"
+        pid = scope_id(store, f"EP_{frag}_{proto}_{span}")
+        out = {**rec, "passage_id": pid, "revision": put(pid, content)}
+        if rec.get("extra_quotes"):                    # further verified spans of the record, each its own passage, named as such
+            made = []
+            for eq in rec["extra_quotes"]:
+                xid = scope_id(store, f"EP_{frag}_{proto}X_{eq['char_start']}_{eq['char_end']}")
+                xc = {"label": f"{protocol.id} {rec['field']} {eq.get('role') or 'extra'} span in {obj['content'].get('citation_key', obj['object_id'])}",
+                      "locator": f"{obj['object_id']} chars {eq['char_start']}-{eq['char_end']}", "quote": eq["quote"], "normalized_claim": eq["quote"][:5000],
+                      "source_id": obj["object_id"], "source_revision": obj["revision"], "char_start": eq["char_start"], "char_end": eq["char_end"], "quote_verified": True,
+                      "protocol": protocol.pin, "field": rec["field"], "generated_by": content["generated_by"], "extraction_key": key, "model": model,
+                      "item_type": "extra_quote", "attributes": {"extra_of": pid, "role": eq.get("role"), "why": eq.get("why")}}
+                if section_of(eq["char_start"]):
+                    xc["section"] = section_of(eq["char_start"])
+                made.append({**eq, "passage_id": xid, "revision": put(xid, xc)})
+            out["extra_quotes"] = made
+        stored.append(out)
     tx.audit("extract", "RECORDED", {"protocol": protocol.pin, "source": obj["object_id"], "records": len(stored)})
     return stored
 
@@ -312,12 +426,17 @@ def _commit_extraction(store: StateStore, token: Optional[str], protocol: Readin
 
 def run_protocol(store: StateStore, token: Optional[str], source_id: str, protocol_id: str, adapter: Any, *,
                  source_revision: Optional[int] = None, max_input_tokens: int = DEFAULT_MAX_INPUT_TOKENS,
-                 reuse: bool = True) -> dict[str, Any]:
-    """Extract `protocol_id` from the stored text of `source_id`; see the module docstring for what is kept."""
+                 reuse: bool = True, spans: Optional[list[tuple[int, int]]] = None, context: Optional[str] = None) -> dict[str, Any]:
+    """Extract `protocol_id` from the stored text of `source_id`; see the module docstring for what is kept.
+
+    `spans` (character ranges) replace the protocol's sections as the text to read, and `context` is a line added to what the model is told (a selective
+    follow-up: "link this claim to its evidence"). Both belong to the configuration of a model-scoped protocol's cache key."""
     protocol = get_protocol(protocol_id)
     obj, text = source_text(store, source_id, source_revision)
     text_digest = _text_digest(obj, text)
-    key = extraction_key(source_id, obj["revision"], text_digest, protocol)
+    model = adapter_identity(adapter)
+    cfg = config_digest(max_input_tokens, spans, context)
+    key = extraction_key(source_id, obj["revision"], text_digest, protocol, config=cfg, model=model)
     fingerprint = _fingerprint(key, protocol)
     wf = f"reading_protocol:{protocol.id}"
 
@@ -332,43 +451,67 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
                                model=row.get("model_descriptor"), artifact=row["artifact_sha256"], source_id=source_id,
                                source_revision=obj["revision"], text_digest=text_digest, reused_from=row["run_id"],
                                protocol=protocol)
-            return {**cached, "reused": True, "run_id": run_id, "reused_from_run_id": row["run_id"]}
+            cached_model = row.get("model_descriptor") or {}
+            matches = protocol.model_scoped or model_digest(cached_model) == model_digest(model)
+            return {**cached, "reused": True, "run_id": run_id, "reused_from_run_id": row["run_id"],
+                    "reuse": {"model_matches": matches, "cached_model": cached_model.get("model_id"), "requested_model": model.get("model_id")}}
         imported = _cached_from_passages(store, key, protocol, obj)
         if imported is not None:  # the extraction came with the source (a library import): no model call, same result
             run_id = _register(store, fingerprint=fingerprint, execution=ExecutionStatus.SUCCEEDED, context=ContextStatus.COMPLETE,
                                assessment=AssessmentStatus.PROVISIONAL, legacy_status="SUCCESS", reason="reused_imported_passages",
                                usage={"llm_calls": 0, "usage_source": "not_available"}, model=imported.get("model"), artifact=None,
                                source_id=source_id, source_revision=obj["revision"], text_digest=text_digest, protocol=protocol)
-            return {**imported, "reused": True, "run_id": run_id, "reused_from": "imported_passages"}
+            return {**imported, "reused": True, "run_id": run_id, "reused_from": "imported_passages",
+                    "reuse": {"model_matches": True if protocol.model_scoped else None, "cached_model": (imported.get("model") or {}).get("model_id"), "requested_model": model.get("model_id")}}
 
     sections_all = source_sections(store, obj, text)
     typed = [Section(**s) for s in sections_all]
     picked: dict[int, Section] = {}
-    for dim in protocol.dimensions:
-        for sec in sections_for_dimension(typed, dim):
-            picked[sec.char_start] = sec
-    if protocol.include_unlabeled:   # a heading that matched no label may still hold what the protocol asks for: it is read, and the run says so
+    if spans is not None:
+        pass                                  # the caller named the text to read
+    elif protocol.all_sections:
         for sec in typed:
-            if sec.label == "other" and sec.heading:
+            if sec.label not in protocol.exclude_labels:
                 picked[sec.char_start] = sec
+    else:
+        for dim in protocol.dimensions:
+            for sec in sections_for_dimension(typed, dim):
+                picked[sec.char_start] = sec
+        if protocol.include_unlabeled:   # a heading that matched no label may still hold what the protocol asks for: it is read, and the run says so
+            for sec in typed:
+                if sec.label == "other" and sec.heading:
+                    picked[sec.char_start] = sec
     chosen = [picked[k] for k in sorted(picked)]
-    fallback = not chosen
-    spans = [(s.char_start, s.char_end) for s in chosen] or [(0, len(text))]
-    section_note = ", ".join(s.heading or s.label for s in chosen) if chosen else "whole text (no section matched)"
+    fallback = not chosen and spans is None
+    read_spans = list(spans) if spans is not None else ([(s.char_start, s.char_end) for s in chosen] or [(0, len(text))])
+    if spans is not None:
+        section_note = f"{len(read_spans)} selected span(s) of the text"
+    else:
+        section_note = ", ".join(s.heading or s.label for s in chosen) if chosen else "whole text (no section matched)"
     system = build_system_prompt(protocol)
     budget = max_input_tokens - estimate_tokens(system)[0] - 400
     if budget < MIN_TEXT_BUDGET:
         raise KnowledgeError("BUDGET_TOO_SMALL", f"max_input_tokens={max_input_tokens} leaves no room for text")
-    ranges = chunk_ranges(spans, text, budget)
-    model = adapter_identity(adapter)
+    ranges = chunk_ranges(read_spans, text, budget)
+    groups: list[list[tuple[int, int]]] = [[r] for r in ranges]
+    if spans is not None:                    # separate spans named by the caller are read together in one call as far as the budget allows, not one call each
+        groups, current = [], []
+        for r in ranges:
+            if current and estimate_tokens("\n\n[...]\n\n".join(text[lo:hi] for lo, hi in [*current, r]))[0] > budget:
+                groups.append(current)
+                current = []
+            current.append(r)
+        if current:
+            groups.append(current)
 
     accepted_all: list[dict[str, Any]] = []
     rejected_all: list[dict[str, Any]] = []
     gaps: list[str] = []
     usage = {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0, "usage_source": "scripted_or_provider"}
     failure: Optional[tuple[str, str]] = None
-    for i, (lo, hi) in enumerate(ranges, 1):
-        prompt = build_user_prompt(obj, section_note, text[lo:hi], i, len(ranges))
+    for i, group in enumerate(groups, 1):
+        shown = "\n\n[...]\n\n".join(text[lo:hi] for lo, hi in group)
+        prompt = build_user_prompt(obj, section_note, shown, i, len(groups), context)
         try:
             raw, u = adapter.generate(system, prompt, expected_schema=protocol.output_schema(), temperature=0.0)
         except ModelRefusal as exc:
@@ -384,7 +527,7 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
         usage["input_tokens"] += getattr(u, "input_tokens", 0) or 0
         usage["output_tokens"] += getattr(u, "output_tokens", 0) or 0
         usage["usage_source"] = getattr(u, "usage_source", usage["usage_source"])
-        accepted, rejected, part_gaps, error = validate_extraction(protocol, raw, text[lo:hi], lo, text)
+        accepted, rejected, part_gaps, error = validate_extraction(protocol, raw, shown, group[0][0], text, pieces=[(text[lo:hi], lo) for lo, hi in group])
         if error:
             failure = ("invalid_output", error)
             break
@@ -413,19 +556,23 @@ def run_protocol(store: StateStore, token: Optional[str], source_id: str, protoc
             continue
         kept_per_field[rec["field"]] = kept_per_field.get(rec["field"], 0) + 1
         uniq[key_] = rec
-    context = ContextStatus.PARTIAL if fallback else ContextStatus.COMPLETE
+    saturated = sorted(f for f, n in kept_per_field.items() if (protocol.field(f) or {}).get("max_records") == n)   # a field at its cap may have been cut short by the instruction
+    chars_read = sum(hi - lo for lo, hi in ranges)
+    not_read = [] if (spans is not None or fallback) else [s.heading or s.label for s in typed if s not in chosen]
+    context_status = ContextStatus.PARTIAL if fallback else ContextStatus.COMPLETE
     common = dict(fingerprint=fingerprint, usage=usage, model=model, source_id=source_id, source_revision=obj["revision"],
                   text_digest=text_digest, protocol=protocol)
 
     def finish(stored: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
-        assessment = apply_caps(AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, context=context,
+        assessment = apply_caps(AssessmentStatus.PROVISIONAL if stored else AssessmentStatus.NOT_ASSESSED, context=context_status,
                                 generated_by=f"model:{model.get('model_id')}")
         result = {"protocol": protocol.pin, "protocol_digest": protocol.digest, "source_id": source_id,
                   "source_revision": obj["revision"], "extraction_key": key, "status": "EXTRACTED" if stored else "NO_RECORDS",
-                  "records": stored, "rejected": rejected_all, "gaps": sorted(set(gaps)), "chunks": len(ranges),
+                  "records": stored, "rejected": rejected_all, "gaps": sorted(set(gaps)), "chunks": len(groups),
                   "sections_read": [s.heading or s.label for s in chosen], "section_fallback": fallback,
-                  "context_status": context.value, "assessment": assessment.value, "model": model}
-        return result, _run_row(execution=ExecutionStatus.SUCCEEDED, context=context, assessment=assessment, legacy_status="SUCCESS",
+                  "sections_not_read": not_read, "chars_read": chars_read, "chars_total": len(text), "ranges_read": [[lo, hi] for lo, hi in ranges], "cap_saturated": saturated,
+                  "context_status": context_status.value, "assessment": assessment.value, "model": model}
+        return result, _run_row(execution=ExecutionStatus.SUCCEEDED, context=context_status, assessment=assessment, legacy_status="SUCCESS",
                                 reason=None, artifact=None, **common)
 
     failed = _run_row(execution=ExecutionStatus.FAILED, context=ContextStatus.PARTIAL, assessment=AssessmentStatus.NOT_ASSESSED,
@@ -444,14 +591,27 @@ def _cached_from_passages(store: StateStore, key: str, protocol: ReadingProtocol
     if not passages:
         return None
     records = []
+    extras: dict[str, list[dict[str, Any]]] = {}
     for p in passages:
         c = p["content"]
+        if c.get("item_type") == "extra_quote":
+            extras.setdefault((c.get("attributes") or {}).get("extra_of"), []).append(
+                {"quote": c["quote"], "char_start": c["char_start"], "char_end": c["char_end"], "role": (c.get("attributes") or {}).get("role"),
+                 "why": (c.get("attributes") or {}).get("why"), "passage_id": p["object_id"], "revision": p["revision"]})
+    for p in passages:
+        c = p["content"]
+        if c.get("item_type") == "extra_quote":
+            continue
         rec = {"passage_id": p["object_id"], "revision": p["revision"], "field": c["field"], "value": c["value"], "quote": c["quote"],
                "char_start": c["char_start"], "char_end": c["char_end"]}
         if c.get("item_label"):
             rec["label"] = c["item_label"]
         if c.get("item_type"):
             rec["type"] = c["item_type"]
+        if c.get("attributes"):
+            rec["attributes"] = c["attributes"]
+        if extras.get(p["object_id"]):
+            rec["extra_quotes"] = sorted(extras[p["object_id"]], key=lambda e: e["char_start"])
         records.append(rec)
     records.sort(key=lambda r: (r["char_start"], r["field"]))
     return {"protocol": protocol.pin, "protocol_digest": protocol.digest, "source_id": obj["object_id"], "source_revision": obj["revision"],
@@ -475,11 +635,16 @@ def _load_cached(store: StateStore, row: Optional[dict[str, Any]]) -> Optional[d
     return result
 
 
-def extraction_status(store: StateStore, source_id: str, protocol_id: str) -> dict[str, Any]:
-    """Is there a verified extraction of this protocol for the current revision of the Source?"""
+def extraction_status(store: StateStore, source_id: str, protocol_id: str, *, adapter: Any = None, max_input_tokens: int = DEFAULT_MAX_INPUT_TOKENS,
+                      spans: Optional[list[tuple[int, int]]] = None, context: Optional[str] = None, source_revision: Optional[int] = None) -> dict[str, Any]:
+    """Is there a verified extraction of this protocol for the current revision of the Source? A model-scoped protocol also needs the adapter and the
+    configuration the run would use: an extraction by another model, or with other settings, is not this one."""
     protocol = get_protocol(protocol_id)
-    obj, text = source_text(store, source_id)
-    key = extraction_key(source_id, obj["revision"], _text_digest(obj, text), protocol)
+    obj, text = source_text(store, source_id, source_revision)
+    if protocol.model_scoped and adapter is None:
+        raise KnowledgeError("EXTRACTION_KEY_NEEDS_MODEL", f"{protocol.pin} is model-scoped: say which adapter the status is asked for")
+    key = extraction_key(source_id, obj["revision"], _text_digest(obj, text), protocol,
+                         config=config_digest(max_input_tokens, spans, context), model=adapter_identity(adapter) if adapter is not None else None)
     with store.read() as conn:
         row = workflow_runs.latest_reusable(conn, f"reading_protocol:{protocol.id}", _fingerprint(key, protocol), ["SUCCESS"])
     return {"protocol": protocol.pin, "extraction_key": key, "cached": _load_cached(store, row) is not None,
@@ -505,6 +670,8 @@ def reconsider(store: StateStore, token: Optional[str], source_id: str, protocol
     (`reason: reconsidered`, zero model calls) and is what later reuse finds. Nothing is invented: every record is one the model produced.
     """
     protocol = get_protocol(protocol_id)
+    if protocol.model_scoped:
+        raise KnowledgeError("RECONSIDER_NOT_FOR_MODEL_SCOPED", f"{protocol.pin} is model-scoped: re-run it (the result is cached per model and configuration)")
     obj, text = source_text(store, source_id)
     text_digest = _text_digest(obj, text)
     key = extraction_key(source_id, obj["revision"], text_digest, protocol)

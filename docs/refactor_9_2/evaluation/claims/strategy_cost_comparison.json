@@ -1,0 +1,765 @@
+{
+  "answers_come_from": "a fixed rule-based stand-in, not a model",
+  "conditions": {
+    "A_independent_protocols": {
+      "claims_by_attribution": {},
+      "claims_by_role": {},
+      "claims_flagged_for_followup": {},
+      "per_paper": {
+        "cr": {
+          "by_protocol": {
+            "RP_CONTRIBUTION": {
+              "calls": 1,
+              "chars_read": 774,
+              "records": 0
+            },
+            "RP_INTRO_ARGUMENT": {
+              "calls": 1,
+              "chars_read": 774,
+              "records": 4
+            },
+            "RP_LANDSCAPE": {
+              "calls": 1,
+              "chars_read": 1474,
+              "records": 9
+            },
+            "RP_METHOD": {
+              "calls": 1,
+              "chars_read": 623,
+              "records": 0
+            },
+            "RP_THEORY": {
+              "calls": 1,
+              "chars_read": 1338,
+              "records": 2
+            }
+          },
+          "chars_read_at_least_once": 1474,
+          "chars_read_summed_over_runs": 4983,
+          "chars_total": 1592,
+          "chunks": 5,
+          "fields_at_cap": [],
+          "input_tokens": 5099,
+          "label": "cr",
+          "model_calls": 5,
+          "output_tokens": 1002,
+          "records": {
+            "RP_INTRO_ARGUMENT.established_knowledge": 2,
+            "RP_INTRO_ARGUMENT.unresolved_tension": 2,
+            "RP_LANDSCAPE.boundary_condition": 3,
+            "RP_LANDSCAPE.finding": 1,
+            "RP_LANDSCAPE.identifying_assumption": 1,
+            "RP_LANDSCAPE.open_question": 1,
+            "RP_LANDSCAPE.stated_limitation": 1,
+            "RP_LANDSCAPE.theoretical_claim": 2,
+            "RP_THEORY.construct_definition": 1,
+            "RP_THEORY.stated_assumption": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 3.38,
+          "reused_runs": 0,
+          "runs": 5,
+          "sections_never_read": [
+            "preamble",
+            "References"
+          ],
+          "share_of_text_never_read": 0.0741,
+          "usage_source": "scripted"
+        },
+        "edu": {
+          "by_protocol": {
+            "RP_CONTRIBUTION": {
+              "calls": 1,
+              "chars_read": 137,
+              "records": 0
+            },
+            "RP_INTRO_ARGUMENT": {
+              "calls": 1,
+              "chars_read": 137,
+              "records": 0
+            },
+            "RP_LANDSCAPE": {
+              "calls": 1,
+              "chars_read": 518,
+              "records": 4
+            },
+            "RP_METHOD": {
+              "calls": 1,
+              "chars_read": 103,
+              "records": 1
+            },
+            "RP_THEORY": {
+              "calls": 1,
+              "chars_read": 77,
+              "records": 0
+            }
+          },
+          "chars_read_at_least_once": 518,
+          "chars_read_summed_over_runs": 972,
+          "chars_total": 630,
+          "chunks": 5,
+          "fields_at_cap": [],
+          "input_tokens": 4379,
+          "label": "edu",
+          "model_calls": 5,
+          "output_tokens": 302,
+          "records": {
+            "RP_LANDSCAPE.design": 1,
+            "RP_LANDSCAPE.finding": 1,
+            "RP_LANDSCAPE.interpretive_finding": 1,
+            "RP_LANDSCAPE.stated_limitation": 1,
+            "RP_METHOD.sample_selection": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.88,
+          "reused_runs": 0,
+          "runs": 5,
+          "sections_never_read": [
+            "preamble",
+            "References"
+          ],
+          "share_of_text_never_read": 0.1778,
+          "usage_source": "scripted"
+        },
+        "fraud": {
+          "by_protocol": {
+            "RP_CONTRIBUTION": {
+              "calls": 1,
+              "chars_read": 129,
+              "records": 0
+            },
+            "RP_INTRO_ARGUMENT": {
+              "calls": 1,
+              "chars_read": 129,
+              "records": 0
+            },
+            "RP_LANDSCAPE": {
+              "calls": 1,
+              "chars_read": 516,
+              "records": 4
+            },
+            "RP_METHOD": {
+              "calls": 1,
+              "chars_read": 193,
+              "records": 2
+            },
+            "RP_THEORY": {
+              "calls": 1,
+              "chars_read": 78,
+              "records": 0
+            }
+          },
+          "chars_read_at_least_once": 516,
+          "chars_read_summed_over_runs": 1045,
+          "chars_total": 634,
+          "chunks": 5,
+          "fields_at_cap": [],
+          "input_tokens": 4419,
+          "label": "fraud",
+          "model_calls": 5,
+          "output_tokens": 407,
+          "records": {
+            "RP_LANDSCAPE.design": 2,
+            "RP_LANDSCAPE.finding": 1,
+            "RP_LANDSCAPE.stated_limitation": 1,
+            "RP_METHOD.sample_selection": 2
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 2.03,
+          "reused_runs": 0,
+          "runs": 5,
+          "sections_never_read": [
+            "preamble",
+            "References"
+          ],
+          "share_of_text_never_read": 0.1861,
+          "usage_source": "scripted"
+        },
+        "long": {
+          "by_protocol": {
+            "RP_CONTRIBUTION": {
+              "calls": 1,
+              "chars_read": 3240,
+              "records": 0
+            },
+            "RP_INTRO_ARGUMENT": {
+              "calls": 1,
+              "chars_read": 3240,
+              "records": 2
+            },
+            "RP_LANDSCAPE": {
+              "calls": 1,
+              "chars_read": 19080,
+              "records": 14
+            },
+            "RP_METHOD": {
+              "calls": 1,
+              "chars_read": 3174,
+              "records": 3
+            },
+            "RP_THEORY": {
+              "calls": 1,
+              "chars_read": 3182,
+              "records": 2
+            }
+          },
+          "chars_read_at_least_once": 19080,
+          "chars_read_summed_over_runs": 31916,
+          "chars_total": 19187,
+          "chunks": 5,
+          "fields_at_cap": [
+            "RP_LANDSCAPE.finding",
+            "RP_LANDSCAPE.identifying_assumption",
+            "RP_METHOD.sample_selection"
+          ],
+          "input_tokens": 11733,
+          "label": "long",
+          "model_calls": 5,
+          "output_tokens": 15405,
+          "records": {
+            "RP_INTRO_ARGUMENT.established_knowledge": 2,
+            "RP_LANDSCAPE.finding": 8,
+            "RP_LANDSCAPE.identifying_assumption": 4,
+            "RP_LANDSCAPE.stated_limitation": 1,
+            "RP_LANDSCAPE.theoretical_claim": 1,
+            "RP_METHOD.sample_selection": 3,
+            "RP_THEORY.construct_definition": 1,
+            "RP_THEORY.stated_assumption": 1
+          },
+          "records_set_aside_for_caps": 184,
+          "rejected": {
+            "over_cap": 184
+          },
+          "reread_factor": 1.67,
+          "reused_runs": 0,
+          "runs": 5,
+          "sections_never_read": [
+            "preamble",
+            "References"
+          ],
+          "share_of_text_never_read": 0.0056,
+          "usage_source": "scripted"
+        }
+      },
+      "second_identical_pass": {
+        "model_calls_added": 0,
+        "runs_served_from_cache": 20,
+        "tokens_added": 0
+      },
+      "totals": {
+        "chars_read_at_least_once": 21588,
+        "chars_read_summed_over_runs": 38916,
+        "chunks": 20,
+        "input_tokens": 25630,
+        "model_calls": 20,
+        "output_tokens": 17116,
+        "records_set_aside_for_caps": 184,
+        "reread_factor": 1.8,
+        "total_tokens": 42746
+      },
+      "views_derivable_without_a_call": {}
+    },
+    "B_single_pass_inventory": {
+      "claims_by_attribution": {
+        "AUTHOR_OWN_CLAIM": 196,
+        "AUTHOR_REPORTS_PRIOR_WORK": 2
+      },
+      "claims_by_role": {
+        "ASSUMPTION": 7,
+        "BOUNDARY_CONDITION": 3,
+        "CLAIMED_CONTRIBUTION": 1,
+        "DEFINITION": 7,
+        "EMPIRICAL_FINDING": 168,
+        "GAP_STATEMENT": 1,
+        "INTERPRETIVE_FINDING": 1,
+        "LIMITATION": 4,
+        "METHODOLOGICAL_CLAIM": 3,
+        "THEORETICAL_PROPOSITION": 3
+      },
+      "claims_flagged_for_followup": {
+        "cr": 2,
+        "edu": 2,
+        "fraud": 1,
+        "long": 165
+      },
+      "per_paper": {
+        "cr": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 1,
+              "chars_read": 1508,
+              "records": 11
+            }
+          },
+          "chars_read_at_least_once": 1508,
+          "chars_read_summed_over_runs": 1508,
+          "chars_total": 1592,
+          "chunks": 1,
+          "fields_at_cap": [],
+          "input_tokens": 2484,
+          "label": "cr",
+          "model_calls": 1,
+          "output_tokens": 803,
+          "records": {
+            "RP_CLAIMS.assumption": 1,
+            "RP_CLAIMS.boundary_condition": 3,
+            "RP_CLAIMS.claimed_contribution": 1,
+            "RP_CLAIMS.definition": 1,
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.gap_statement": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.theoretical_proposition": 2
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 1,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.0528,
+          "usage_source": "scripted"
+        },
+        "edu": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 1,
+              "chars_read": 546,
+              "records": 4
+            }
+          },
+          "chars_read_at_least_once": 546,
+          "chars_read_summed_over_runs": 546,
+          "chars_total": 630,
+          "chunks": 1,
+          "fields_at_cap": [],
+          "input_tokens": 2316,
+          "label": "edu",
+          "model_calls": 1,
+          "output_tokens": 246,
+          "records": {
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.interpretive_finding": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.methodological_claim": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 1,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.1333,
+          "usage_source": "scripted"
+        },
+        "fraud": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 1,
+              "chars_read": 550,
+              "records": 4
+            }
+          },
+          "chars_read_at_least_once": 550,
+          "chars_read_summed_over_runs": 550,
+          "chars_total": 634,
+          "chunks": 1,
+          "fields_at_cap": [],
+          "input_tokens": 2337,
+          "label": "fraud",
+          "model_calls": 1,
+          "output_tokens": 283,
+          "records": {
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.methodological_claim": 2
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 1,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.1325,
+          "usage_source": "scripted"
+        },
+        "long": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 1,
+              "chars_read": 19103,
+              "records": 179
+            }
+          },
+          "chars_read_at_least_once": 19103,
+          "chars_read_summed_over_runs": 19103,
+          "chars_total": 19187,
+          "chunks": 1,
+          "fields_at_cap": [],
+          "input_tokens": 6739,
+          "label": "long",
+          "model_calls": 1,
+          "output_tokens": 15645,
+          "records": {
+            "RP_CLAIMS.assumption": 6,
+            "RP_CLAIMS.definition": 6,
+            "RP_CLAIMS.empirical_finding": 165,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.theoretical_proposition": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 1,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.0044,
+          "usage_source": "scripted"
+        }
+      },
+      "second_identical_pass": {
+        "model_calls_added": 0,
+        "runs_served_from_cache": 4,
+        "tokens_added": 0
+      },
+      "totals": {
+        "chars_read_at_least_once": 21707,
+        "chars_read_summed_over_runs": 21707,
+        "chunks": 4,
+        "input_tokens": 13876,
+        "model_calls": 4,
+        "output_tokens": 16977,
+        "records_set_aside_for_caps": 0,
+        "reread_factor": 1.0,
+        "total_tokens": 30853
+      },
+      "views_derivable_without_a_call": {
+        "RP_CONTRIBUTION": {
+          "fields_not_derivable": [
+            "design",
+            "research_question"
+          ],
+          "fields_partial": [
+            "mechanism",
+            "setting"
+          ],
+          "records": 1
+        },
+        "RP_INTRO_ARGUMENT": {
+          "fields_not_derivable": [
+            "evidence_needed",
+            "phenomenon"
+          ],
+          "fields_partial": [],
+          "records": 4
+        },
+        "RP_LANDSCAPE": {
+          "fields_not_derivable": [],
+          "fields_partial": [
+            "design",
+            "identifying_assumption",
+            "measurement"
+          ],
+          "records": 185
+        },
+        "RP_METHOD": {
+          "fields_not_derivable": [],
+          "fields_partial": [
+            "interpretation_rule",
+            "label_construction",
+            "limitation_handling",
+            "model_or_estimator",
+            "sample_selection",
+            "study_design",
+            "validation_or_tests",
+            "variable_measurement"
+          ],
+          "records": 3
+        },
+        "RP_THEORY": {
+          "fields_not_derivable": [
+            "assumption_tested",
+            "theory_invoked"
+          ],
+          "fields_partial": [
+            "assumed_mechanism"
+          ],
+          "records": 14
+        }
+      }
+    },
+    "C_section_aware_with_followup": {
+      "claims_by_attribution": {
+        "AUTHOR_OWN_CLAIM": 196,
+        "AUTHOR_REPORTS_PRIOR_WORK": 2
+      },
+      "claims_by_role": {
+        "ASSUMPTION": 7,
+        "BOUNDARY_CONDITION": 3,
+        "CLAIMED_CONTRIBUTION": 1,
+        "DEFINITION": 7,
+        "EMPIRICAL_FINDING": 168,
+        "GAP_STATEMENT": 1,
+        "INTERPRETIVE_FINDING": 1,
+        "LIMITATION": 4,
+        "METHODOLOGICAL_CLAIM": 3,
+        "THEORETICAL_PROPOSITION": 3
+      },
+      "claims_flagged_for_followup": {
+        "cr": 2,
+        "edu": 2,
+        "fraud": 1,
+        "long": 165
+      },
+      "per_paper": {
+        "cr": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 2,
+              "chars_read": 1508,
+              "records": 11
+            },
+            "RP_CLAIM_EVIDENCE": {
+              "calls": 1,
+              "chars_read": 1244,
+              "records": 0
+            }
+          },
+          "chars_read_at_least_once": 1508,
+          "chars_read_summed_over_runs": 2752,
+          "chars_total": 1592,
+          "chunks": 3,
+          "fields_at_cap": [],
+          "input_tokens": 5892,
+          "label": "cr",
+          "model_calls": 3,
+          "output_tokens": 823,
+          "records": {
+            "RP_CLAIMS.assumption": 1,
+            "RP_CLAIMS.boundary_condition": 3,
+            "RP_CLAIMS.claimed_contribution": 1,
+            "RP_CLAIMS.definition": 1,
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.gap_statement": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.theoretical_proposition": 2
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.82,
+          "reused_runs": 0,
+          "runs": 3,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.0528,
+          "usage_source": "scripted"
+        },
+        "edu": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 4,
+              "chars_read": 546,
+              "records": 4
+            }
+          },
+          "chars_read_at_least_once": 546,
+          "chars_read_summed_over_runs": 546,
+          "chars_total": 630,
+          "chunks": 4,
+          "fields_at_cap": [],
+          "input_tokens": 8983,
+          "label": "edu",
+          "model_calls": 4,
+          "output_tokens": 275,
+          "records": {
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.interpretive_finding": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.methodological_claim": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 4,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.1333,
+          "usage_source": "scripted"
+        },
+        "fraud": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 4,
+              "chars_read": 550,
+              "records": 4
+            }
+          },
+          "chars_read_at_least_once": 550,
+          "chars_read_summed_over_runs": 550,
+          "chars_total": 634,
+          "chunks": 4,
+          "fields_at_cap": [],
+          "input_tokens": 9006,
+          "label": "fraud",
+          "model_calls": 4,
+          "output_tokens": 312,
+          "records": {
+            "RP_CLAIMS.empirical_finding": 1,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.methodological_claim": 2
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 4,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.1325,
+          "usage_source": "scripted"
+        },
+        "long": {
+          "by_protocol": {
+            "RP_CLAIMS": {
+              "calls": 3,
+              "chars_read": 19103,
+              "records": 179
+            }
+          },
+          "chars_read_at_least_once": 19103,
+          "chars_read_summed_over_runs": 19103,
+          "chars_total": 19187,
+          "chunks": 3,
+          "fields_at_cap": [],
+          "input_tokens": 11152,
+          "label": "long",
+          "model_calls": 3,
+          "output_tokens": 15663,
+          "records": {
+            "RP_CLAIMS.assumption": 6,
+            "RP_CLAIMS.definition": 6,
+            "RP_CLAIMS.empirical_finding": 165,
+            "RP_CLAIMS.limitation": 1,
+            "RP_CLAIMS.theoretical_proposition": 1
+          },
+          "records_set_aside_for_caps": 0,
+          "rejected": {},
+          "reread_factor": 1.0,
+          "reused_runs": 0,
+          "runs": 3,
+          "sections_never_read": [
+            "References"
+          ],
+          "share_of_text_never_read": 0.0044,
+          "usage_source": "scripted"
+        }
+      },
+      "second_identical_pass": {
+        "model_calls_added": 0,
+        "runs_served_from_cache": 14,
+        "tokens_added": 0
+      },
+      "totals": {
+        "chars_read_at_least_once": 21707,
+        "chars_read_summed_over_runs": 22951,
+        "chunks": 14,
+        "input_tokens": 35033,
+        "model_calls": 14,
+        "output_tokens": 17073,
+        "records_set_aside_for_caps": 0,
+        "reread_factor": 1.06,
+        "total_tokens": 52106
+      },
+      "views_derivable_without_a_call": {
+        "RP_CONTRIBUTION": {
+          "fields_not_derivable": [
+            "design",
+            "research_question"
+          ],
+          "fields_partial": [
+            "mechanism",
+            "setting"
+          ],
+          "records": 1
+        },
+        "RP_INTRO_ARGUMENT": {
+          "fields_not_derivable": [
+            "evidence_needed",
+            "phenomenon"
+          ],
+          "fields_partial": [],
+          "records": 4
+        },
+        "RP_LANDSCAPE": {
+          "fields_not_derivable": [],
+          "fields_partial": [
+            "design",
+            "identifying_assumption",
+            "measurement"
+          ],
+          "records": 185
+        },
+        "RP_METHOD": {
+          "fields_not_derivable": [],
+          "fields_partial": [
+            "interpretation_rule",
+            "label_construction",
+            "limitation_handling",
+            "model_or_estimator",
+            "sample_selection",
+            "study_design",
+            "validation_or_tests",
+            "variable_measurement"
+          ],
+          "records": 3
+        },
+        "RP_THEORY": {
+          "fields_not_derivable": [
+            "assumption_tested",
+            "theory_invoked"
+          ],
+          "fields_partial": [
+            "assumed_mechanism"
+          ],
+          "records": 14
+        }
+      }
+    }
+  },
+  "fixed_prompt_tokens_per_call": {
+    "RP_CLAIMS": 2160,
+    "RP_CLAIM_EVIDENCE": 842,
+    "RP_CONTRIBUTION": 597,
+    "RP_INTRO_ARGUMENT": 682,
+    "RP_LANDSCAPE": 1184,
+    "RP_METHOD": 860,
+    "RP_THEORY": 669
+  },
+  "not_measured": [
+    "coverage of the claims a paper really makes",
+    "fidelity of restatements",
+    "latency"
+  ],
+  "papers": {
+    "cr": 1592,
+    "edu": 630,
+    "fraud": 634,
+    "long": 19187
+  },
+  "tokenizer": "tiktoken:cl100k_base",
+  "usage_note": "tokens are counted by the scripted adapter from the prompt and the answer with the tokenizer named here: estimates, never provider billing"
+}

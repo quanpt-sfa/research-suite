@@ -73,8 +73,10 @@ OBJECT_TYPES = (
     "RetrievalRun",
     # M5 WP6 (appended): the landscape of the literature on a problem: entries with their passages, evidence dimensions and suite inferences
     "Landscape",
+    # M5 WP6.2 (appended): the claims of a set of Source revisions, with attribution, evidence links, relations and version alignments
+    "ClaimInventory",
 )
-SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem", "RetrievalRun", "Landscape"})  # can never be created through a proposal
+SERVER_ONLY_TYPES = frozenset({"Approval", "Adjudication", "ResearchTask", "ResearchProblem", "RetrievalRun", "Landscape", "ClaimInventory"})  # can never be created through a proposal
 
 CLAIM_TIERS = (
     "descriptive", "associational", "predictive", "mechanism_consistent", "causal",

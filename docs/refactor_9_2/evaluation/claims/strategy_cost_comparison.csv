@@ -1,0 +1,16 @@
+condition,paper,chars,model_calls,input_tokens_estimated,output_tokens_estimated,chunks,reread_factor,share_never_read,sections_never_read,records_set_aside_for_caps,fields_at_cap,calls_added_by_an_identical_second_pass
+A_independent_protocols,cr,1592,5,5099,1002,5,3.38,0.0741,preamble; References,0,,0
+A_independent_protocols,edu,630,5,4379,302,5,1.88,0.1778,preamble; References,0,,0
+A_independent_protocols,fraud,634,5,4419,407,5,2.03,0.1861,preamble; References,0,,0
+A_independent_protocols,long,19187,5,11733,15405,5,1.67,0.0056,preamble; References,184,RP_LANDSCAPE.finding; RP_LANDSCAPE.identifying_assumption; RP_METHOD.sample_selection,0
+A_independent_protocols,(all),22043,20,25630,17116,20,1.8,,,184,,0
+B_single_pass_inventory,cr,1592,1,2484,803,1,1.0,0.0528,References,0,,0
+B_single_pass_inventory,edu,630,1,2316,246,1,1.0,0.1333,References,0,,0
+B_single_pass_inventory,fraud,634,1,2337,283,1,1.0,0.1325,References,0,,0
+B_single_pass_inventory,long,19187,1,6739,15645,1,1.0,0.0044,References,0,,0
+B_single_pass_inventory,(all),22043,4,13876,16977,4,1.0,,,0,,0
+C_section_aware_with_followup,cr,1592,3,5892,823,3,1.82,0.0528,References,0,,0
+C_section_aware_with_followup,edu,630,4,8983,275,4,1.0,0.1333,References,0,,0
+C_section_aware_with_followup,fraud,634,4,9006,312,4,1.0,0.1325,References,0,,0
+C_section_aware_with_followup,long,19187,3,11152,15663,3,1.0,0.0044,References,0,,0
+C_section_aware_with_followup,(all),22043,14,35033,17073,14,1.06,,,0,,0

@@ -81,6 +81,8 @@ def build_landscape_export(store: StateStore, landscape_id: str) -> Export:
             f"Built from {c['retrieval_id']} for {c['problem_id']} with {', '.join(c['protocols'])}; versions read: {c['versions_policy']}. "
             f"{k['works_read']} of {k['works_on_reading_list']} works on the reading list were read ({k['sources_read']} sources), {k['entries']} entries; "
             f"{k['possibly_relevant_not_read']} possibly relevant papers were **not read** (no full text).", "",
+            *(["**Fields at their cap** (the reading protocol limits the records per field, so these papers may hold more than were recorded; the number of entries is not the number of claims): "
+               + "; ".join(f"{sid}: {', '.join(fs)}" for sid, fs in sorted(k["fields_at_cap"].items())) + ".", ""] if k.get("fields_at_cap") else []),
             "Each entry shows the verbatim quote and where it is. A finding carries three separate dimensions — reading, inference, reproduction — and none of them says "
             "the finding is established. What the authors say is author-asserted; what the suite derives or proposes is listed apart, with its provenance and whether you confirmed it.", "")
     d_ = (inq or {}).get("discipline") or {}

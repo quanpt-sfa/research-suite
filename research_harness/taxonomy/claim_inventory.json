@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "vocabularies": {
+    "claim_attribution": ["AUTHOR_OWN_CLAIM", "AUTHOR_REPORTS_PRIOR_WORK", "AUTHOR_CRITIQUES_PRIOR_WORK", "RESEARCHER_INTERPRETATION", "MODEL_PROPOSED_INTERPRETATION"],
+    "claim_attribution_by_extraction": ["AUTHOR_OWN_CLAIM", "AUTHOR_REPORTS_PRIOR_WORK", "AUTHOR_CRITIQUES_PRIOR_WORK"],
+    "claim_role": ["EMPIRICAL_FINDING", "INTERPRETIVE_FINDING", "THEORETICAL_PROPOSITION", "METHODOLOGICAL_CLAIM", "DEFINITION", "CLAIMED_CONTRIBUTION", "ASSUMPTION", "BOUNDARY_CONDITION", "LIMITATION", "GAP_STATEMENT"],
+    "claim_granularity": ["ATOMIC", "COMPOUND"],
+    "claim_evidence_link_role": ["WORDING", "QUALIFIER", "SUPPORTING_EVIDENCE", "PREMISE", "CONTEXT", "BOUNDARY"],
+    "claim_attribute_basis": ["STATED_IN_QUOTE", "MODEL_INFERRED"],
+    "cited_work_state": ["REPORTED_BY_CITING_AUTHOR", "CITED_SOURCE_LINKED"],
+    "claim_relation_kind": ["SUPPORTS", "CHALLENGES", "QUALIFIES", "DEFINES", "ASSUMES", "DEPENDS_ON", "EXTENDS", "RECONCEPTUALIZES", "CONTRADICTS_WITHIN_SCOPE", "COMPLEMENTS", "SAME_IDEA_PROPOSED"],
+    "claim_relation_derivation": ["model_proposed", "researcher_proposed", "critic_proposed"],
+    "claim_version_change": ["UNCHANGED", "QUALIFIED", "NARROWED", "WEAKENED", "STRENGTHENED", "REVERSED", "WITHDRAWN", "NEW_IN_LATER_VERSION"],
+    "claim_review_decision": ["CONFIRMED", "CORRECTED", "REJECTED"],
+    "claim_scope_compatibility": ["COMPATIBLE", "DIFFERENT", "NOT_ASSESSED"]
+  }
+}

@@ -92,3 +92,30 @@ B1 and B2 above are still open and unchanged. No paid-model batch run was starte
 * **Redoing an upstream decide step does not reopen downstream steps automatically** (B5 item 7), still an engine change that is not part of WP6.1.
 * **`review-protocol` stores the screening log and PRISMA counts as data; there is no flow-diagram renderer** and no import from reference managers or database exports.
 * **Not started, on instruction:** WP7, WP8, WP14.
+
+## B7. WP6.2 (2026-10-23): what remains open
+
+B1 and B2 stay open and unchanged. No paid-model run was made for WP6.2; all extraction in the tests and measurements is scripted or rule-based.
+
+* **No benchmark of a real model's claim extraction exists** (`REAL_CORPUS_VALIDATION_PENDING`). Own-versus-background attribution accuracy, claim recall and the fidelity of restatements are unmeasured. They need
+  (a) full texts the project may use, (b) gold by people who did not see system output, with disagreements kept and adjudicated (the blank form is `research claims annotation-form`), (c) a bounded, approved model
+  run with a budget guard (B1), and (d) the researcher's own domain: SciArg is computer graphics, SciFact is biomedical abstracts, and neither covers conceptual papers or critical reviews.
+* **Public benchmarks not used, and why.** SciArg: the data server did not answer from here and no licence is stated (it would be the one public source of own/background labels; the researcher may be able to
+  fetch it and clear the licence). CLAIM-BENCH: no licence file, 89 published PDFs in the repository, annotations as text blobs without offsets, AI/ML papers only, evidence excluded from introductions by its guidelines.
+  The authors could be asked for a licence.
+* **SciFact measures only a lexical selector** on biomedical abstracts, where the claims were written from the abstracts' own citation contexts and so share vocabulary with them. The figures are an upper-leaning
+  indication of what BM25 does for the claim follow-up on other kinds of papers, not a measure of it.
+* **The reading-cost comparison uses a rule-based stand-in.** Calls, chunks, re-reading, unread text, caps and cache are real properties of the code; the token counts are estimates by a scripted adapter; coverage,
+  fidelity and latency of the three strategies were not measured. Candidate B saves calls and tokens here but cannot fill `theory_invoked`, `assumption_tested`, `phenomenon`, `evidence_needed`, `research_question`,
+  `design`, and fills the `RP_METHOD` fields only as unclassified candidates (`claim_views.DERIVABILITY`); whether that loss matters is for the researcher to judge.
+* **The cache key of the five older protocols still omits the model.** A reuse now reports `reuse.model_matches` and `cached_model`, so it is visible, not silent. Whether those protocols should become model-scoped
+  (which re-keys their passages and caches) is a decision for the owner.
+* **`RP_LANDSCAPE` still mixes the authors' findings with their reports of earlier work** and caps each field (8/8/8/4/4/5/3/4/3); a capped field is now reported (`cap_saturated`) but the Landscape coverage
+  does not surface it yet. A landscape built from an inventory (`claim_views.derive`) would separate attribution and need no cap; not built, because it changes WP6 behaviour and is a WP7 decision.
+* **Recognition of already-addressed tensions (task 10) stays in the Landscape's inspection records.** Claim relations carry no recognition status; `CONTRADICTS_WITHIN_SCOPE` and `SAME_IDEA_PROPOSED` say nothing about novelty.
+* **`STATED_IN_QUOTE` is a word-overlap check.** A paraphrase reads as inferred (the safe error); a combination of words the text does not state as one fact can read as stated (the unsafe one).
+* **Absence-based alignments (`WITHDRAWN`, `NEW_IN_LATER_VERSION`)** carry the other version's coverage caveat and need `missing_information`, but cannot tell a withdrawn claim from one the second extraction missed.
+* **No path publishes an inventory into the knowledge library** (ids, pins). The edges a closure would walk exist.
+* **GROBID: no adapter, no comparison with `pypdf`.** Docker is not available here. The test to run: structure (sections, references, tables, offsets) on PDFs with known structure from the researcher's fields.
+* **ECA sampling workload grows** with every claim of every inventory (as with Landscape entries, B4); ECA still adjudicates a claim against its wording only (`basis_passage` takes the first passage), not against each evidence link.
+* **Not started, on instruction:** WP7, WP8, WP14.

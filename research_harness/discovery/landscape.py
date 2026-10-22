@@ -353,6 +353,8 @@ def build(store: StateStore, token: Optional[str], retrieval_id: str, adapter: A
                                                      "text_sha256": (store.get_object(item["source_id"])["content"].get("text_sha256"))})
         s["protocols"].append(res["protocol"])
         s["extraction_runs"].append(res["run_id"])
+        s.setdefault("fields_at_cap", [])
+        s["fields_at_cap"] += [f"{res['protocol']}.{f}" for f in res.get("cap_saturated") or []]    # a field that reached its cap may have been cut short: eight records is not eight findings
         s["reused"] += 1 if res.get("reused") else 0
         s["rejected_records"] += len(res.get("rejected") or [])
     sources_read = sorted(by_source.values(), key=lambda s: s["source_id"])
@@ -382,7 +384,8 @@ def build(store: StateStore, token: Optional[str], retrieval_id: str, adapter: A
     coverage = {"works_on_reading_list": len(view["reading_list"]), "works_read": len(works_info), "sources_read": len(sources_read), "entries": len(elements),
                 "entries_by_type": counts, "inferences": {k: sum(1 for i in inferences if i["kind"] == k) for k in INFERENCE_KINDS[:3]},
                 "findings_without_a_relationship_label": unlabelled_cmp, "records_rejected_in_extraction": sum(s["rejected_records"] for s in sources_read),
-                "model_calls_reused": sum(s["reused"] for s in sources_read), "not_read": plan["skipped"], "possibly_relevant_not_read": len(view["not_read_candidates"]),
+                "model_calls_reused": sum(s["reused"] for s in sources_read), "not_read": plan["skipped"],
+                "fields_at_cap": {s["source_id"]: sorted(set(s.get("fields_at_cap") or [])) for s in sources_read if s.get("fields_at_cap")}, "possibly_relevant_not_read": len(view["not_read_candidates"]),
                 "works_with_a_later_version_not_read": sorted(w for w, i in works_info.items() if i["later_version_not_read"] is True),
                 "works_where_the_latest_version_cannot_be_told": sorted(w for w, i in works_info.items() if i["later_version_not_read"] == "UNKNOWN")}
     limits = ["a landscape lists what the papers on the reading list state; a topic or a competitor that was not retrieved is not shown to be absent (see the retrieval's coverage)",

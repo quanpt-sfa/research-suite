@@ -1,0 +1,112 @@
+{
+  "abstract_level": {
+    "abstracts_ranked": 5183,
+    "at_k": {
+      "1": {
+        "any_cited_abstract_in_top_k": 0.7128,
+        "chance_any_cited_abstract_in_top_k": 0.0002,
+        "cited_abstract_recall": 0.6964
+      },
+      "10": {
+        "any_cited_abstract_in_top_k": 0.9415,
+        "chance_any_cited_abstract_in_top_k": 0.0021,
+        "cited_abstract_recall": 0.9282
+      },
+      "5": {
+        "any_cited_abstract_in_top_k": 0.883,
+        "chance_any_cited_abstract_in_top_k": 0.0011,
+        "cited_abstract_recall": 0.8692
+      },
+      "50": {
+        "any_cited_abstract_in_top_k": 0.9681,
+        "chance_any_cited_abstract_in_top_k": 0.0107,
+        "cited_abstract_recall": 0.9556
+      }
+    },
+    "claims_with_evidence": 188
+  },
+  "archive": {
+    "bytes": 3115079,
+    "repository": "https://github.com/allenai/scifact",
+    "sha256": "11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be",
+    "sha256_of_file_used": "11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be",
+    "url": "https://scifact.s3-us-west-2.amazonaws.com/release/latest/data.tar.gz"
+  },
+  "benchmark": "SciFact",
+  "claims_in_split": 300,
+  "corpus_abstracts": 5183,
+  "domain": "biomedical abstracts",
+  "licence": {
+    "abstracts": "ODC-By 1.0 (S2ORC)",
+    "claims_and_annotations": "CC BY 4.0",
+    "code": "Apache-2.0",
+    "redistribution": "the data are not committed to this repository",
+    "source": "allenai/scifact LICENSE.md"
+  },
+  "reading": "figures are fractions of claims (or claim-abstract pairs); the chance column is what a random ranking gives; ties are broken by position so the result is reproducible and not in the selector's favour",
+  "sentence_level_corpus_statistics": {
+    "at_k": {
+      "1": {
+        "any_rationale_in_top_k": 0.5215,
+        "chance_any_rationale_in_top_k": 0.2008,
+        "rationale_sentence_recall": 0.3833
+      },
+      "2": {
+        "any_rationale_in_top_k": 0.6986,
+        "chance_any_rationale_in_top_k": 0.3714,
+        "rationale_sentence_recall": 0.539
+      },
+      "3": {
+        "any_rationale_in_top_k": 0.8182,
+        "chance_any_rationale_in_top_k": 0.5167,
+        "rationale_sentence_recall": 0.6636
+      },
+      "5": {
+        "any_rationale_in_top_k": 0.9043,
+        "chance_any_rationale_in_top_k": 0.7378,
+        "rationale_sentence_recall": 0.7873
+      }
+    },
+    "claim_abstract_pairs": 209,
+    "claims_with_evidence": 188,
+    "idf": "corpus",
+    "mean_sentences_per_abstract": 9.72,
+    "rationale_sentences": 366
+  },
+  "sentence_level_within_document_statistics": {
+    "at_k": {
+      "1": {
+        "any_rationale_in_top_k": 0.4928,
+        "chance_any_rationale_in_top_k": 0.2008,
+        "rationale_sentence_recall": 0.3506
+      },
+      "2": {
+        "any_rationale_in_top_k": 0.7464,
+        "chance_any_rationale_in_top_k": 0.3714,
+        "rationale_sentence_recall": 0.5749
+      },
+      "3": {
+        "any_rationale_in_top_k": 0.8325,
+        "chance_any_rationale_in_top_k": 0.5167,
+        "rationale_sentence_recall": 0.6791
+      },
+      "5": {
+        "any_rationale_in_top_k": 0.9139,
+        "chance_any_rationale_in_top_k": 0.7378,
+        "rationale_sentence_recall": 0.8041
+      }
+    },
+    "claim_abstract_pairs": 209,
+    "claims_with_evidence": 188,
+    "idf": "within_document",
+    "mean_sentences_per_abstract": 9.72,
+    "rationale_sentences": 366
+  },
+  "split": "dev",
+  "task_ids": [
+    4,
+    5
+  ],
+  "what_is_measured": "a BM25 selector's ranking of evidence sentences and abstracts for a claim (no model)",
+  "what_is_not": "claim extraction, attribution, conceptual or critical-review papers, SUPPORT/CONTRADICT verification"
+}
